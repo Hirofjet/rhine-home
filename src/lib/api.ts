@@ -4,11 +4,15 @@
    · 前端默认请求同源的 /api/messages；如需跨域，在 .env 里配置
      VITE_API_BASE=http://localhost:3001
    · 后端未就绪时自动回退到浏览器 localStorage，页面照常可用
+   · 留言 id 为自增序号（第一条 = 1，第二条 = 2 …）：
+     - 后端：MySQL 的 AUTO_INCREMENT 直接提供序号
+     - 本地回退：取现有最大 id + 1，保证同内容/同名字的留言不会互相覆盖
    · MySQL 表结构与后端示例见 server/README.md 与 server/index.mjs
    ============================================================ */
 
 export interface GuestMessage {
-  id: string
+  /** 自增序号（唯一 id） */
+  id: number
   name: string
   content: string
   createdAt: string
@@ -18,15 +22,39 @@ const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 const LOCAL_KEY = 'rhine:guestbook'
 const MAX_LOCAL = 200
 
+/** 读取本地留言（兼容旧数据，统一把 id 规整为数字） */
 function readLocal(): GuestMessage[] {
   try {
     const raw = localStorage.getItem(LOCAL_KEY)
     if (!raw) return []
-    const parsed = JSON.parse(raw) as GuestMessage[]
-    return Array.isArray(parsed) ? parsed : []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    const messages: GuestMessage[] = []
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue
+      const v = item as Record<string, unknown>
+      const id = Number(v.id)
+      if (!Number.isFinite(id)) continue
+      if (typeof v.name !== 'string' || typeof v.content !== 'string') continue
+      messages.push({
+        id,
+        name: v.name,
+        content: v.content,
+        createdAt:
+          typeof v.createdAt === 'string'
+            ? v.createdAt
+            : new Date().toISOString(),
+      })
+    }
+    return messages
   } catch {
     return []
   }
+}
+
+/** 下一条留言的序号（现有最大 id + 1） */
+function nextLocalId(list: GuestMessage[]): number {
+  return list.reduce((max, m) => (m.id > max ? m.id : max), 0) + 1
 }
 
 function writeLocal(messages: GuestMessage[]) {
@@ -52,7 +80,7 @@ export async function listMessages(): Promise<GuestMessage[]> {
   }
 }
 
-/** 提交留言：优先后端，失败写入本地 */
+/** 提交留言：优先后端，失败写入本地（本地按最大 id + 1 分配序号） */
 export async function createMessage(input: {
   name: string
   content: string
@@ -68,16 +96,14 @@ export async function createMessage(input: {
     if (isGuestMessage(msg)) return msg
     throw new Error('invalid response')
   } catch {
+    const existing = readLocal()
     const msg: GuestMessage = {
-      id:
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      id: nextLocalId(existing),
       name: input.name,
       content: input.content,
       createdAt: new Date().toISOString(),
     }
-    writeLocal([msg, ...readLocal()])
+    writeLocal([msg, ...existing])
     return msg
   }
 }
@@ -86,7 +112,8 @@ function isGuestMessage(value: unknown): value is GuestMessage {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
   return (
-    typeof v.id === 'string' &&
+    typeof v.id === 'number' &&
+    Number.isFinite(v.id) &&
     typeof v.name === 'string' &&
     typeof v.content === 'string' &&
     typeof v.createdAt === 'string'

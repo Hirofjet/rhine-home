@@ -9,8 +9,8 @@ import { cx } from '../../lib/cx'
  * 否则鼠标悬停的卡片会被误判成单独一行，导致面板起点算错。
  */
 const ROW_TOLERANCE = 6
-/** 展开面板的最小高度（px） */
-const PANEL_MIN_HEIGHT = 340
+/** 展开面板的最小高度（px）—— 需要容纳 16:9 视频 + 标题/简介 */
+const PANEL_MIN_HEIGHT = 640
 /** 展开 / 收回时长（ms），与 CSS 过渡保持一致 */
 const OPEN_MS = 520
 const CLOSE_MS = 380
