@@ -80,7 +80,7 @@ export function NavBar() {
                 key={item.id}
                 to={item.href}
                 className={cx(
-                  'px-2 font-mono text-[11px] tracking-[0.2em] transition-colors duration-300',
+                  'px-2 font-mono text-[11px] tracking-[0.2em] whitespace-nowrap transition-colors duration-300',
                   pathname === item.href
                     ? 'text-rhine-cyan'
                     : 'text-rhine-dim hover:text-rhine-cyan',

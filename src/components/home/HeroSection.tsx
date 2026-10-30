@@ -88,8 +88,8 @@ export function HeroSection() {
               <GlowButton to="/#contact" variant="ghost">
                 联络终端
               </GlowButton>
-              <GlowButton to="/lab" variant="ghost">
-                进入实验室
+              <GlowButton to="/logs" variant="ghost">
+                进入日志
               </GlowButton>
             </motion.div>
 
