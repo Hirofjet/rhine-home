@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+/* ============================================================
+   RHINE//HOME 设计系统
+   莱茵生命风格设计令牌：在这里修改颜色 / 字体即可全局换肤
+   ============================================================ */
+@theme {
+  /* ---- 色彩：黑曜石基底 + 白金 + 数据青 ---- */
+  --color-abyss: #05070b; /* 页面底色 */
+  --color-abyss-2: #070b11; /* 深色次级底色 */
+  --color-panel: #0b111a; /* 面板底色 */
+  --color-panel-2: #0e1520; /* 面板悬浮/次级底色 */
+  --color-line: #1e2a37; /* 常规描边 */
+  --color-line-2: #31445a; /* 高亮描边 */
+  --color-ink: #e2e9f2; /* 主文字 */
+  --color-dim: #8b9bad; /* 次级文字 */
+  --color-faint: #54657a; /* 弱化文字 */
+  --color-gold: #d3b27a; /* 莱茵金：主强调色 */
+  --color-gold-deep: #8a7248; /* 深金：次级强调 */
+  --color-cyan: #63d4dc; /* 数据青：信息强调色 */
+  --color-green: #7ee2a0; /* 正常状态 */
+  --color-red: #ff6b6b; /* 警示状态 */
+
+  /* ---- 字体：拉丁科幻字体本地打包，中文走系统字体栈 ---- */
+  --font-display: "Orbitron", "Rajdhani", "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+  --font-ui: "Rajdhani", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, SFMono-Regular, Menlo,
+    Consolas, monospace;
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
+    "Source Han Sans SC", system-ui, -apple-system, sans-serif;
+
+  /* ---- 动画 ---- */
+  --animate-spin-slower: spin 26s linear infinite;
+  --animate-spin-reverse: spin-reverse 34s linear infinite;
+  --animate-float-y: float-y 7s ease-in-out infinite;
+  --animate-scan-sweep: scan-sweep 6.5s linear infinite;
+  --animate-blink: blink 1.06s step-end infinite;
+  --animate-pulse-soft: pulse-soft 2.6s ease-in-out infinite;
+  --animate-marquee: marquee 30s linear infinite;
+
+  @keyframes spin-reverse {
+    to {
+      transform: rotate(-360deg);
+    }
+  }
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-16px);
+    }
+  }
+  @keyframes scan-sweep {
+    0% {
+      top: -15%;
+    }
+    100% {
+      top: 105%;
+    }
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 0.45;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 88px; /* 固定导航栏高度补偿 */
+  }
+
+  body {
+    background-color: var(--color-abyss);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: rgb(211 178 122 / 0.3);
+    color: #ffffff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-abyss);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-2);
+    border: 2px solid var(--color-abyss);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-gold-deep);
+  }
+}
+
+@layer components {
+  /* 数据网格背景 */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgb(99 212 220 / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(99 212 220 / 0.05) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  /* CRT 扫描线 */
+  .scanlines {
+    background: repeating-linear-gradient(
+      0deg,
+      rgb(0 0 0 / 0) 0px,
+      rgb(0 0 0 / 0) 2px,
+      rgb(0 0 0 / 0.16) 2px,
+      rgb(0 0 0 / 0.16) 3px
+    );
+  }
+
+  /* 文字辉光 */
+  .text-glow-gold {
+    text-shadow: 0 0 14px rgb(211 178 122 / 0.5);
+  }
+  .text-glow-cyan {
+    text-shadow: 0 0 14px rgb(99 212 220 / 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
