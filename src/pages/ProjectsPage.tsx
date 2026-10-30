@@ -31,11 +31,6 @@ export function ProjectsPage() {
           <ProjectCard key={p.id} project={p} index={i} />
         ))}
       </motion.div>
-
-      <p className="mt-8 text-center font-mono text-[11px] tracking-wider text-rhine-faint">
-        ※ 项目数据在 src/content/projects.ts 中维护，新增条目会自动出现在这里与首页。
-      </p>
-
       <div className="mt-10 flex justify-center">
         <GlowButton to="/" variant="ghost">
           <ArrowLeft className="h-3.5 w-3.5" /> 返回首页 RETURN

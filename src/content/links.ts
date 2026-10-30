@@ -27,8 +27,8 @@ export const contactLinks: ContactLink[] = [
     id: 'github',
     label: 'GitHub',
     labelEn: '代码仓库',
-    value: 'github.com/yourname',
-    href: 'https://github.com/',
+    value: 'github.com/Hirofjet',
+    href: 'https://github.com/Hirofjet',
     icon: 'github',
     note: 'CODE',
   },
@@ -36,7 +36,7 @@ export const contactLinks: ContactLink[] = [
     id: 'bilibili',
     label: '哔哩哔哩',
     labelEn: 'BILIBILI',
-    value: 'UID：待填写',
+    value: 'UID：432976432',
     href: 'https://space.bilibili.com/',
     icon: 'bilibili',
     note: 'VIDEO',
@@ -45,21 +45,21 @@ export const contactLinks: ContactLink[] = [
     id: 'mail',
     label: '电子邮箱',
     labelEn: 'E-MAIL',
-    value: 'you@example.com',
-    href: 'mailto:you@example.com',
+    value: '337265010@qq.com',
+    href: 'mailto:337265010@qq.com',
     icon: 'mail',
     note: 'DIRECT',
   },
   {
     id: 'music',
-    label: '网易云音乐',
-    labelEn: 'NETEASE MUSIC',
-    value: 'ID：待填写',
-    href: 'https://music.163.com/',
+    label: '酷狗音乐',
+    labelEn: 'KUGOU MUSIC',
+    value: 'ID：1278380529',
+    href: 'https://activity.kugou.com/share/v-c7b4da67/index.html?id=93377639e20f539393376f9f012f5f1a',
     icon: 'music',
     note: 'MUSIC',
   },
 ]
 
 /** 直连邮箱（复制按钮使用） */
-export const emailAddress = 'you@example.com'
+export const emailAddress = '337265010@qq.com'

@@ -26,25 +26,25 @@ export interface OperatorProfile {
   specialties: string[]
   /** 特性标签 */
   traits: string[]
-  /** 信赖值（0-200，对应明日方舟信赖体系） */
+  /** 信赖值（0-200） */
   trust: { value: number; label: string }
 }
 
 export const profile: OperatorProfile = {
-  codeName: 'RESERVED',
-  realName: '你的名字',
-  roles: ['干员候补', '前端开发者', '次元探险者', '莱茵生命观察员'],
-  intro: '这里是一句话简介：你是什么样的人、正在做什么样的事。',
+  codeName: 'Hirofjet',
+  realName: '菲羽猫',
+  roles: ['技术宅男', '科技数码爱好者', '开拓者', '旅行者' ,'管理员' ,'绳匠', '二次元爱好者', '喵星人'],
+  intro: '我是一只伪装成人的喵星人，我喜欢人类的科技、数码、二次元。这是本猫的主页喵~',
   dossier: [
-    '这里是档案正文第一段。介绍一下你的经历、身份与正在进行的「实验」。',
-    '这里是档案正文第二段。写下你的兴趣、能力方向，或者任何你想让来访者知道的事。',
-    '所有文字都在 src/content/profile.ts 中修改，页面会自动更新。',
+    '吾名菲羽猫,喵星第一的魔法师兼爆裂魔法的操纵者兼邪王真眼的拥有者,好好见识我的力量吧!Explosion!',
+    '数码区的神，科技区的鬼，人世间的猫。',
+    '喜欢模仿社畜人类程序员敲代码。',
   ],
-  occupation: '待定',
-  affiliation: '莱茵生命（荣誉编外）',
-  status: 'ACTIVE',
-  location: 'CN · 某个实验室',
-  specialties: ['待填写', '待填写', '待填写'],
+  occupation: '人类学生伪装员',
+  affiliation: '洛琪希神教',
+  status: '薛定谔态',
+  location: 'CN · HangZhou',
+  specialties: ['大数据运维', '软件编程', '睡觉'],
   traits: ['二次元', '科技宅', '夜行性'],
-  trust: { value: 200, label: '信赖值' },
+  trust: { value: 100, label: '信赖值' },
 }

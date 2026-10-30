@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, Construction, Plus } from 'lucide-react'
-import { fadeUp, stagger, viewportOnce } from '../../lib/motion'
+import { ArrowLeft, Construction } from 'lucide-react'
+import type { SlotModule } from '../../content/slots'
+import { fadeUp, viewportOnce } from '../../lib/motion'
+import { SlotGrid } from '../slots/SlotGrid'
 import { GlowButton, Panel, SectionTitle } from '../ui'
 
 interface ModulePlaceholderProps {
@@ -12,8 +14,8 @@ interface ModulePlaceholderProps {
   titleZh: string
   /** 模块说明（介绍未来会放什么内容） */
   description: string
-  /** 预留的内容槽位 */
-  slots?: string[]
+  /** 槽位模块（数据在 src/content/slots.ts 中维护） */
+  slots?: SlotModule[]
 }
 
 /**
@@ -47,32 +49,29 @@ export function ModulePlaceholder({
         </Panel>
       </motion.div>
 
-      {/* 预留槽位 */}
+      {/* 槽位模块 */}
       {slots.length > 0 && (
         <motion.div
-          variants={stagger}
+          variants={fadeUp}
           initial="hidden"
           whileInView="show"
           viewport={viewportOnce}
-          className="mt-6 grid gap-4 sm:grid-cols-2"
+          className="mt-8"
         >
-          {slots.map((slot, i) => (
-            <motion.div
-              key={slot}
-              variants={fadeUp}
-              className="group flex items-center gap-3 border border-dashed border-rhine-line/80 bg-rhine-panel/40 p-4 transition-colors duration-300 hover:border-rhine-gold/50"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-rhine-line text-rhine-faint transition-colors group-hover:border-rhine-gold/60 group-hover:text-rhine-gold">
-                <Plus className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
-                  EMPTY SLOT {String(i + 1).padStart(2, '0')}
-                </p>
-                <p className="mt-0.5 text-sm text-rhine-dim">{slot}</p>
-              </div>
-            </motion.div>
-          ))}
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="font-mono text-[10px] tracking-[0.3em] text-rhine-faint">
+              MODULE SLOTS // 模块槽位
+            </p>
+            <span className="font-mono text-[10px] tracking-[0.25em] text-rhine-faint">
+              SLOTS: {String(slots.length).padStart(2, '0')}
+            </span>
+          </div>
+
+          <SlotGrid slots={slots} />
+
+          <p className="mt-4 text-center font-mono text-[10px] tracking-wider text-rhine-faint">
+            ※ 点击模块展开隐藏内容 · 点击面板外空白 / ESC 收回
+          </p>
         </motion.div>
       )}
 

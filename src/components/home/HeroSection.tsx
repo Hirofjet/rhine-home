@@ -82,7 +82,7 @@ export function HeroSection() {
             {/* 行动按钮 */}
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-4">
               <GlowButton to="/#dossier">
-                查看干员档案
+                查看个人档案
                 <ChevronRight className="h-3.5 w-3.5" />
               </GlowButton>
               <GlowButton to="/#contact" variant="ghost">

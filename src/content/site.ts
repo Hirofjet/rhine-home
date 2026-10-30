@@ -5,17 +5,17 @@
 
 export const site = {
   /** 站点名（导航 Logo 大字） */
-  title: 'RHINE//HOME',
+  title: 'Hirofjet//HOME',
   /** 站点名小字 */
   titleSub: 'PERSONAL TERMINAL',
   /** 中文标语 */
-  slogan: '莱茵生命风格个人主页',
+  slogan: '菲羽猫的个人主页',
   /** 干员编号（会出现在开机画面、Hero 状态栏等处） */
   operatorId: 'RL-0001',
   /** 时区（用于页内时钟显示） */
   timezone: 'Asia/Shanghai',
   footer: {
-    line1: 'RHINE//HOME — 非官方同人风格个人主页',
+    line1: 'Hirofjet//HOME — 菲羽猫的个人主页',
     line2: '本页面视觉风格致敬《明日方舟》莱茵生命；相关设定与素材归鹰角网络所有，仅作个人学习与展示用途。',
     builtWith: 'React · Vite · TypeScript · Tailwind CSS · Framer Motion',
   },

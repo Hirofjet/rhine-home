@@ -138,20 +138,49 @@ src/
 
 在 `src/components/ui/` 新建组件并从 `ui/index.ts` 导出；颜色直接使用主题类名（`text-rhine-gold`、`border-rhine-line` 等）。
 
+### F. 槽位模块（SLOT）交互与隐藏内容
+
+数据在 `src/content/slots.ts`（`archiveSlots` / `labSlots`），每个槽位：
+
+```ts
+{
+  id: 'articles',            // 唯一 id（展开动画定位用）
+  label: '文章 / 随笔集',     // 卡片与面板标题
+  labelEn: 'ARTICLES',
+  summary: '待接入：文章列表与阅读页',
+  content: {                 // ← 展开后的隐藏内容，以后主要填这里
+    paragraphs: ['正文段落'],
+    items: [{ label: '条目数', value: '待填写' }],
+    tags: ['标签'],
+    link: { label: '外链按钮', href: 'https://example.com' },
+    // custom: <你的组件 />  // 需要复杂排版时用（把 slots.ts 改名为 slots.tsx）
+  },
+}
+```
+
+交互规则（`src/components/slots/SlotGrid.tsx`）：
+
+- **第一排模块展开**：面板从网格顶部开始，允许盖住第一排（包括自己）；
+- **第二排及以后展开**：面板从第二排顶部开始，不遮挡第一排；
+- 面板从**模块自身位置**朝网格中心方向展开，收回时缩回模块所在角（左上→右下 / 右下→左上 / 右上→左下 / 左下→右上，自动计算）；
+- 已展开时点击可见的其他模块：**先收回当前面板，再展开目标模块**；
+- 收回方式：再次点击当前模块 / 面板右上 ✕ / `ESC` / **点击面板外空白**；
+- **增加槽位**：在数组里追加一项即可 —— 行数变化后展开方向、面板位置、动画面板尺寸全部自适应。
+
 ---
 
 ## 设计令牌速查
 
 | 变量 | 用途 | 默认值 |
 | --- | --- | --- |
-| `--color-abyss` | 页面底色 | `#05070b` |
-| `--color-panel` | 面板底色 | `#0b111a` |
-| `--color-line` | 描边 | `#1e2a37` |
-| `--color-ink` | 主文字 | `#e2e9f2` |
-| `--color-dim` / `--color-faint` | 次级/弱化文字 | `#8b9bad` / `#54657a` |
-| `--color-gold` | 莱茵金（主强调） | `#d3b27a` |
-| `--color-cyan` | 数据青（信息强调） | `#63d4dc` |
-| `--color-green` / `--color-red` | 状态色 | `#7ee2a0` / `#ff6b6b` |
+| `--color-rhine-abyss` | 页面底色 | `#05070b` |
+| `--color-rhine-panel` | 面板底色 | `#0b111a` |
+| `--color-rhine-line` | 描边 | `#1e2a37` |
+| `--color-rhine-ink` | 主文字 | `#e2e9f2` |
+| `--color-rhine-dim` / `--color-rhine-faint` | 次级/弱化文字 | `#8b9bad` / `#54657a` |
+| `--color-rhine-gold` | 莱茵金（主强调） | `#d3b27a` |
+| `--color-rhine-cyan` | 数据青（信息强调） | `#63d4dc` |
+| `--color-rhine-green` / `--color-rhine-red` | 状态色 | `#7ee2a0` / `#ff6b6b` |
 
 Tailwind 中使用：`bg-rhine-*` / `text-rhine-*` / `border-rhine-*`（主题前缀会自动拼接为 `rhine-abyss` 等）。
 
@@ -177,6 +206,7 @@ Tailwind 中使用：`bg-rhine-*` / `text-rhine-*` / `border-rhine-*`（主题�
 - 能力模块：进入视口时进度条动画填充
 - 项目卡片：悬停上浮 + 扫描光带
 - 联络终端：邮箱一键复制（带 COPIED 反馈）、可玩的迷你讯号终端（输入→回显）
+- 槽位模块：点击展开隐藏内容（方向随行列自适应）、先收回再切换、点空白/ESC/✕ 收回
 - 无障碍：`prefers-reduced-motion` 下自动关闭动画
 
 ---
