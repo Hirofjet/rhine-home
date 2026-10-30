@@ -14,7 +14,7 @@ interface ModulePlaceholderProps {
   titleZh: string
   /** 模块说明（介绍未来会放什么内容） */
   description: string
-  /** 槽位模块（数据在 src/content/slots.ts 中维护） */
+  /** 槽位模块（数据在 src/content/slots.tsx 中维护） */
   slots?: SlotModule[]
 }
 
@@ -68,10 +68,6 @@ export function ModulePlaceholder({
           </div>
 
           <SlotGrid slots={slots} />
-
-          <p className="mt-4 text-center font-mono text-[10px] tracking-wider text-rhine-faint">
-            ※ 点击模块展开隐藏内容 · 点击面板外空白 / ESC 收回
-          </p>
         </motion.div>
       )}
 

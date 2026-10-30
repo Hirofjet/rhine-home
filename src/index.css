@@ -147,6 +147,153 @@
   .text-glow-cyan {
     text-shadow: 0 0 14px rgb(99 212 220 / 0.5);
   }
+
+  /* ---------- Markdown 正文样式（ArticleBlock 使用） ---------- */
+  .md-body {
+    overflow-wrap: anywhere;
+    font-size: 0.875rem;
+    line-height: 1.75;
+    color: var(--color-rhine-dim);
+  }
+  .md-body > :first-child {
+    margin-top: 0;
+  }
+  .md-body > :last-child {
+    margin-bottom: 0;
+  }
+  .md-body h1,
+  .md-body h2,
+  .md-body h3,
+  .md-body h4 {
+    margin: 1.1em 0 0.45em;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--color-rhine-ink);
+  }
+  .md-body h1 {
+    font-size: 1.3rem;
+  }
+  .md-body h2 {
+    border-bottom: 1px solid var(--color-rhine-line);
+    padding-bottom: 0.3em;
+    font-size: 1.12rem;
+  }
+  .md-body h3 {
+    font-size: 1rem;
+    color: var(--color-rhine-gold);
+  }
+  .md-body h4 {
+    font-size: 0.92rem;
+    color: var(--color-rhine-cyan);
+  }
+  .md-body p {
+    margin: 0.55em 0;
+  }
+  .md-body a {
+    color: var(--color-rhine-gold);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .md-body a:hover {
+    color: var(--color-rhine-ink);
+  }
+  .md-body strong {
+    color: var(--color-rhine-ink);
+  }
+  .md-body ul,
+  .md-body ol {
+    margin: 0.55em 0;
+    padding-left: 1.4em;
+  }
+  .md-body ul {
+    list-style: disc;
+  }
+  .md-body ol {
+    list-style: decimal;
+  }
+  .md-body li {
+    margin: 0.2em 0;
+  }
+  .md-body li::marker {
+    color: var(--color-rhine-gold-dim);
+  }
+  .md-body input[type='checkbox'] {
+    margin-right: 0.4em;
+    accent-color: var(--color-rhine-gold);
+  }
+  .md-body blockquote {
+    margin: 0.8em 0;
+    border-left: 2px solid var(--color-rhine-gold);
+    background: rgb(211 178 122 / 0.06);
+    padding: 0.4em 0.9em;
+  }
+  .md-body code {
+    border: 1px solid var(--color-rhine-line);
+    background: var(--color-rhine-abyss-2);
+    padding: 0.12em 0.4em;
+    color: var(--color-rhine-cyan);
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+  }
+  .md-body pre {
+    margin: 0.8em 0;
+    border: 1px solid var(--color-rhine-line);
+    background: var(--color-rhine-abyss-2);
+    padding: 0.8em 1em;
+    overflow-x: auto;
+  }
+  .md-body pre code {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: var(--color-rhine-ink);
+    font-size: 0.8rem;
+  }
+  .md-body table {
+    display: block;
+    width: 100%;
+    margin: 0.8em 0;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    overflow-x: auto;
+  }
+  .md-body th,
+  .md-body td {
+    border: 1px solid var(--color-rhine-line);
+    padding: 0.35em 0.7em;
+    text-align: left;
+  }
+  .md-body th {
+    background: rgb(99 212 220 / 0.06);
+    color: var(--color-rhine-ink);
+    font-weight: 600;
+  }
+  .md-body hr {
+    margin: 1em 0;
+    border: 0;
+    border-top: 1px dashed var(--color-rhine-line);
+  }
+  .md-body img {
+    max-width: 100%;
+    border: 1px solid var(--color-rhine-line);
+  }
+}
+
+/* ---------- 留言板弹幕 ---------- */
+@keyframes danmaku-fly {
+  from {
+    transform: translateX(100vw);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.danmaku-item {
+  animation-name: danmaku-fly;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {

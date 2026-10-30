@@ -72,4 +72,5 @@ export const moduleLinks: NavItem[] = [
   { id: 'archive', label: '档案库', labelEn: 'ARCHIVE', href: '/archive' },
   { id: 'project-db', label: '项目库', labelEn: 'PROJECT DB', href: '/projects' },
   { id: 'lab', label: '实验室', labelEn: 'LAB', href: '/lab' },
+  { id: 'guestbook', label: '留言板', labelEn: 'GUESTBOOK', href: '/guestbook' },
 ]

@@ -2,16 +2,22 @@
    槽位模块（SLOT）内容 —— 「档案库 / 实验室」等占位页的模块网格数据
    ------------------------------------------------------------
    交互说明：
-   · 网格第一排始终可见（像标签页），展开面板覆盖第一排以下区域；
-   · 模块从自身位置朝网格中心方向展开，收回时缩回自己所在的角；
-   · 增加槽位：直接在数组里追加一项即可 —— 网格行数、展开方向自动适配。
+   · 面板从「被点击模块所在行」顶部向下展开：第三排不会盖住前两排，
+     第四排不会盖住前三排；收回时缩回自己所在的角；
+   · 增加槽位：直接在数组里追加一项即可 —— 行数与展开方向自动适配。
    ------------------------------------------------------------
    隐藏内容怎么填：
-   · 普通内容：paragraphs（段落）/ items（键值行）/ tags（标签）/ link（外链）
-   · 复杂排版：把本文件改名为 slots.tsx 后使用 custom: <你的组件 />
+   · 普通内容：paragraphs（段落）/ items（键值行）/ link（外链）
+   · 富内容组件（文章 / 视频 / 照片时间线）放在 content.custom 里：
+       <ArticleBlock file="/src/assets/articles/xxx.md" title="标题" tags={['标签']} />
+       <VideoBlock src="" title="标题" tags={['标签']} />
+       <PhotoTimeline />
+     —— 文章 markdown 放在 src/assets/articles/，照片放在 src/assets/photos/，
+        视频放在 public/videos/。
    ============================================================ */
 
 import type { ReactNode } from 'react'
+import { ArticleBlock, PhotoTimeline, VideoBlock } from '../components/slots/content'
 
 export interface SlotDetailItem {
   label: string
@@ -23,11 +29,9 @@ export interface SlotContent {
   paragraphs?: string[]
   /** 键值行（会渲染成虚线引导的档案式列表） */
   items?: SlotDetailItem[]
-  /** 标签 */
-  tags?: string[]
   /** 右下角外链按钮 */
   link?: { label: string; href: string }
-  /** 完全自定义的内容（需要 JSX 时使用） */
+  /** 富内容（文章 / 视频 / 照片时间线等组件） */
   custom?: ReactNode
 }
 
@@ -48,45 +52,47 @@ export interface SlotModule {
 export const archiveSlots: SlotModule[] = [
   {
     id: 'articles',
-    label: '文章 / 随笔集',
+    label: '文章',
     labelEn: 'ARTICLES',
-    summary: '待接入：文章列表与阅读页',
+    summary: 'Markdown 文章列表',
     content: {
-      paragraphs: [
-        '这里显示模块展开后的隐藏内容。把这段文字换成你的真实内容即可。',
-        '可以放文章简介、更新说明，或者任何你想让访客看到的信息。',
-      ],
-      items: [
-        { label: '条目数', value: '待填写' },
-        { label: '最近更新', value: '待填写' },
-        { label: '维护方式', value: 'Markdown' },
-      ],
-      tags: ['待填写'],
+      custom: (
+        <div className="space-y-4">
+          <ArticleBlock
+            file="/src/assets/articles/sample-article.md"
+            title="示例文章：Markdown 全功能展示"
+            date="2026-10-31"
+            tags={['示例', 'Markdown']}
+          />
+          <ArticleBlock title="待接入文章" tags={['待填写']} />
+        </div>
+      ),
     },
   },
   {
     id: 'vlog',
-    label: '生活vlog',
+    label: '生活vlog与视频',
     labelEn: 'VLOG',
-    summary: '待接入：视频合集与播放列表',
+    summary: '视频合集',
     content: {
-      paragraphs: ['这里放 vlog 合集介绍、播放列表入口或嵌入播放器。'],
-      items: [
-        { label: '平台', value: 'Bilibili' },
-        { label: '更新频率', value: '待填写' },
-      ],
-      tags: ['生活', '视频'],
+      custom: (
+        <div className="space-y-4">
+          <VideoBlock
+            title="待接入视频"
+            description="视频文件放到 public/videos/，把 src 填成 /videos/xxx.mp4"
+            tags={['待填写']}
+          />
+        </div>
+      ),
     },
   },
   {
     id: 'photos',
     label: '照片与回忆录',
     labelEn: 'PHOTOS',
-    summary: '待接入：照片墙与时间线',
+    summary: '按拍摄时间排序的照片时间线',
     content: {
-      paragraphs: ['这里放照片墙、时间线或回忆录。'],
-      items: [{ label: '照片数', value: '待填写' }],
-      tags: ['照片'],
+      custom: <PhotoTimeline />,
     },
   },
   {
@@ -96,7 +102,7 @@ export const archiveSlots: SlotModule[] = [
     summary: '预留槽位：想好之后再扩展',
     content: {
       paragraphs: [
-        '这是一个预留槽位。想好要放什么之后，在 src/content/slots.ts 里改掉它。',
+        '这是一个预留槽位。想好要放什么之后，在 src/content/slots.tsx 里改掉它。',
       ],
     },
   },
@@ -115,7 +121,6 @@ export const labSlots: SlotModule[] = [
         { label: '日志数', value: '待填写' },
         { label: '最近更新', value: '待填写' },
       ],
-      tags: ['日志'],
     },
   },
   {
@@ -126,7 +131,6 @@ export const labSlots: SlotModule[] = [
     content: {
       paragraphs: ['这里放小工具、实验性交互或玩具项目的入口。'],
       items: [{ label: '工具数', value: '待填写' }],
-      tags: ['实验'],
     },
   },
   {
@@ -137,7 +141,6 @@ export const labSlots: SlotModule[] = [
     content: {
       paragraphs: ['这里放开发笔记、踩坑记录或技术备忘录。'],
       items: [{ label: '条目数', value: '待填写' }],
-      tags: ['开发'],
     },
   },
   {
@@ -147,7 +150,7 @@ export const labSlots: SlotModule[] = [
     summary: '预留槽位：想好之后再扩展',
     content: {
       paragraphs: [
-        '这是一个预留槽位。想好要放什么之后，在 src/content/slots.ts 里改掉它。',
+        '这是一个预留槽位。想好要放什么之后，在 src/content/slots.tsx 里改掉它。',
       ],
     },
   },
