@@ -16,8 +16,8 @@ const ArchivePage = lazy(() =>
 const GuestbookPage = lazy(() =>
   import('./pages/GuestbookPage').then((m) => ({ default: m.GuestbookPage })),
 )
-const LabPage = lazy(() =>
-  import('./pages/LabPage').then((m) => ({ default: m.LabPage })),
+const LogsPage = lazy(() =>
+  import('./pages/LogsPage').then((m) => ({ default: m.LogsPage })),
 )
 const ProjectsPage = lazy(() =>
   import('./pages/ProjectsPage').then((m) => ({ default: m.ProjectsPage })),
@@ -98,7 +98,7 @@ export default function App() {
             {/* ==== 扩展模块页面：新增页面时在这里注册路由 ==== */}
             <Route path="/archive" element={<ArchivePage />} />
             <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/lab" element={<LabPage />} />
+            <Route path="/logs" element={<LogsPage />} />
             <Route path="/guestbook" element={<GuestbookPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

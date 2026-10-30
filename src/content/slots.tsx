@@ -1,5 +1,5 @@
 /* ============================================================
-   槽位模块（SLOT）内容 —— 「档案库 / 实验室」等占位页的模块网格数据
+   槽位模块（SLOT）内容 —— 「档案库」页面的模块网格数据
    ------------------------------------------------------------
    交互说明：
    · 面板从「被点击模块所在行」顶部向下展开：第三排不会盖住前两排，
@@ -93,54 +93,6 @@ export const archiveSlots: SlotModule[] = [
     summary: '按拍摄时间排序的照片时间线',
     content: {
       custom: <PhotoTimeline />,
-    },
-  },
-  {
-    id: 'reserved',
-    label: '待定内容…',
-    labelEn: 'RESERVED',
-    summary: '预留槽位：想好之后再扩展',
-    content: {
-      paragraphs: [
-        '这是一个预留槽位。想好要放什么之后，在 src/content/slots.tsx 里改掉它。',
-      ],
-    },
-  },
-]
-
-/** 实验室页面的槽位 */
-export const labSlots: SlotModule[] = [
-  {
-    id: 'blog',
-    label: '博客 / 实验日志',
-    labelEn: 'BLOG',
-    summary: '待接入：日志列表与详情页',
-    content: {
-      paragraphs: ['这里放博客 / 实验日志的入口与简介。'],
-      items: [
-        { label: '日志数', value: '待填写' },
-        { label: '最近更新', value: '待填写' },
-      ],
-    },
-  },
-  {
-    id: 'tools',
-    label: '小工具与玩具',
-    labelEn: 'TOOLS',
-    summary: '待接入：可交互的小实验',
-    content: {
-      paragraphs: ['这里放小工具、实验性交互或玩具项目的入口。'],
-      items: [{ label: '工具数', value: '待填写' }],
-    },
-  },
-  {
-    id: 'notes',
-    label: '开发备忘录',
-    labelEn: 'NOTES',
-    summary: '待接入：开发笔记与踩坑记录',
-    content: {
-      paragraphs: ['这里放开发笔记、踩坑记录或技术备忘录。'],
-      items: [{ label: '条目数', value: '待填写' }],
     },
   },
   {

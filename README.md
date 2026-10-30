@@ -44,8 +44,9 @@ src/
 │   ├── abilities.ts      能力模块卡片
 │   ├── projects.ts       项目档案
 │   ├── links.ts          联络方式 + 直连邮箱
-│   ├── slots.tsx         槽位模块数据（文章 / 视频 / 照片时间线入口）
-│   └── index.ts          统一出口（slots 因含重依赖单独引入，见文件内注释）
+│   ├── slots.tsx         档案库槽位数据（文章 / 视频 / 照片时间线入口）
+│   ├── logs.tsx          日志页数据（自动扫描 src/assets/logs/*.md 生成模块）
+│   └── index.ts          统一出口（slots / logs 因含重依赖单独引入，见文件内注释）
 ├── components/
 │   ├── ui/               莱茵风格 UI 原语：Panel / CornerFrame / SectionTitle /
 │   │                     GlowButton / StatusDot / TypingText / ProgressBar / Tag / Barcode
@@ -55,11 +56,12 @@ src/
 │   ├── slots/            SlotGrid（可展开槽位网格）
 │   │   └── content/      ArticleBlock（markdown 文章）/ VideoBlock（视频）/ PhotoTimeline（照片时间线）
 │   └── guestbook/        DanmakuWall（留言弹幕墙）
-├── pages/                HomePage / ArchivePage / ProjectsPage / LabPage / GuestbookPage / NotFoundPage
+├── pages/                HomePage / ArchivePage / ProjectsPage / LogsPage / GuestbookPage / NotFoundPage
 ├── hooks/                useTypewriter / useClock / useActiveSection / useCopy
 ├── lib/                  cx / motion（动画预设）/ api（留言板接口层）
 ├── assets/
 │   ├── articles/         ← 文章 markdown 放这里
+│   ├── logs/             ← 日志 markdown 放这里（每篇自动生成一个可展开模块）
 │   └── photos/           ← 照片放这里（自动读取拍摄时间排序）
 └── App.tsx               路由注册（非首页按需加载）+ 开机门 + 滚动管理
 
@@ -150,7 +152,7 @@ public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /vi
 
 ### F. 槽位模块（SLOT）交互与隐藏内容
 
-数据在 `src/content/slots.tsx`（`archiveSlots` / `labSlots`），每个槽位：
+数据在 `src/content/slots.tsx`（`archiveSlots`），每个槽位：
 
 ```tsx
 {
@@ -209,6 +211,18 @@ public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /vi
 - 配置后端：见 `server/README.md`（含 MySQL 建表语句 `server/schema.sql` 与 Express 示例 `server/index.mjs`）；
 - 前端指向后端：复制 `.env.example` 为 `.env`，改 `VITE_API_BASE=http://localhost:3001`。
 
+### H. 日志页（/logs）
+
+导航「日志」对应 `/logs`，每篇日志都是一个可展开 / 收回的模块，展开后渲染 markdown 正文（和文章组件同款排版）。
+
+**新增日志不需要改代码**：
+
+1. 在 `src/assets/logs/` 下新建 markdown 文件，文件名以日期开头，例如 `2026-11-01-rainy-day.md`；
+2. 文件第一行写 `# 标题`，作为模块标题（也用于卡片）；第一段正文会作为卡片摘要；
+3. 保存后模块自动出现，并按文件名日期从新到旧排序。
+
+排序与标题解析逻辑在 `src/content/logs.tsx`（`logSlots`），想改标签 / 日期展示格式也在那里改。
+
 ---
 
 ## 设计令牌速查
@@ -249,6 +263,7 @@ Tailwind 中使用：`bg-rhine-*` / `text-rhine-*` / `border-rhine-*`（主题�
 - 项目卡片：悬停上浮 + 扫描光带
 - 联络终端：邮箱一键复制（带 COPIED 反馈）、可玩的迷你讯号终端（输入→回显）
 - 槽位模块：点击展开隐藏内容（面板只向下覆盖、方向随行列自适应）、先收回再切换、点空白/ESC/✕ 收回、展开中打断会从当前进度反向收回
+- 日志页：`src/assets/logs/` 下每篇 markdown 自动生成一个可展开模块，按日期倒序排列
 - 文章组件：读取 `src/assets/articles/` 的 markdown，支持 GFM 表格 / 任务列表 / 代码块 / 图片等
 - 视频组件：预留视频路径，填入后渲染原生播放器（留空显示占位）
 - 照片时间线：读取照片 EXIF 拍摄时间，按年份分组、时间升序排列（无 EXIF 时回退文件名日期）

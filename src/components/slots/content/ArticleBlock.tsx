@@ -4,8 +4,8 @@ import { FileText } from 'lucide-react'
 import { cx } from '../../../lib/cx'
 import { Tag } from '../../ui/Tag'
 
-/** 自动收集 src/assets/articles 下的所有 markdown 文件（?raw 读取原文） */
-const ARTICLE_FILES = import.meta.glob('/src/assets/articles/**/*.md', {
+/** 自动收集 src/assets 下的所有 markdown 文件（文章与日志通用） */
+const ARTICLE_FILES = import.meta.glob('/src/assets/**/*.md', {
   query: '?raw',
   import: 'default',
   eager: true,
@@ -32,6 +32,8 @@ export interface ArticleBlockProps {
   date?: string
   /** 标签（显示在组件底部） */
   tags?: string[]
+  /** 是否隐藏组件自带的标题栏（例如放在日志模块里，标题由模块头提供） */
+  hideHeader?: boolean
   className?: string
 }
 
@@ -44,6 +46,7 @@ export function ArticleBlock({
   title,
   date,
   tags,
+  hideHeader = false,
   className,
 }: ArticleBlockProps) {
   const markdown = findArticle(file)
@@ -54,17 +57,19 @@ export function ArticleBlock({
         className,
       )}
     >
-      <header className="flex items-center gap-3 border-b border-rhine-line/70 px-4 py-2.5">
-        <FileText className="h-4 w-4 shrink-0 text-rhine-gold" />
-        <div className="min-w-0 flex-1">
-          <h4 className="truncate text-sm font-medium text-rhine-ink">
-            {title ?? '未命名文章'}
-          </h4>
-          <p className="mt-0.5 font-mono text-[9px] tracking-[0.25em] text-rhine-faint">
-            {date ? `DATE // ${date}` : 'ARTICLE // MARKDOWN'}
-          </p>
-        </div>
-      </header>
+      {!hideHeader && (
+        <header className="flex items-center gap-3 border-b border-rhine-line/70 px-4 py-2.5">
+          <FileText className="h-4 w-4 shrink-0 text-rhine-gold" />
+          <div className="min-w-0 flex-1">
+            <h4 className="truncate text-sm font-medium text-rhine-ink">
+              {title ?? '未命名文章'}
+            </h4>
+            <p className="mt-0.5 font-mono text-[9px] tracking-[0.25em] text-rhine-faint">
+              {date ? `DATE // ${date}` : 'ARTICLE // MARKDOWN'}
+            </p>
+          </div>
+        </header>
+      )}
 
       <div className="px-4 py-3">
         {markdown ? (
