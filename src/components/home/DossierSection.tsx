@@ -18,7 +18,7 @@ export function DossierSection() {
   return (
     <section id="dossier" className="relative py-20 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <SectionTitle index="01" en="PERSONNEL FILE" zh="干员档案" />
+        <SectionTitle index="01" en="PERSONNEL FILE" zh="个人档案" />
 
         <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_1.35fr]">
           {/* 基础信息 + 标签 */}

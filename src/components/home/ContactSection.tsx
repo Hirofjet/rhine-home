@@ -176,10 +176,6 @@ export function ContactSection() {
                   </button>
                 </div>
               </div>
-
-              <p className="mt-5 font-mono text-[10px] leading-relaxed tracking-wider text-rhine-faint">
-                ※ 请在 src/content/links.ts 中替换为你的真实联系方式
-              </p>
             </Panel>
           </motion.div>
         </div>
