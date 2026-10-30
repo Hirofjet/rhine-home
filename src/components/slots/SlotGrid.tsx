@@ -155,6 +155,8 @@ export function SlotGrid({ slots }: SlotGridProps) {
   const busyRef = useRef(false)
   const openTimerRef = useRef<number | null>(null)
   const closeTimerRef = useRef<number | null>(null)
+  /** 展开过渡是否已经真正开始（用于判断中断收回时是否需要反向过渡） */
+  const revealStartedRef = useRef(false)
 
   const clearTimers = () => {
     if (openTimerRef.current !== null) {
@@ -195,8 +197,12 @@ export function SlotGrid({ slots }: SlotGridProps) {
     phaseRef.current = 'opening'
     setPhase('opening')
     setRevealed(false)
+    revealStartedRef.current = false
 
     const reveal = () => {
+      // 展开已被中断（展开中触发了收回）→ 不再继续播放展开动画
+      if (phaseRef.current !== 'opening') return
+      revealStartedRef.current = true
       setRevealed(true)
       if (reduce) finishOpen()
       else openTimerRef.current = window.setTimeout(finishOpen, OPEN_MS)
@@ -214,18 +220,26 @@ export function SlotGrid({ slots }: SlotGridProps) {
     setPanel(null)
     setSeed(null)
     setStagePad(0)
+    revealStartedRef.current = false
     busyRef.current = false
     drain()
   }
 
-  const closePanel = () => {
-    if (busyRef.current || phaseRef.current === 'idle') return
-    busyRef.current = true
+  /**
+   * 开始收回：允许从 opening / open 状态发起。
+   * - 展开中被打断时：取消展开定时器，CSS 以「当前裁剪进度」为起点直接反向过渡，
+   *   不再把剩余展开动画播完；
+   * - 若展开过渡尚未开始（起始裁剪还没变化），则无需过渡，直接收尾。
+   */
+  const beginClose = () => {
+    const p = phaseRef.current
+    if (p === 'idle' || p === 'closing') return
     clearTimers()
+    busyRef.current = true
     phaseRef.current = 'closing'
     setPhase('closing')
     setRevealed(false)
-    if (reduce) finishClose()
+    if (reduce || !revealStartedRef.current) finishClose()
     else closeTimerRef.current = window.setTimeout(finishClose, CLOSE_MS)
   }
 
@@ -236,33 +250,34 @@ export function SlotGrid({ slots }: SlotGridProps) {
     if (next == null) return
     pendingRef.current = null
 
-    if (next === activeRef.current && phaseRef.current === 'open') {
-      closePanel()
-      return
-    }
     if (phaseRef.current === 'idle') {
       openPanel(next)
       return
     }
+    if (next === activeRef.current) {
+      beginClose()
+      return
+    }
     pendingRef.current = next
-    closePanel()
+    beginClose()
   }
 
   const handleSlotClick = (id: string) => {
-    if (busyRef.current) {
-      pendingRef.current = id
-      return
-    }
-    if (activeRef.current === id && phaseRef.current === 'open') {
-      closePanel()
-      return
-    }
-    if (phaseRef.current === 'idle') {
+    const p = phaseRef.current
+    if (p === 'idle') {
       openPanel(id)
       return
     }
+    // 收回过程中忽略点击，避免把「收回」打断成「重新展开」
+    if (p === 'closing') return
+    // 再次点击当前模块 / 展开中点击当前模块 → 从当前进度收回
+    if (id === activeRef.current) {
+      beginClose()
+      return
+    }
+    // 切换：先收回当前面板，收回完成后再展开目标模块
     pendingRef.current = id
-    closePanel()
+    beginClose()
   }
 
   // 展开期间窗口尺寸变化：实时修正面板与起始裁剪
@@ -282,28 +297,22 @@ export function SlotGrid({ slots }: SlotGridProps) {
     return () => window.removeEventListener('resize', onResize)
   }, [activeId])
 
-  // ESC 收回（复用卡片点击入口，保证与点击逻辑一致）
+  // ESC 收回（复用卡片点击入口：展开中同样会从当前进度反向收回）
   useEffect(() => {
     if (!activeId) return undefined
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       const id = activeRef.current
-      if (id == null) return
-      if (busyRef.current) {
-        pendingRef.current = id
-        return
-      }
-      cardRefs.current.get(id)?.click()
+      if (id != null) cardRefs.current.get(id)?.click()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [activeId])
 
-  // 点击面板外的空白处收回（点击其他模块卡片不在此处理，交给卡片自身）
+  // 点击面板外的空白处收回（展开中同样立即从当前进度反向收回）
   useEffect(() => {
     if (!activeId) return undefined
     const onPointerDown = (e: PointerEvent) => {
-      if (busyRef.current) return
       const node = e.target as Node | null
       if (!node) return
       if (panelRef.current?.contains(node)) return
