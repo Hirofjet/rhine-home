@@ -3,10 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { ChevronDown, ExternalLink, X } from 'lucide-react'
 import type { SlotModule } from '../../content/slots'
 import { cx } from '../../lib/cx'
-import { Tag } from '../ui/Tag'
 
-/** 与网格 gap-4 对应的间距（px） */
-const GAP = 16
 /**
  * 行分组容差（px）：必须大于卡片 hover 位移（2px），
  * 否则鼠标悬停的卡片会被误判成单独一行，导致面板起点算错。
@@ -44,9 +41,10 @@ interface Measured {
 
 /**
  * 测量网格与目标卡片的位置：
- * - 第一排模块展开：面板从网格顶部开始（允许盖住第一排，包括自己）；
- * - 第二排及以下展开：面板从第二排顶部开始，不遮挡第一排；
- * - 起始裁剪矩形 = 目标卡片与面板区域的交集（完全在面板上方的卡片投影成细条）。
+ * - 面板从「被点击模块所在行」的顶部开始，只向下覆盖到网格底部：
+ *   第三排不会覆盖第一、二排，第四排不会覆盖前三排；
+ * - 面板下方空间不足时，用网格的 padding-bottom 撑开；
+ * - 起始裁剪矩形 = 目标卡片与面板区域的交集（展开从此处对角向下生长）。
  */
 function measureSlots(grid: HTMLElement, target: HTMLElement): Measured | null {
   const cardEls = Array.from(
@@ -78,23 +76,18 @@ function measureSlots(grid: HTMLElement, target: HTMLElement): Measured | null {
     }
   }
   rowTops.sort((a, b) => a - b)
-  const rowOneBottom = Math.max(
-    ...rects
-      .filter((r) => Math.abs(r.top - rowTops[0]) < ROW_TOLERANCE)
-      .map((r) => r.bottom),
-  )
   const contentBottom = Math.max(...rects.map((r) => r.bottom))
 
   const tr = target.getBoundingClientRect()
   const cardTop = tr.top - gRect.top
   const cardBottom = tr.bottom - gRect.top
-  const targetRow = rowTops.findIndex(
-    (t) => Math.abs(t - cardTop) < ROW_TOLERANCE,
+  const targetRow = Math.max(
+    0,
+    rowTops.findIndex((t) => Math.abs(t - cardTop) < ROW_TOLERANCE),
   )
 
-  // 第一排展开 → 面板从网格顶部开始；其余行 → 从第二排顶部开始
-  const panelTop =
-    targetRow <= 0 ? 0 : rowTops.length > 1 ? rowTops[1] : rowOneBottom + GAP
+  // 面板顶部 = 被点击模块所在行的顶部（不覆盖它上面的任何一行）
+  const panelTop = Math.max(0, rowTops[targetRow] ?? 0)
 
   const naturalPanel = Math.max(0, contentBottom - panelTop)
   const panelHeight = Math.max(naturalPanel, PANEL_MIN_HEIGHT)
@@ -484,16 +477,6 @@ export function SlotGrid({ slots }: SlotGridProps) {
                       ))}
                     </dl>
                   )}
-                {activeSlot.content.tags &&
-                  activeSlot.content.tags.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {activeSlot.content.tags.map((t) => (
-                        <Tag key={t} tone="cyan">
-                          {t}
-                        </Tag>
-                      ))}
-                    </div>
-                  )}
                 {activeSlot.content.link && (
                   <a
                     href={activeSlot.content.link.href}
@@ -509,16 +492,11 @@ export function SlotGrid({ slots }: SlotGridProps) {
               </>
             ) : (
               <p className="font-mono text-xs leading-relaxed tracking-wider text-rhine-faint">
-                CONTENT EMPTY — 在 src/content/slots.ts 中为「{activeSlot.label}
+                CONTENT EMPTY — 在 src/content/slots.tsx 中为「{activeSlot.label}
                 」补充隐藏内容
               </p>
             )}
           </motion.div>
-
-          <footer className="relative flex items-center justify-between gap-2 border-t border-rhine-line/70 px-4 py-2 font-mono text-[9px] tracking-[0.25em] text-rhine-faint sm:px-5">
-            <span>ESC / ✕ / 空白处收回</span>
-            <span>切换模块：先收回，再展开</span>
-          </footer>
         </div>
       )}
     </div>

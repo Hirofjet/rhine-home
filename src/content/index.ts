@@ -8,4 +8,6 @@ export * from './profile'
 export * from './abilities'
 export * from './projects'
 export * from './links'
-export * from './slots'
+
+// 注意：slots 不从这里导出（它包含 markdown/exifr 等较重依赖，
+// 由页面直接 import '../content/slots' 以保持按需加载）

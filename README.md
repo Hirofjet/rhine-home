@@ -44,17 +44,27 @@ src/
 │   ├── abilities.ts      能力模块卡片
 │   ├── projects.ts       项目档案
 │   ├── links.ts          联络方式 + 直连邮箱
-│   └── index.ts          统一出口
+│   ├── slots.tsx         槽位模块数据（文章 / 视频 / 照片时间线入口）
+│   └── index.ts          统一出口（slots 因含重依赖单独引入，见文件内注释）
 ├── components/
 │   ├── ui/               莱茵风格 UI 原语：Panel / CornerFrame / SectionTitle /
 │   │                     GlowButton / StatusDot / TypingText / ProgressBar / Tag / Barcode
 │   ├── layout/           NavBar / Footer / BackgroundFX（背景特效）/ ModulePlaceholder（占位页模板）
 │   ├── boot/             BootScreen（开机终端动画）
-│   └── home/             首页五大区块：Hero / Dossier / Abilities / Projects / Contact
-├── pages/                HomePage / ArchivePage / ProjectsPage / LabPage / NotFoundPage
+│   ├── home/             首页五大区块：Hero / Dossier / Abilities / Projects / Contact
+│   ├── slots/            SlotGrid（可展开槽位网格）
+│   │   └── content/      ArticleBlock（markdown 文章）/ VideoBlock（视频）/ PhotoTimeline（照片时间线）
+│   └── guestbook/        DanmakuWall（留言弹幕墙）
+├── pages/                HomePage / ArchivePage / ProjectsPage / LabPage / GuestbookPage / NotFoundPage
 ├── hooks/                useTypewriter / useClock / useActiveSection / useCopy
-├── lib/                  cx（className 合并）/ motion（动画预设）/ 
-└── App.tsx               路由注册 + 开机门 + 滚动管理
+├── lib/                  cx / motion（动画预设）/ api（留言板接口层）
+├── assets/
+│   ├── articles/         ← 文章 markdown 放这里
+│   └── photos/           ← 照片放这里（自动读取拍摄时间排序）
+└── App.tsx               路由注册（非首页按需加载）+ 开机门 + 滚动管理
+
+server/                   留言板后端示例（Express + MySQL，可选启用）
+public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /videos/xxx.mp4）
 ```
 
 ---
@@ -140,33 +150,61 @@ src/
 
 ### F. 槽位模块（SLOT）交互与隐藏内容
 
-数据在 `src/content/slots.ts`（`archiveSlots` / `labSlots`），每个槽位：
+数据在 `src/content/slots.tsx`（`archiveSlots` / `labSlots`），每个槽位：
 
-```ts
+```tsx
 {
   id: 'articles',            // 唯一 id（展开动画定位用）
-  label: '文章 / 随笔集',     // 卡片与面板标题
+  label: '文章',              // 卡片与面板标题
   labelEn: 'ARTICLES',
-  summary: '待接入：文章列表与阅读页',
-  content: {                 // ← 展开后的隐藏内容，以后主要填这里
-    paragraphs: ['正文段落'],
-    items: [{ label: '条目数', value: '待填写' }],
-    tags: ['标签'],
-    link: { label: '外链按钮', href: 'https://example.com' },
-    // custom: <你的组件 />  // 需要复杂排版时用（把 slots.ts 改名为 slots.tsx）
+  summary: 'Markdown 文章列表',
+  content: {                 // ← 展开后的隐藏内容
+    paragraphs: ['正文段落'],  // 普通文字（可选）
+    items: [{ label: '条目', value: '值' }],
+    link: { label: '外链', href: 'https://example.com' },
+    custom: (                 // 富内容组件（文章 / 视频 / 照片时间线）
+      <div className="space-y-4">
+        <ArticleBlock file="/src/assets/articles/hello.md" title="标题" tags={['标签']} />
+      </div>
+    ),
   },
 }
 ```
 
 交互规则（`src/components/slots/SlotGrid.tsx`）：
 
-- **第一排模块展开**：面板从网格顶部开始，允许盖住第一排（包括自己）；
-- **第二排及以后展开**：面板从第二排顶部开始，不遮挡第一排；
-- 面板从**模块自身位置**朝网格中心方向展开，收回时缩回模块所在角（左上→右下 / 右下→左上 / 右上→左下 / 左下→右上，自动计算）；
+- 面板从**被点击模块所在行**的顶部向下展开：第三排不会盖住前两排，第四排不会盖住前三排；
+- 展开方向从模块自身位置朝网格中心方向（右上→左下、左下→右上等自动计算），收回时缩回自己所在的角；
 - 已展开时点击可见的其他模块：**先收回当前面板，再展开目标模块**；
 - **展开过程中触发收回**（再次点击 / ✕ / `ESC` / 点空白）：取消剩余展开动画，**从当前裁剪进度直接反向收回**；
 - 收回方式：再次点击当前模块 / 面板右上 ✕ / `ESC` / **点击面板外空白**；
-- **增加槽位**：在数组里追加一项即可 —— 行数变化后展开方向、面板位置、动画面板尺寸全部自适应。
+- **增加槽位**：数组里追加一项即可 —— 行数变化后展开方向、面板位置全部自适应。
+
+**富内容组件**（`src/components/slots/content/`，标签显示在组件底部）：
+
+| 组件 | 用途 | 数据位置 |
+| --- | --- | --- |
+| `<ArticleBlock file="..." title="" tags={[]} />` | 渲染 markdown 文章（支持 GFM：表格、任务列表、删除线、代码块、图片等） | markdown 放 `src/assets/articles/` |
+| `<VideoBlock src="" title="" tags={[]} />` | 视频播放器（`src` 留空显示占位） | 视频放 `public/videos/` |
+| `<PhotoTimeline />` | 照片时间线：自动读取 EXIF 拍摄时间排序，按年份分组 | 照片放 `src/assets/photos/` |
+
+小提示：
+
+- 文章文件路径可以写完整路径 `/src/assets/articles/hello.md`，也可以只写文件名 `hello.md`；
+- markdown 里引用图片可以写 `/favicon.svg` 这类 public 路径；
+- 照片没有 EXIF 时，会尝试从文件名解析 `YYYY-MM-DD`，都没有则归入「未知时间」；
+- 照片和文章都是构建时静态加载 —— 增删文件后重新构建即可。
+
+### G. 留言板与后端接口（MySQL）
+
+留言板页面：`/guestbook`（导航「GUESTBOOK」）。留言以弹幕形式滚动整页，提交后立即出现。
+
+- 前端接口层：`src/lib/api.ts`
+  - `GET {API_BASE}/api/messages` → `{ messages: [{ id, name, content, createdAt }] }`
+  - `POST {API_BASE}/api/messages` `{ name, content }` → 单条留言
+- **未配置后端时自动回退 localStorage**，静态部署也能直接使用；
+- 配置后端：见 `server/README.md`（含 MySQL 建表语句 `server/schema.sql` 与 Express 示例 `server/index.mjs`）；
+- 前端指向后端：复制 `.env.example` 为 `.env`，改 `VITE_API_BASE=http://localhost:3001`。
 
 ---
 
@@ -207,8 +245,12 @@ Tailwind 中使用：`bg-rhine-*` / `text-rhine-*` / `border-rhine-*`（主题�
 - 能力模块：进入视口时进度条动画填充
 - 项目卡片：悬停上浮 + 扫描光带
 - 联络终端：邮箱一键复制（带 COPIED 反馈）、可玩的迷你讯号终端（输入→回显）
-- 槽位模块：点击展开隐藏内容（方向随行列自适应）、先收回再切换、点空白/ESC/✕ 收回
-- 无障碍：`prefers-reduced-motion` 下自动关闭动画
+- 槽位模块：点击展开隐藏内容（面板只向下覆盖、方向随行列自适应）、先收回再切换、点空白/ESC/✕ 收回、展开中打断会从当前进度反向收回
+- 文章组件：读取 `src/assets/articles/` 的 markdown，支持 GFM 表格 / 任务列表 / 代码块 / 图片等
+- 视频组件：预留视频路径，填入后渲染原生播放器（留空显示占位）
+- 照片时间线：读取照片 EXIF 拍摄时间，按年份分组、时间升序排列（无 EXIF 时回退文件名日期）
+- 留言板：留言以弹幕滚动整页，可提交新留言；未配置后端时本地存储，配置 MySQL 后端后自动走接口
+- 无障碍：`prefers-reduced-motion` 下自动关闭动画（留言改为静态排列）
 
 ---
 
