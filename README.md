@@ -185,7 +185,7 @@ public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /vi
 | 组件 | 用途 | 数据位置 |
 | --- | --- | --- |
 | `<ArticleBlock file="..." title="" tags={[]} />` | 渲染 markdown 文章（支持 GFM：表格、任务列表、删除线、代码块、图片等） | markdown 放 `src/assets/articles/` |
-| `<VideoBlock src="" title="" tags={[]} />` | 视频播放器（`src` 留空显示占位） | 视频放 `public/videos/` |
+| `<VideoBlock src="" title="" description="" tags={[]} />` | 标题 + 简介 + 播放器（`src` 留空显示占位；播放器限高 420px） | 视频放 `public/videos/` |
 | `<PhotoTimeline />` | 照片时间线：自动读取 EXIF 拍摄时间排序，按年份分组 | 照片放 `src/assets/photos/` |
 
 小提示：
@@ -193,15 +193,18 @@ public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /vi
 - 文章文件路径可以写完整路径 `/src/assets/articles/hello.md`，也可以只写文件名 `hello.md`；
 - markdown 里引用图片可以写 `/favicon.svg` 这类 public 路径；
 - 照片没有 EXIF 时，会尝试从文件名解析 `YYYY-MM-DD`，都没有则归入「未知时间」；
-- 照片和文章都是构建时静态加载 —— 增删文件后重新构建即可。
+- 照片和文章都是构建时静态加载 —— 增删文件后重新构建即可；
+- 展开面板最小高度为 `640px`（`SlotGrid.tsx` 的 `PANEL_MIN_HEIGHT`），足够完整显示视频与文案，可按需调整。
 
 ### G. 留言板与后端接口（MySQL）
 
 留言板页面：`/guestbook`（导航「GUESTBOOK」）。留言以弹幕形式滚动整页，提交后立即出现。
 
+- 弹幕规则：**每条留言只生成一个弹幕元素**，动画走完一屏后才会重新出现，因此同一条留言不会同时出现在屏幕上两次；
 - 前端接口层：`src/lib/api.ts`
   - `GET {API_BASE}/api/messages` → `{ messages: [{ id, name, content, createdAt }] }`
   - `POST {API_BASE}/api/messages` `{ name, content }` → 单条留言
+  - `id` 为**自增序号**（第一条 = 1，第二条 = 2 …）：后端用 MySQL `AUTO_INCREMENT`，本地回退取现有最大 id + 1，保证同名留言也不会互相顶掉；
 - **未配置后端时自动回退 localStorage**，静态部署也能直接使用；
 - 配置后端：见 `server/README.md`（含 MySQL 建表语句 `server/schema.sql` 与 Express 示例 `server/index.mjs`）；
 - 前端指向后端：复制 `.env.example` 为 `.env`，改 `VITE_API_BASE=http://localhost:3001`。
@@ -249,7 +252,7 @@ Tailwind 中使用：`bg-rhine-*` / `text-rhine-*` / `border-rhine-*`（主题�
 - 文章组件：读取 `src/assets/articles/` 的 markdown，支持 GFM 表格 / 任务列表 / 代码块 / 图片等
 - 视频组件：预留视频路径，填入后渲染原生播放器（留空显示占位）
 - 照片时间线：读取照片 EXIF 拍摄时间，按年份分组、时间升序排列（无 EXIF 时回退文件名日期）
-- 留言板：留言以弹幕滚动整页，可提交新留言；未配置后端时本地存储，配置 MySQL 后端后自动走接口
+- 留言板：留言以弹幕滚动整页，可提交新留言；每条留言串行播放（播完才再出现）；留言 id 为自增序号；未配置后端时本地存储，配置 MySQL 后端后自动走接口
 - 无障碍：`prefers-reduced-motion` 下自动关闭动画（留言改为静态排列）
 
 ---

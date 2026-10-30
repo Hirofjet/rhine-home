@@ -5,7 +5,7 @@
 - `GET  {API_BASE}/api/messages` → `{ messages: GuestMessage[] }`
 - `POST {API_BASE}/api/messages` `{ name, content }` → `GuestMessage`
 
-`GuestMessage`：`{ id, name, content, createdAt }`（`createdAt` 为 ISO 时间字符串）。
+`GuestMessage`：`{ id, name, content, createdAt }`（`id` 为自增序号，`createdAt` 为 ISO 时间字符串）。
 
 **后端未启动时前端会自动回退到浏览器 localStorage**，所以本地预览、静态部署都能直接用。
 

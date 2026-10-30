@@ -20,33 +20,26 @@ const COLORS = [
   'text-rhine-ink/70',
 ]
 
+/**
+ * 每条留言只生成一个弹幕元素：
+ * - 动画时长 = 完整飞过一屏的时间，无限循环；
+ * - 因此同一条留言只有在「上一次播完」之后才会再次出现，不会同时出现两次；
+ * - 用负延迟让进入页面时各条弹幕已经分布在不同进度/轨道上。
+ */
 function buildItems(messages: GuestMessage[]): DanmakuItem[] {
-  if (messages.length === 0) return []
-  const items: DanmakuItem[] = []
-  const laneCounters = new Array<number>(LANES).fill(0)
-  // 重复几轮，让屏幕更饱满
-  const cycles = Math.max(1, Math.ceil(18 / messages.length))
-  for (let c = 0; c < cycles; c++) {
-    messages.forEach((m, i) => {
-      const idx = c * messages.length + i
-      const lane = idx % LANES
-      const duration = 24 + (lane % 3) * 5
-      const k = laneCounters[lane] ?? 0
-      laneCounters[lane] = k + 1
-      // 同一轨道的相邻弹幕错开「duration + 8s」，避免文字重叠
-      const phaseOffset = (lane * 2.7) % duration
-      items.push({
-        key: `${m.id}-${c}-${i}`,
-        name: m.name,
-        text: m.content,
-        top: 6 + lane * 7,
-        duration,
-        delay: -(phaseOffset + k * (duration + 8)),
-        color: COLORS[idx % COLORS.length] ?? 'text-rhine-dim',
-      })
-    })
-  }
-  return items
+  return messages.map((m, i) => {
+    const lane = i % LANES
+    const duration = 24 + (i % 4) * 4
+    return {
+      key: String(m.id),
+      name: m.name,
+      text: m.content,
+      top: 6 + lane * 7,
+      duration,
+      delay: -((i * 3.7) % duration),
+      color: COLORS[i % COLORS.length] ?? 'text-rhine-dim',
+    }
+  })
 }
 
 /** 弹幕墙：所有留言从右向左飘过整页（无障碍偏好下改为静态列表） */
