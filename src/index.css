@@ -5,21 +5,23 @@
    莱茵生命风格设计令牌：在这里修改颜色 / 字体即可全局换肤
    ============================================================ */
 @theme {
-  /* ---- 色彩：黑曜石基底 + 白金 + 数据青 ---- */
-  --color-abyss: #05070b; /* 页面底色 */
-  --color-abyss-2: #070b11; /* 深色次级底色 */
-  --color-panel: #0b111a; /* 面板底色 */
-  --color-panel-2: #0e1520; /* 面板悬浮/次级底色 */
-  --color-line: #1e2a37; /* 常规描边 */
-  --color-line-2: #31445a; /* 高亮描边 */
-  --color-ink: #e2e9f2; /* 主文字 */
-  --color-dim: #8b9bad; /* 次级文字 */
-  --color-faint: #54657a; /* 弱化文字 */
-  --color-gold: #d3b27a; /* 莱茵金：主强调色 */
-  --color-gold-deep: #8a7248; /* 深金：次级强调 */
-  --color-cyan: #63d4dc; /* 数据青：信息强调色 */
-  --color-green: #7ee2a0; /* 正常状态 */
-  --color-red: #ff6b6b; /* 警示状态 */
+  /* ---- 色彩：黑曜石基底 + 白金 + 数据青 ----
+     变量名带 rhine- 前缀，因此 Tailwind 类名为
+     bg-rhine-abyss / text-rhine-gold / border-rhine-line … */
+  --color-rhine-abyss: #05070b; /* 页面底色 */
+  --color-rhine-abyss-2: #070b11; /* 深色次级底色 */
+  --color-rhine-panel: #0b111a; /* 面板底色 */
+  --color-rhine-panel-2: #0e1520; /* 面板悬浮/次级底色 */
+  --color-rhine-line: #1e2a37; /* 常规描边 */
+  --color-rhine-line-2: #31445a; /* 高亮描边 */
+  --color-rhine-ink: #e2e9f2; /* 主文字 */
+  --color-rhine-dim: #8b9bad; /* 次级文字 */
+  --color-rhine-faint: #54657a; /* 弱化文字 */
+  --color-rhine-gold: #d3b27a; /* 莱茵金：主强调色 */
+  --color-rhine-gold-deep: #8a7248; /* 深金：次级强调 */
+  --color-rhine-cyan: #63d4dc; /* 数据青：信息强调色 */
+  --color-rhine-green: #7ee2a0; /* 正常状态 */
+  --color-rhine-red: #ff6b6b; /* 警示状态 */
 
   /* ---- 字体：拉丁科幻字体本地打包，中文走系统字体栈 ---- */
   --font-display: "Orbitron", "Rajdhani", "PingFang SC", "Microsoft YaHei",
@@ -89,8 +91,8 @@
   }
 
   body {
-    background-color: var(--color-abyss);
-    color: var(--color-ink);
+    background-color: var(--color-rhine-abyss);
+    color: var(--color-rhine-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -107,14 +109,14 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: var(--color-abyss);
+    background: var(--color-rhine-abyss);
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-line-2);
-    border: 2px solid var(--color-abyss);
+    background: var(--color-rhine-line-2);
+    border: 2px solid var(--color-rhine-abyss);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-gold-deep);
+    background: var(--color-rhine-gold-deep);
   }
 }
 
