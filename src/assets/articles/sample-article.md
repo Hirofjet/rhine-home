@@ -1,7 +1,6 @@
-# 示例文章：Markdown 全功能展示
+# 没想好写啥
 
-> 这是一篇用于验证渲染效果的文章。把 `src/assets/articles/` 下的 markdown 文件换成你自己的，
-> 或者在 `ArticleBlock` 的 `file` 属性里指向你自己的文件即可。
+> 就把这篇文章当作markdown小教程好了
 
 ## 二级标题
 
@@ -45,3 +44,7 @@ export function hello(name: string) {
 ### 图片
 
 ![站点图标](/favicon.svg)
+
+### 下载本文章
+
+[站点图标](sample-article.md)

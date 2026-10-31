@@ -60,9 +60,17 @@ export const archiveSlots: SlotModule[] = [
         <div className="space-y-4">
           <ArticleBlock
             file="/src/assets/articles/sample-article.md"
-            title="示例文章：Markdown 全功能展示"
+            title="没想好写啥"
             date="2026-10-31"
             tags={['示例', 'Markdown']}
+            downloads={[
+              {
+                label: '示例附件：纯文本说明',
+                file: 'sample-readme.txt',
+                size: '1 KB',
+                note: '文件放在 public/downloads/ 下',
+              },
+            ]}
           />
           <ArticleBlock title="待接入文章" tags={['待填写']} />
         </div>
