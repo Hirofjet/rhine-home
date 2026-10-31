@@ -186,7 +186,7 @@ public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /vi
 
 | 组件 | 用途 | 数据位置 |
 | --- | --- | --- |
-| `<ArticleBlock file="..." title="" tags={[]} />` | 渲染 markdown 文章（支持 GFM：表格、任务列表、删除线、代码块、图片等） | markdown 放 `src/assets/articles/` |
+| `<ArticleBlock file="..." title="" tags={[]} downloads={[]} />` | 渲染 markdown 文章（支持 GFM：表格、任务列表、删除线、代码块、图片等）；可在文末附本地文件下载链接 | markdown 放 `src/assets/articles/`；附件放 `public/downloads/` |
 | `<VideoBlock src="" title="" description="" tags={[]} />` | 标题 + 简介 + 播放器（`src` 留空显示占位；播放器限高 420px） | 视频放 `public/videos/` |
 | `<PhotoTimeline />` | 照片时间线：自动读取 EXIF 拍摄时间排序，按年份分组 | 照片放 `src/assets/photos/` |
 
@@ -197,6 +197,23 @@ public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /vi
 - 照片没有 EXIF 时，会尝试从文件名解析 `YYYY-MM-DD`，都没有则归入「未知时间」；
 - 照片和文章都是构建时静态加载 —— 增删文件后重新构建即可；
 - 展开面板最小高度为 `640px`（`SlotGrid.tsx` 的 `PANEL_MIN_HEIGHT`），足够完整显示视频与文案，可按需调整。
+
+**文章附件下载**：把文件放进 `public/downloads/`，然后给 `ArticleBlock` 传 `downloads`：
+
+```tsx
+<ArticleBlock
+  file="/src/assets/articles/hello.md"
+  title="文章标题"
+  tags={['随笔']}
+  downloads={[
+    { label: '本文 PDF 版', file: 'hello.pdf', size: '1.2 MB' },
+    { label: '源码压缩包', file: 'source.zip', note: '含示例代码' },
+    // file 也可写完整路径 '/downloads/x.zip' 或 https 外链
+  ]}
+/>
+```
+
+渲染在文章正文下方、标签上方；链接带 `download` 属性，点击即下载（跨域外链会由浏览器决定打开方式）。
 
 ### G. 留言板与后端接口（MySQL）
 
