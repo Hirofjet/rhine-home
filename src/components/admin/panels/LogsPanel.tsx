@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { FileUp, Plus } from 'lucide-react'
-import type { ContentLog } from '../../../lib/contentApi'
-import { adminApi } from '../../../lib/adminApi'
+import { adminApi, type ContentLog } from '../../../lib/api'
 import {
   AdminButton,
   AdminError,

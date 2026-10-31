@@ -4,7 +4,7 @@ import {
   contentApi,
   resolveMediaUrl,
   type ContentArticle,
-} from '../../../lib/contentApi'
+} from '../../../lib/api'
 import { ArticleBlock } from './ArticleBlock'
 
 interface ArticlesFeedProps {

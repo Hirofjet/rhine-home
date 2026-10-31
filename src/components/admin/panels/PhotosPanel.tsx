@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImagePlus, Link2, Upload } from 'lucide-react'
-import type { ContentPhoto } from '../../../lib/contentApi'
-import { adminApi } from '../../../lib/adminApi'
+import { adminApi, type ContentPhoto } from '../../../lib/api'
 import {
   AdminButton,
   AdminCheckbox,

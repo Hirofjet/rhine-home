@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import * as exifr from 'exifr'
 import { ImageOff } from 'lucide-react'
 import { cx } from '../../../lib/cx'
-import { contentApi, resolveMediaUrl } from '../../../lib/contentApi'
+import { contentApi, resolveMediaUrl } from '../../../lib/api'
 
 /** 自动收集 src/assets/photos 下的图片（?url 获取可访问地址） */
 const PHOTO_FILES = import.meta.glob(

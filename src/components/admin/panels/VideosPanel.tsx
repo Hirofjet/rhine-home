@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { ContentVideo } from '../../../lib/contentApi'
-import { adminApi } from '../../../lib/adminApi'
+import { adminApi, type ContentVideo } from '../../../lib/api'
 import {
   AdminButton,
   AdminError,

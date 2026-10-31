@@ -1,79 +1,118 @@
-# RHINE//HOME 后端
+# RHINE//HOME 后端（MySQL）
 
-Express 5 + 文件存储服务：管理后台鉴权、内容 CRUD、文件上传、留言板，并可托管前端构建产物。
+Express 5 服务：账号 / 邮箱验证码 / 数据库会话 / 权限树 / 档案内容 / 日志 / 论坛 / 审核 / 上传，并可托管前端 `dist/`。
 
 ## 快速开始
 
 ```bash
 cd server
 npm install
-npm start        # http://localhost:3001
+cp .env.example .env    # 填写 DB_*、ADMIN_USER、ADMIN_PASSWORD
+npm start               # http://localhost:3001
 ```
 
-首次启动会：
+启动时自动建表；用户表为空时按环境变量创建超级管理员。
 
-1. 自动建库表（MySQL 模式）或创建 `server/data/*.json`（JSON 模式）；
-2. 在没有任何账号时创建初始管理员（默认 `admin / admin123`）。
+健康检查：
 
-> 生产环境请用环境变量覆盖初始账号，并在后台修改密码。
+```bash
+curl http://127.0.0.1:3001/api/health
+# {"ok":true,"storage":"mysql","version":"2.0.0",...}
+```
 
 ## 环境变量
 
-复制 `.env.example` 为 `.env`（或直接设置环境变量）：
-
 | 变量 | 说明 |
 | --- | --- |
-| `PORT` | 端口，默认 `3001` |
-| `ADMIN_USER` / `ADMIN_PASSWORD` | 首次启动时创建的管理员账号 |
-| `CORS_ORIGIN` | 前后端分域时允许的来源，逗号分隔（同域部署可留空） |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 配置后使用 MySQL；不配置则用 JSON 文件 |
-| `UPLOAD_DIR` / `DATA_DIR` | 自定义上传 / 数据目录（默认 `server/uploads`、`server/data`） |
+| `PORT` | 端口，默认 3001 |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | **必填**，MySQL 连接 |
+| `ADMIN_USER` / `ADMIN_PASSWORD` | 首次启动创建超级管理员 |
+| `SESSION_HOURS` | 会话时长（默认 12 小时，存 MySQL） |
+| `UPLOAD_DIR` | 上传目录（默认 `server/uploads`） |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | 验证码邮件；不配置则打印到日志 |
+| `ALLOW_DEV_CODES` | 本地调试返回验证码（生产必须 0） |
+| `CORS_ORIGIN` | 前后端分域时允许的来源；同域留空 |
 
-## 存储
+## 数据表
 
-- **MySQL 8**：配置 `DB_HOST` 后自动建表（`schema.sql` 为参考 DDL）；
-- **JSON 文件**：默认模式，数据保存在 `server/data/*.json`，无需数据库，适合弱性能服务器或本地调试。
+`users`、`sessions`、`email_codes`、`articles`、`photos`、`videos`、`logs`、`forum_boards`、`forum_posts`、`forum_replies`、`guest_messages`。完整 DDL 见 `schema.sql`。
 
-两种模式共用同一套接口与数据模型。
+## 权限
 
-## 接口一览
+| key | 含义 |
+| --- | --- |
+| `archive` / `archive.articles` / `archive.photos` / `archive.videos` | 档案及子权限 |
+| `logs` | 日志 |
+| `forum` / `forum.<boardId>` | 论坛全部板块 / 指定板块 |
+| `members.manage` | 管理成员（新增、删除、重置密码） |
+| `members.grant` | 授权权限（修改他人权限） |
 
-公开（前台读取，无需登录）：
+规则由服务端强制：
 
-- `GET /api/content/articles`
-- `GET /api/content/logs`
-- `GET /api/content/photos`
-- `GET /api/content/videos`
-- `GET /api/messages` / `POST /api/messages`（留言板）
-- `GET /api/health`（健康检查）
+- 只有 `members.grant`（或超级用户）能修改权限；
+- 不能修改自己的权限；
+- 拥有 `members.*` 的账号之间不能互相操作（仅超级用户）；
+- 超级管理员不可删除、不可被其他账号改密。
 
-后台（`Authorization: Bearer <token>`）：
+## 接口
 
-- `POST /api/admin/login` `{ username, password }` → `{ token, user }`
-- `POST /api/admin/logout`、`GET /api/admin/me`
-- `GET/POST /api/admin/articles`、`PUT/DELETE /api/admin/articles/:id`
-- 日志 / 照片 / 视频同上（`logs` / `photos` / `videos`）
-- `POST /api/admin/upload?kind=file|photo|video`（multipart 字段名 `file`）
-  - 照片会读取 EXIF `DateTimeOriginal`，返回 `{ url, name, size, date }`
-- 成员管理（owner 或拥有 `members` 权限的账号）：
-  - `GET /api/admin/users`
-  - `POST /api/admin/users` `{ username, password, permissions }`
-  - `PUT /api/admin/users/:id` `{ password?, permissions? }`
-  - `DELETE /api/admin/users/:id`
+### 公开
 
-权限模块：`articles` / `logs` / `photos` / `videos` / `members`。
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/health` | 健康检查（含 MySQL ping） |
+| POST | `/api/auth/login` | 登录（用户名或邮箱 + 密码） |
+| POST | `/api/auth/email-code` | 发送注册/重置验证码 |
+| POST | `/api/auth/register` | 注册（需验证码） |
+| POST | `/api/auth/password/reset` | 邮箱验证码重置密码 |
+| GET | `/api/content/articles` / `logs` / `photos` / `videos` | 前台内容 |
+| GET | `/api/messages` | 留言板 |
+| POST | `/api/messages` | 提交留言 |
+| GET | `/api/forum/boards` | 板块列表 |
+| GET | `/api/forum/boards/:slug` | 板块帖子（分页，仅已审核） |
+| GET | `/api/forum/posts/:id` | 帖子详情 + 已审核回复 |
 
-## 部署
+### 登录用户
 
-1. 在项目根目录执行 `npm run build` 生成 `dist/`；
-2. 启动本服务（`npm start`）；
-3. 服务会自动托管 `dist/`（SPA 回退），并通过 `/uploads` 提供上传文件；
-4. 访问 `http://服务器:3001` 即为完整站点，管理后台在 `/admin`（或前端配置的 `VITE_ADMIN_PATH`）。
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/auth/me` | 当前用户 |
+| POST | `/api/auth/logout` | 退出 |
+| POST | `/api/admin/me/password` | 修改自己的密码（原密码 + 两次确认） |
+| POST | `/api/upload?kind=file\|photo\|video` | 上传（multipart 字段 `file`） |
+| POST | `/api/forum/posts` | 发帖（进入待审核） |
+| POST | `/api/forum/posts/:id/replies` | 回复（进入待审核） |
+| GET | `/api/forum/my` | 我的帖子 / 回复及审核状态 |
 
-也可以前后端分离部署：前端配置 `VITE_API_BASE`，后端设置 `CORS_ORIGIN`。
+### 管理后台（Bearer Token）
 
-## 安全提示
+| 方法 | 路径 | 权限 |
+| --- | --- | --- |
+| GET | `/api/admin/overview` | 任意管理权限 |
+| GET/POST/PUT/DELETE | `/api/admin/articles`（及 `photos` / `videos` / `logs`） | 对应档案/日志权限 |
+| GET | `/api/admin/users` | 成员管理或授权权限 |
+| POST | `/api/admin/users` | `members.manage` |
+| PUT | `/api/admin/users/:id` | `members.manage`（邮箱 / 密码 / 禁用） |
+| PUT | `/api/admin/users/:id/permissions` | `members.grant` |
+| DELETE | `/api/admin/users/:id` | `members.manage` |
+| GET/POST/PUT/DELETE | `/api/admin/forum/boards` | 论坛权限（创建/删除需 `forum`） |
+| GET | `/api/admin/forum/pending` | 论坛权限（按板块过滤） |
+| POST | `/api/admin/forum/review` | 对应板块审核权限 |
 
+## 上传
+
+- 目录：`uploads/file`、`uploads/photo`、`uploads/video`；
+- 单文件上限 500MB；
+- 照片服务端读取 EXIF `DateTimeOriginal`，返回 `{ url, name, size, date }`；
+- 静态访问：`/uploads/...`，缓存 7 天。
+
+## 生产部署
+
+见项目根目录 **[DEPLOY.md](../DEPLOY.md)**（MySQL、systemd、Nginx、HTTPS、备份、故障排查）。
+
+## 注意
+
+- 不要提交 `.env`；
+- 生产环境设置 `ALLOW_DEV_CODES=0`；
 - 修改默认管理员密码；
-- 生产环境建议挂在 Nginx 后面开启 HTTPS；
-- 上传目录不要允许执行脚本（仅作为静态文件提供）。
+- 上传目录只作为静态文件提供，不执行脚本。
