@@ -4,7 +4,7 @@ import {
   contentApi,
   resolveMediaUrl,
   type ContentVideo,
-} from '../../../lib/contentApi'
+} from '../../../lib/api'
 import { VideoBlock } from './VideoBlock'
 
 interface VideosFeedProps {

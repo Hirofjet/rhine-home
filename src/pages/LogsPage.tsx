@@ -5,7 +5,7 @@ import { ArticleBlock } from '../components/slots/content/ArticleBlock'
 import { GlowButton, SectionTitle } from '../components/ui'
 import { logSlots } from '../content/logs'
 import type { SlotModule } from '../content/slots'
-import { contentApi, type ContentLog } from '../lib/contentApi'
+import { contentApi, type ContentLog } from '../lib/api'
 
 /** 取 markdown 第一段正文作为卡片摘要 */
 function summaryOf(markdown: string): string {

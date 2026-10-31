@@ -1,82 +1,137 @@
 import { useEffect, useState } from 'react'
-import { adminApi, type AdminUser } from '../../../lib/adminApi'
-import { AdminPanel } from '../AdminUi'
+import { Activity, ArrowUpRight } from 'lucide-react'
+import {
+  adminApi,
+  API_BASE,
+  errorMessage,
+  ROLE_LABELS,
+  type ApiUser,
+} from '../../../lib/api'
+import { AdminBadge, AdminError, AdminPanel } from '../AdminUi'
 
-const MODULES = [
-  { key: 'articles', label: '文章' },
-  { key: 'logs', label: '日志' },
-  { key: 'photos', label: '照片' },
-  { key: 'videos', label: '视频' },
-] as const
+interface OverviewPanelProps {
+  user: ApiUser
+  onNavigate?: (key: string) => void
+}
 
-type ModuleKey = (typeof MODULES)[number]['key']
+const CARDS: Array<{ key: string; label: string; target?: string; tone?: 'gold' | 'cyan' | 'red' }> = [
+  { key: 'articles', label: '文章', target: 'articles' },
+  { key: 'photos', label: '照片', target: 'photos' },
+  { key: 'videos', label: '视频', target: 'videos' },
+  { key: 'logs', label: '日志', target: 'logs' },
+  { key: 'boards', label: '论坛板块', target: 'forum-boards' },
+  { key: 'pendingPosts', label: '待审帖子', target: 'review', tone: 'gold' },
+  { key: 'pendingReplies', label: '待审回复', target: 'review', tone: 'gold' },
+  { key: 'users', label: '成员', target: 'members', tone: 'cyan' },
+]
 
-/** 概览：各模块条目数 + 当前账号信息 */
-export function OverviewPanel({ user }: { user: AdminUser }) {
-  const [counts, setCounts] = useState<Partial<Record<ModuleKey, number>>>({})
+export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  const [error, setError] = useState('')
+  const [health, setHealth] = useState<'checking' | 'ok' | 'down'>('checking')
 
   useEffect(() => {
     let alive = true
-    const load = async () => {
-      const next: Partial<Record<ModuleKey, number>> = {}
-      for (const module of MODULES) {
-        if (user.role !== 'owner' && !user.permissions.includes(module.key)) continue
-        try {
-          const data = (await adminApi.list(module.key)) as { items: unknown[] }
-          next[module.key] = data.items.length
-        } catch {
-          next[module.key] = 0
-        }
-      }
-      if (alive) setCounts(next)
-    }
-    void load()
+    adminApi
+      .overview()
+      .then((data) => {
+        if (alive) setCounts(data.counts)
+      })
+      .catch((err: unknown) => {
+        if (alive) setError(errorMessage(err))
+      })
     return () => {
       alive = false
     }
-  }, [user])
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    fetch(`${API_BASE}/api/health`)
+      .then((res) => res.json())
+      .then((data: { ok?: boolean }) => {
+        if (alive) setHealth(data.ok ? 'ok' : 'down')
+      })
+      .catch(() => {
+        if (alive) setHealth('down')
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   return (
     <div className="space-y-4">
+      <AdminError message={error} />
       <AdminPanel title="控制台概览" subtitle="OVERVIEW">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {MODULES.map((module) => {
-            const permitted =
-              user.role === 'owner' || user.permissions.includes(module.key)
+          {CARDS.filter((card) => counts[card.key] !== undefined).map((card) => {
+            const value = counts[card.key] ?? 0
             return (
-              <div
-                key={module.key}
-                className="border border-rhine-line bg-rhine-abyss/40 p-4"
+              <button
+                key={card.key}
+                type="button"
+                onClick={() => card.target && onNavigate?.(card.target)}
+                className="group border border-rhine-line bg-rhine-abyss/40 p-4 text-left transition-colors hover:border-rhine-gold/50"
               >
-                <p className="font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
-                  {module.key.toUpperCase()}
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
+                    {card.key.toUpperCase()}
+                  </p>
+                  {card.target && (
+                    <ArrowUpRight className="h-3 w-3 text-rhine-faint opacity-0 transition-opacity group-hover:opacity-100" />
+                  )}
+                </div>
+                <p
+                  className={`mt-2 font-display text-2xl ${
+                    card.tone === 'cyan'
+                      ? 'text-rhine-cyan'
+                      : card.tone === 'red'
+                        ? 'text-rhine-red'
+                        : 'text-rhine-gold'
+                  }`}
+                >
+                  {value}
                 </p>
-                <p className="mt-2 font-display text-2xl text-rhine-gold">
-                  {permitted ? (counts[module.key] ?? '--') : '✕'}
-                </p>
-                <p className="mt-1 font-mono text-[10px] text-rhine-dim">
-                  {module.label}
-                  {permitted ? '' : '（无权限）'}
-                </p>
-              </div>
+                <p className="mt-1 font-mono text-[10px] text-rhine-dim">{card.label}</p>
+              </button>
             )
           })}
         </div>
 
-        <div className="mt-5 space-y-1 border-t border-rhine-line/60 pt-4 font-mono text-[10px] leading-relaxed tracking-wider text-rhine-faint">
-          <p>
-            当前账号：{user.username}（{user.role === 'owner' ? 'OWNER' : 'ADMIN'}）
+        {Object.keys(counts).length === 0 && (
+          <p className="mt-4 font-mono text-[10px] tracking-wider text-rhine-faint">
+            暂无可统计的模块
           </p>
-          <p>
-            可管理模块：
-            {user.role === 'owner'
-              ? '全部'
-              : user.permissions.length > 0
-                ? user.permissions.join(' / ')
-                : '无'}
-          </p>
-          <p>后台入口不会出现在前台导航中，仅通过地址访问。</p>
+        )}
+
+        <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-rhine-line/60 pt-4 font-mono text-[10px] tracking-wider text-rhine-dim">
+          <span className="flex items-center gap-2">
+            <Activity
+              className={`h-3.5 w-3.5 ${
+                health === 'ok'
+                  ? 'text-rhine-green'
+                  : health === 'down'
+                    ? 'text-rhine-red'
+                    : 'text-rhine-gold'
+              }`}
+            />
+            服务状态：
+            {health === 'ok' ? 'MySQL 已连接' : health === 'down' ? '无法连接后端' : '检测中…'}
+          </span>
+          <span>
+            当前账号：{user.username}（{ROLE_LABELS[user.role]}）
+          </span>
+          {user.isSuper ? (
+            <AdminBadge tone="gold">SUPERUSER</AdminBadge>
+          ) : (
+            <AdminBadge tone="cyan">{user.permissions.length} 项权限</AdminBadge>
+          )}
         </div>
+
+        <p className="mt-3 font-mono text-[10px] leading-relaxed tracking-wider text-rhine-faint">
+          提示：后台入口不会出现在前台导航；账号与权限修改会记录在成员列表中。
+        </p>
       </AdminPanel>
     </div>
   )

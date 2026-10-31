@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { BootScreen } from './components/boot/BootScreen'
+import { SessionProvider } from './components/auth/SessionProvider'
 import { BackgroundFX } from './components/layout/BackgroundFX'
 import { Footer } from './components/layout/Footer'
 import { NavBar } from './components/layout/NavBar'
@@ -24,6 +25,20 @@ const LogsPage = lazy(() =>
 )
 const ProjectsPage = lazy(() =>
   import('./pages/ProjectsPage').then((m) => ({ default: m.ProjectsPage })),
+)
+const ForumPage = lazy(() =>
+  import('./pages/ForumPage').then((m) => ({ default: m.ForumPage })),
+)
+const ForumBoardPage = lazy(() =>
+  import('./pages/ForumBoardPage').then((m) => ({ default: m.ForumBoardPage })),
+)
+const ForumPostPage = lazy(() =>
+  import('./pages/ForumPostPage').then((m) => ({ default: m.ForumPostPage })),
+)
+const ForumComposePage = lazy(() =>
+  import('./pages/ForumComposePage').then((m) => ({
+    default: m.ForumComposePage,
+  })),
 )
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
@@ -114,6 +129,10 @@ function AnimatedRoutes() {
             <Route path="/archive" element={<ArchivePage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/logs" element={<LogsPage />} />
+            <Route path="/forum" element={<ForumPage />} />
+            <Route path="/forum/new" element={<ForumComposePage />} />
+            <Route path="/forum/post/:id" element={<ForumPostPage />} />
+            <Route path="/forum/:slug" element={<ForumBoardPage />} />
             <Route path="/guestbook" element={<GuestbookPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
@@ -138,21 +157,23 @@ function PublicSite() {
 export default function App() {
   return (
     <BrowserRouter>
-      <BootGate>
-        <ScrollManager />
-        <Routes>
-          {/* 后台：独立入口，不出现在前台导航 */}
-          <Route
-            path={`${ADMIN_PATH}/*`}
-            element={
-              <Suspense fallback={<PageLoading />}>
-                <AdminPage />
-              </Suspense>
-            }
-          />
-          <Route path="*" element={<PublicSite />} />
-        </Routes>
-      </BootGate>
+      <SessionProvider>
+        <BootGate>
+          <ScrollManager />
+          <Routes>
+            {/* 后台：独立入口，不出现在前台导航 */}
+            <Route
+              path={`${ADMIN_PATH}/*`}
+              element={
+                <Suspense fallback={<PageLoading />}>
+                  <AdminPage />
+                </Suspense>
+              }
+            />
+            <Route path="*" element={<PublicSite />} />
+          </Routes>
+        </BootGate>
+      </SessionProvider>
     </BrowserRouter>
   )
 }

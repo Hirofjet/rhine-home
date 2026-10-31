@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Plus } from 'lucide-react'
-import type { ContentArticle } from '../../../lib/contentApi'
-import { adminApi } from '../../../lib/adminApi'
+import { adminApi, type ContentArticle } from '../../../lib/api'
 import {
   AdminButton,
   AdminError,
@@ -301,14 +300,7 @@ export function ArticlesPanel() {
                     kind="file"
                     label="附件文件"
                     value={download.file}
-                    onChange={(value, meta) =>
-                      updateDownload(index, {
-                        file: value,
-                        size:
-                          download.size ||
-                          (meta?.size ? `${Math.round(meta.size / 1024)} KB` : ''),
-                      })
-                    }
+                    onChange={(value) => updateDownload(index, { file: value })}
                   />
                   <AdminField label="备注（可选）">
                     <AdminInput
