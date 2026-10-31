@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { BootScreen } from './components/boot/BootScreen'
 import { BackgroundFX } from './components/layout/BackgroundFX'
@@ -8,6 +8,9 @@ import { Footer } from './components/layout/Footer'
 import { NavBar } from './components/layout/NavBar'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
+
+/** 后台入口路径（可用 VITE_ADMIN_PATH 自定义，前台导航中不出现） */
+const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin'
 
 // 非首页路由按需加载：markdown 解析、EXIF 等依赖只在进入对应页面时才下载
 const ArchivePage = lazy(() =>
@@ -21,6 +24,9 @@ const LogsPage = lazy(() =>
 )
 const ProjectsPage = lazy(() =>
   import('./pages/ProjectsPage').then((m) => ({ default: m.ProjectsPage })),
+)
+const AdminPage = lazy(() =>
+  import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
 )
 
 /** 懒加载页面的加载态 */
@@ -56,9 +62,13 @@ function ScrollManager() {
   return null
 }
 
-/** 开机门：同会话内只播放一次开机动画，之后直接进入站点 */
+/** 开机门：同会话内只播放一次开机动画；后台入口不播放 */
 function BootGate({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  const isAdmin = pathname.startsWith(ADMIN_PATH)
+
   const [booted, setBooted] = useState(() => {
+    if (isAdmin) return true
     try {
       return sessionStorage.getItem('rhine:booted') === '1'
     } catch {
@@ -85,15 +95,20 @@ function BootGate({ children }: { children: ReactNode }) {
   )
 }
 
-export default function App() {
+/** 前台页面切换动画 */
+function AnimatedRoutes() {
+  const location = useLocation()
   return (
-    <BrowserRouter>
-      <BootGate>
-        <ScrollManager />
-        <BackgroundFX />
-        <NavBar />
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ duration: 0.24, ease: 'easeOut' }}
+      >
         <Suspense fallback={<PageLoading />}>
-          <Routes>
+          <Routes location={location}>
             <Route path="/" element={<HomePage />} />
             {/* ==== 扩展模块页面：新增页面时在这里注册路由 ==== */}
             <Route path="/archive" element={<ArchivePage />} />
@@ -103,7 +118,40 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
-        <Footer />
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+/** 前台站点布局（后台页面不套用这套布局） */
+function PublicSite() {
+  return (
+    <>
+      <BackgroundFX />
+      <NavBar />
+      <AnimatedRoutes />
+      <Footer />
+    </>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <BootGate>
+        <ScrollManager />
+        <Routes>
+          {/* 后台：独立入口，不出现在前台导航 */}
+          <Route
+            path={`${ADMIN_PATH}/*`}
+            element={
+              <Suspense fallback={<PageLoading />}>
+                <AdminPage />
+              </Suspense>
+            }
+          />
+          <Route path="*" element={<PublicSite />} />
+        </Routes>
       </BootGate>
     </BrowserRouter>
   )

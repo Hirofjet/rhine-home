@@ -17,6 +17,11 @@ dist-ssr
 .env.*
 !.env.example
 
+# 后端运行时数据（上传文件、JSON 存储）
+server/node_modules
+server/data
+server/uploads
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

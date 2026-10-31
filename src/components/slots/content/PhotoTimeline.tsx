@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import * as exifr from 'exifr'
 import { ImageOff } from 'lucide-react'
 import { cx } from '../../../lib/cx'
+import { contentApi, resolveMediaUrl } from '../../../lib/contentApi'
 
 /** 自动收集 src/assets/photos 下的图片（?url 获取可访问地址） */
 const PHOTO_FILES = import.meta.glob(
@@ -60,7 +61,8 @@ function formatDate(date: Date | null): string {
  * - 按时间先后排列，按年份分组渲染。
  */
 export function PhotoTimeline({ className }: { className?: string }) {
-  const [photos, setPhotos] = useState<TimelinePhoto[] | null>(null)
+  const [localPhotos, setLocalPhotos] = useState<TimelinePhoto[] | null>(null)
+  const [remotePhotos, setRemotePhotos] = useState<TimelinePhoto[] | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -77,18 +79,46 @@ export function PhotoTimeline({ className }: { className?: string }) {
           date: (await readExifDate(url)) ?? readDateFromName(path),
         })),
       )
-      parsed.sort((a, b) => {
-        const ta = a.date?.getTime() ?? Number.POSITIVE_INFINITY
-        const tb = b.date?.getTime() ?? Number.POSITIVE_INFINITY
-        return ta === tb ? a.name.localeCompare(b.name) : ta - tb
-      })
-      if (alive) setPhotos(parsed)
+      if (alive) setLocalPhotos(parsed)
     }
     void load()
     return () => {
       alive = false
     }
   }, [])
+
+  // 后台新增的照片（接口不可用时为空，不影响本地照片）
+  useEffect(() => {
+    let alive = true
+    contentApi
+      .photos()
+      .then((list) => {
+        if (!alive) return
+        setRemotePhotos(
+          list.map((photo) => ({
+            key: `remote-${photo.id}`,
+            url: resolveMediaUrl(photo.url),
+            name: photo.name,
+            date: photo.date ? new Date(photo.date) : null,
+          })),
+        )
+      })
+      .catch(() => {
+        if (alive) setRemotePhotos([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const photos =
+    localPhotos && remotePhotos
+      ? [...localPhotos, ...remotePhotos].sort((a, b) => {
+          const ta = a.date?.getTime() ?? Number.POSITIVE_INFINITY
+          const tb = b.date?.getTime() ?? Number.POSITIVE_INFINITY
+          return ta === tb ? a.name.localeCompare(b.name) : ta - tb
+        })
+      : null
 
   if (!photos) {
     return (

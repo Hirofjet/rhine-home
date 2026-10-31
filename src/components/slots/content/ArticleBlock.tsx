@@ -49,6 +49,8 @@ export interface ArticleBlockProps {
    * 可写完整路径 '/src/assets/articles/hello.md'，也可只写文件名 'hello.md'
    */
   file?: string
+  /** 直接传入 markdown 文本（后台管理发布的文章用这个，与 file 二选一） */
+  content?: string
   /** 文章标题（不填则显示默认） */
   title?: string
   /** 日期文字 */
@@ -68,6 +70,7 @@ export interface ArticleBlockProps {
  */
 export function ArticleBlock({
   file,
+  content,
   title,
   date,
   tags,
@@ -75,7 +78,7 @@ export function ArticleBlock({
   hideHeader = false,
   className,
 }: ArticleBlockProps) {
-  const markdown = findArticle(file)
+  const markdown = content ?? findArticle(file)
   return (
     <article
       className={cx(

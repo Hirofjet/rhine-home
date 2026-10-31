@@ -17,18 +17,32 @@
 | 路由 | React Router v7（`BrowserRouter`） |
 | 图标 | lucide-react |
 | 字体 | `@fontsource` 本地打包拉丁子集（Orbitron / Rajdhani / Share Tech Mono）；中文走系统字体栈 |
+| 后端 | Node + Express 5：鉴权、内容 CRUD、文件上传、留言板；MySQL 8 或 JSON 文件存储 |
+| 管理后台 | `/admin` 独立入口（不出现在前台导航），账号 + 模块权限 |
 
 > 项目使用 **npm**（扁平 `node_modules` 布局，Windows + 中文路径下最稳）。请使用 `npm install`。
 
 ## 快速开始
 
 ```bash
-npm install          # 安装依赖
-npm run dev          # 开发服务器 → http://localhost:5173
+npm install          # 前端依赖
+npm run dev          # 前端开发服务器 → http://localhost:5173
 npm run build        # 类型检查 + 生产构建（产物在 dist/）
 npm run preview      # 本地预览构建产物
 npm run lint         # oxlint 检查
 ```
+
+另开一个终端启动后端（管理后台 / 上传 / 留言板 / 内容接口都依赖它）：
+
+```bash
+cd server
+npm install
+npm start            # → http://localhost:3001（自动建表 / 初始化管理员）
+```
+
+- 开发服务器已配置代理，前端用 `/api`、`/uploads` 访问后端，无需额外配置；
+- **管理后台入口：`http://localhost:5173/admin`**（前台导航中不出现，可用 `VITE_ADMIN_PATH` 改成自己的路径）；
+- 初始管理员默认 `admin / admin123`（首次启动自动创建，请尽快修改或通过 `ADMIN_USER` / `ADMIN_PASSWORD` 环境变量覆盖）。
 
 环境要求：Node.js ≥ 20.19（本机为 24.x）。
 
@@ -54,18 +68,24 @@ src/
 │   ├── boot/             BootScreen（开机终端动画）
 │   ├── home/             首页五大区块：Hero / Dossier / Abilities / Projects / Contact
 │   ├── slots/            SlotGrid（可展开槽位网格）
-│   │   └── content/      ArticleBlock（markdown 文章）/ VideoBlock（视频）/ PhotoTimeline（照片时间线）
-│   └── guestbook/        DanmakuWall（留言弹幕墙）
-├── pages/                HomePage / ArchivePage / ProjectsPage / LogsPage / GuestbookPage / NotFoundPage
+│   │   └── content/      ArticleBlock / VideoBlock / PhotoTimeline / ArticlesFeed / VideosFeed
+│   ├── guestbook/        DanmakuWall（留言弹幕墙）
+│   └── admin/            管理后台：登录、控制台、文章 / 日志 / 照片 / 视频 / 成员面板
+├── pages/                HomePage / ArchivePage / ProjectsPage / LogsPage / GuestbookPage / AdminPage / NotFoundPage
 ├── hooks/                useTypewriter / useClock / useActiveSection / useCopy
-├── lib/                  cx / motion（动画预设）/ api（留言板接口层）
+├── lib/                  cx / motion（动画预设）/ contentApi（公开内容接口）/ adminApi（后台接口）/ api（留言板）
 ├── assets/
 │   ├── articles/         ← 文章 markdown 放这里
 │   ├── logs/             ← 日志 markdown 放这里（每篇自动生成一个可展开模块）
 │   └── photos/           ← 照片放这里（自动读取拍摄时间排序）
-└── App.tsx               路由注册（非首页按需加载）+ 开机门 + 滚动管理
+└── App.tsx               路由注册（前台 / 后台分离、非首页按需加载）+ 开机门
 
-server/                   留言板后端示例（Express + MySQL，可选启用）
+server/                   后端服务：鉴权、内容 CRUD、上传、留言板（MySQL 或 JSON 存储）
+├── index.mjs             Express 主程序（API + /uploads 静态 + 生产环境托管 dist）
+├── store.mjs             存储层（MySQL / JSON 文件双实现）
+├── auth.mjs              密码哈希（scrypt）与权限清单
+├── schema.sql            MySQL 建表语句（启动时会自动建表，此文件供参考）
+└── uploads/              上传文件目录（运行时生成）
 public/videos/            ← 视频文件放这里（VideoBlock 的 src 填 /videos/xxx.mp4）
 ```
 
@@ -259,14 +279,63 @@ Tailwind 中使用：`bg-rhine-*` / `text-rhine-*` / `border-rhine-*`（主题�
 
 ---
 
-## 部署
+## 部署（推荐：后端直接托管站点）
 
-- `npm run build` 后将 `dist/` 部署到任意静态托管（Vercel / Netlify / GitHub Pages / 自建 Nginx）；
-- 本项目使用 `BrowserRouter`，托管端需开启 SPA 回退：
-  - Nginx：`try_files $uri /index.html;`
-  - Netlify / Vercel：默认支持
-- 若部署在子路径（如 GitHub Pages 的 `/<repo>/`）：在 `vite.config.ts` 设置 `base: '/<repo>/'`，并给 `BrowserRouter` 传入 `basename="/<repo>"`；
-- 若想用纯静态托管且不想配置回退，可把 `BrowserRouter` 换成 `HashRouter`（`App.tsx`）。
+**方式一：后端托管（推荐，带管理后台）**
+
+1. `npm run build` 生成 `dist/`；
+2. `cd server && npm install && npm start`；
+3. 后端会自动托管 `dist/` 并通过 `/uploads` 提供上传文件，访问 `http://localhost:3001` 即可。
+
+**方式二：前后端分离**
+
+- `dist/` 交给静态托管（需 SPA 回退），后端单独部署；
+- 前端 `.env` 配置 `VITE_API_BASE=https://api.example.com`，后端设置 `CORS_ORIGIN=https://example.com`。
+
+Nginx 静态托管需要 `try_files $uri /index.html;`；部署在子路径时还要设置 `base` 与 `basename`。
+
+---
+
+## 管理后台（/admin）
+
+- 入口：`/admin`（**不出现在前台导航**；可用 `VITE_ADMIN_PATH` 改成自定义路径，例如 `/console-x7k2`，构建时生效）；
+- 鉴权：登录后获得 12 小时会话令牌；连续失败登录会限流；
+- 权限：owner 拥有全部权限；新增成员时可勾选模块权限（文章 / 日志 / 照片 / 视频 / 成员）；
+- **文章**：标题、日期、标签、markdown 正文（可预览）、附件 —— 每条附件都有「使用文件链接」勾选框：勾选填链接，不勾选直接上传本地文件；
+- **日志**：可直接导入 `.md` 文件（自动识别 `# 标题` 与文件名日期），也可手写；
+- **照片**：批量上传（服务端读取 EXIF 拍摄日期用于排序）或用链接添加；
+- **视频**：标题 + 简介 + 视频文件（上传或链接）+ 封面；
+- **成员**：创建账号、勾选模块权限、重置密码、删除（owner 或拥有「成员」权限的账号可操作）；
+- 上传文件存放在 `server/uploads/`，通过 `/uploads/...` 访问。
+
+---
+
+## 后端与存储
+
+- 支持 **MySQL 8**（配置 `DB_HOST` 等环境变量，启动自动建表）与 **JSON 文件**（默认，无需数据库，适合弱性能服务器）；
+- 配置见 `server/.env.example`：`ADMIN_USER` / `ADMIN_PASSWORD` / `DB_*` / `CORS_ORIGIN` / `UPLOAD_DIR` 等；
+- 公开接口（前台读取，无需登录）：`GET /api/content/articles|logs|photos|videos`、`GET/POST /api/messages`；
+- 后台接口（需要令牌）：`/api/admin/*`（登录、内容 CRUD、上传、成员管理）；
+- 健康检查：`GET /api/health`。
+
+---
+
+## 性能与动效（本轮增强）
+
+性能：
+
+- 路由级代码分割：首页主包约 443KB（gzip 140KB），markdown / EXIF / 后台面板均在进入对应页面时才加载；
+- 后端开启 gzip 压缩；`/uploads` 与 `dist/assets` 带长缓存头（immutable），其余静态资源 1 小时缓存；
+- 照片懒加载 + `decoding="async"`；内容接口带 30 秒缓存；
+- 后台页面不加载前台特效与导航，减少管理端开销；
+- 接口不可用时自动回退本地静态内容，站点照常可用。
+
+动效：
+
+- 前台页面切换过渡（淡入 + 上移）；
+- Hero 徽记鼠标视差 + 环绕轨道粒子；
+- 按钮跟随鼠标的柔光；
+- 背景缓慢漂移的光束。
 
 ---
 
@@ -285,6 +354,9 @@ Tailwind 中使用：`bg-rhine-*` / `text-rhine-*` / `border-rhine-*`（主题�
 - 视频组件：预留视频路径，填入后渲染原生播放器（留空显示占位）
 - 照片时间线：读取照片 EXIF 拍摄时间，按年份分组、时间升序排列（无 EXIF 时回退文件名日期）
 - 留言板：留言以弹幕滚动整页，可提交新留言；每条留言串行播放（播完才再出现）；留言 id 为自增序号；未配置后端时本地存储，配置 MySQL 后端后自动走接口
+- 管理后台：`/admin` 独立入口 + 登录鉴权 + 模块权限；文章 / 日志 / 照片 / 视频 / 成员管理，文件上传或链接二选一
+- 前台内容联动：后台发布的文章、日志、照片、视频无需重新构建即可在对应模块显示（接口不可用时回退本地内容）
+- 页面切换过渡、Hero 鼠标视差与轨道粒子、按钮柔光、背景漂移光束
 - 无障碍：`prefers-reduced-motion` 下自动关闭动画（留言改为静态排列）
 
 ---

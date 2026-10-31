@@ -44,7 +44,3 @@ export function hello(name: string) {
 ### 图片
 
 ![站点图标](/favicon.svg)
-
-### 下载本文章
-
-[站点图标](sample-article.md)

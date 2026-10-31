@@ -69,7 +69,7 @@ export function VideoBlock({
             VIDEO // 待接入
           </p>
           <p className="px-6 text-center font-mono text-[10px] leading-relaxed tracking-wider text-rhine-faint">
-            把视频放到 public/videos/，然后把 src 填成 /videos/xxx.mp4
+            待接入视频放到 public/videos/，然后把 src 填成 /videos/xxx.mp4
           </p>
         </div>
       )}

@@ -1,57 +1,79 @@
-# 留言板后端（可选）— Express + MySQL
+# RHINE//HOME 后端
 
-前端已经在 `src/lib/api.ts` 里预留好了接口：
+Express 5 + 文件存储服务：管理后台鉴权、内容 CRUD、文件上传、留言板，并可托管前端构建产物。
 
-- `GET  {API_BASE}/api/messages` → `{ messages: GuestMessage[] }`
-- `POST {API_BASE}/api/messages` `{ name, content }` → `GuestMessage`
+## 快速开始
 
-`GuestMessage`：`{ id, name, content, createdAt }`（`id` 为自增序号，`createdAt` 为 ISO 时间字符串）。
+```bash
+cd server
+npm install
+npm start        # http://localhost:3001
+```
 
-**后端未启动时前端会自动回退到浏览器 localStorage**，所以本地预览、静态部署都能直接用。
+首次启动会：
 
-## 启用步骤
+1. 自动建库表（MySQL 模式）或创建 `server/data/*.json`（JSON 模式）；
+2. 在没有任何账号时创建初始管理员（默认 `admin / admin123`）。
 
-1. 建表：
+> 生产环境请用环境变量覆盖初始账号，并在后台修改密码。
 
-   ```bash
-   mysql -u root -p < server/schema.sql
-   ```
+## 环境变量
 
-2. 安装后端依赖（在本目录执行，不会影响前端构建）：
+复制 `.env.example` 为 `.env`（或直接设置环境变量）：
 
-   ```bash
-   cd server
-   npm init -y
-   npm i express cors mysql2
-   ```
+| 变量 | 说明 |
+| --- | --- |
+| `PORT` | 端口，默认 `3001` |
+| `ADMIN_USER` / `ADMIN_PASSWORD` | 首次启动时创建的管理员账号 |
+| `CORS_ORIGIN` | 前后端分域时允许的来源，逗号分隔（同域部署可留空） |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 配置后使用 MySQL；不配置则用 JSON 文件 |
+| `UPLOAD_DIR` / `DATA_DIR` | 自定义上传 / 数据目录（默认 `server/uploads`、`server/data`） |
 
-3. 配置数据库连接（环境变量）：
+## 存储
 
-   ```bash
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_USER=root
-   DB_PASSWORD=你的密码
-   DB_NAME=rhine_home
-   PORT=3001
-   ```
+- **MySQL 8**：配置 `DB_HOST` 后自动建表（`schema.sql` 为参考 DDL）；
+- **JSON 文件**：默认模式，数据保存在 `server/data/*.json`，无需数据库，适合弱性能服务器或本地调试。
 
-4. 启动：
+两种模式共用同一套接口与数据模型。
 
-   ```bash
-   node index.mjs
-   ```
+## 接口一览
 
-5. 让前端指向后端：在项目根目录的 `.env` 中写入（参考 `.env.example`）：
+公开（前台读取，无需登录）：
 
-   ```bash
-   VITE_API_BASE=http://localhost:3001
-   ```
+- `GET /api/content/articles`
+- `GET /api/content/logs`
+- `GET /api/content/photos`
+- `GET /api/content/videos`
+- `GET /api/messages` / `POST /api/messages`（留言板）
+- `GET /api/health`（健康检查）
 
-6. 重新启动前端 `npm run dev`。
+后台（`Authorization: Bearer <token>`）：
 
-## 部署提示
+- `POST /api/admin/login` `{ username, password }` → `{ token, user }`
+- `POST /api/admin/logout`、`GET /api/admin/me`
+- `GET/POST /api/admin/articles`、`PUT/DELETE /api/admin/articles/:id`
+- 日志 / 照片 / 视频同上（`logs` / `photos` / `videos`）
+- `POST /api/admin/upload?kind=file|photo|video`（multipart 字段名 `file`）
+  - 照片会读取 EXIF `DateTimeOriginal`，返回 `{ url, name, size, date }`
+- 成员管理（owner 或拥有 `members` 权限的账号）：
+  - `GET /api/admin/users`
+  - `POST /api/admin/users` `{ username, password, permissions }`
+  - `PUT /api/admin/users/:id` `{ password?, permissions? }`
+  - `DELETE /api/admin/users/:id`
 
-- 生产环境把后端放在同域 `/api` 下时，可以省略 `VITE_API_BASE`；
-- 跨域部署时，前端用 `VITE_API_BASE` 指向后端地址，后端已内置宽松 CORS；
-- 防刷可以基于 `ip_hash` 字段做频率限制（示例里留了字段与注释，未实现限流）。
+权限模块：`articles` / `logs` / `photos` / `videos` / `members`。
+
+## 部署
+
+1. 在项目根目录执行 `npm run build` 生成 `dist/`；
+2. 启动本服务（`npm start`）；
+3. 服务会自动托管 `dist/`（SPA 回退），并通过 `/uploads` 提供上传文件；
+4. 访问 `http://服务器:3001` 即为完整站点，管理后台在 `/admin`（或前端配置的 `VITE_ADMIN_PATH`）。
+
+也可以前后端分离部署：前端配置 `VITE_API_BASE`，后端设置 `CORS_ORIGIN`。
+
+## 安全提示
+
+- 修改默认管理员密码；
+- 生产环境建议挂在 Nginx 后面开启 HTTPS；
+- 上传目录不要允许执行脚本（仅作为静态文件提供）。
