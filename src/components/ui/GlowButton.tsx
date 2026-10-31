@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { PointerEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { cx } from '../../lib/cx'
 
@@ -31,14 +31,35 @@ export function GlowButton({
   variant = 'gold',
   className,
 }: GlowButtonProps) {
+  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
+    const element = event.currentTarget
+    const rect = element.getBoundingClientRect()
+    element.style.setProperty('--glow-x', `${event.clientX - rect.left}px`)
+    element.style.setProperty('--glow-y', `${event.clientY - rect.top}px`)
+  }
+
   const cls = cx(
-    'inline-flex cursor-pointer items-center gap-2 border px-5 py-2.5 font-ui text-xs font-semibold uppercase tracking-[0.22em] transition-all duration-300',
+    'group relative isolate inline-flex cursor-pointer items-center gap-2 overflow-hidden border px-5 py-2.5 font-ui text-xs font-semibold uppercase tracking-[0.22em] transition-all duration-300',
     VARIANTS[variant],
     className,
   )
+
+  // 跟随鼠标的柔光（内容之下，按钮底色之上）
+  const glow = (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+      style={{
+        background:
+          'radial-gradient(160px circle at var(--glow-x, 50%) var(--glow-y, 50%), rgb(211 178 122 / 0.22), transparent 62%)',
+      }}
+    />
+  )
+
   if (to) {
     return (
-      <Link to={to} className={cls}>
+      <Link to={to} className={cls} onPointerMove={handlePointerMove}>
+        {glow}
         {children}
       </Link>
     )
@@ -50,13 +71,21 @@ export function GlowButton({
         href={href}
         {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
         className={cls}
+        onPointerMove={handlePointerMove}
       >
+        {glow}
         {children}
       </a>
     )
   }
   return (
-    <button type="button" onClick={onClick} className={cls}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cls}
+      onPointerMove={handlePointerMove}
+    >
+      {glow}
       {children}
     </button>
   )

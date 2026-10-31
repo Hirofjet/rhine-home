@@ -52,6 +52,15 @@ export function BackgroundFX() {
       <div className="absolute -left-24 bottom-16 h-72 w-72 rotate-45 animate-spin-slower border border-rhine-gold/15" />
       <div className="absolute -left-16 bottom-24 h-72 w-72 rotate-45 border border-rhine-gold/10" />
 
+      {/* 缓慢漂移的光束 */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-[-30%] top-[28%] h-px w-[150%] rotate-[-18deg] animate-beam bg-gradient-to-r from-transparent via-rhine-cyan/20 to-transparent" />
+        <div
+          className="absolute left-[-20%] top-[64%] h-px w-[140%] rotate-[14deg] animate-beam bg-gradient-to-r from-transparent via-rhine-gold/15 to-transparent"
+          style={{ animationDelay: '-12s' }}
+        />
+      </div>
+
       {/* 漂浮菱形粒子 */}
       {DIAMONDS.map((d, i) => (
         <span

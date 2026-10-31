@@ -18,6 +18,8 @@
 
 import type { ReactNode } from 'react'
 import { ArticleBlock, PhotoTimeline, VideoBlock } from '../components/slots/content'
+import { ArticlesFeed } from '../components/slots/content/ArticlesFeed'
+import { VideosFeed } from '../components/slots/content/VideosFeed'
 
 export interface SlotDetailItem {
   label: string
@@ -56,24 +58,28 @@ export const archiveSlots: SlotModule[] = [
     labelEn: 'ARTICLES',
     summary: 'Markdown 文章列表',
     content: {
+      // 优先显示后台发布的文章；接口不可用时回退到下面的本地示例
       custom: (
-        <div className="space-y-4">
-          <ArticleBlock
-            file="/src/assets/articles/sample-article.md"
-            title="没想好写啥"
-            date="2026-10-31"
-            tags={['示例', 'Markdown']}
-            downloads={[
-              {
-                label: '示例附件：纯文本说明',
-                file: 'sample-readme.txt',
-                size: '1 KB',
-                note: '文件放在 public/downloads/ 下',
-              },
-            ]}
-          />
-          <ArticleBlock title="待接入文章" tags={['待填写']} />
-        </div>
+        <ArticlesFeed
+          fallback={
+            <div className="space-y-4">
+              <ArticleBlock
+                file="/src/assets/articles/sample-article.md"
+                title="没想好写啥"
+                date="2026-10-31"
+                tags={['示例', 'Markdown']}
+                downloads={[
+                  {
+                    label: 'md 源文件',
+                    file: 'sample-article.md',
+                    size: '1 KB',
+                    note: 'Markdown 源文件',
+                  },
+                ]}
+              />
+            </div>
+          }
+        />
       ),
     },
   },
@@ -83,14 +89,19 @@ export const archiveSlots: SlotModule[] = [
     labelEn: 'VLOG',
     summary: '视频合集',
     content: {
+      // 优先显示后台发布的视频；接口不可用时回退到下面的本地占位
       custom: (
-        <div className="space-y-4">
-          <VideoBlock
-            title="待接入视频"
-            description="视频文件放到 public/videos/，把 src 填成 /videos/xxx.mp4"
-            tags={['待填写']}
-          />
-        </div>
+        <VideosFeed
+          fallback={
+            <div className="space-y-4">
+              <VideoBlock
+                title="待接入视频"
+                description="视频文件放到 public/videos/，把 src 填成 /videos/xxx.mp4"
+                tags={['待填写']}
+              />
+            </div>
+          }
+        />
       ),
     },
   },

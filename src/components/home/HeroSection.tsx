@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import type { PointerEvent } from 'react'
 import { profile, site } from '../../content'
 import { useClock } from '../../hooks/useClock'
 import { fadeUp, stagger } from '../../lib/motion'
@@ -8,6 +9,27 @@ import type { DotColor } from '../ui/StatusDot'
 
 export function HeroSection() {
   const clock = useClock(site.timezone)
+  const reduce = useReducedMotion()
+
+  // 鼠标视差：徽记随指针轻微偏移
+  const parallaxX = useMotionValue(0)
+  const parallaxY = useMotionValue(0)
+  const springX = useSpring(parallaxX, { stiffness: 120, damping: 18, mass: 0.4 })
+  const springY = useSpring(parallaxY, { stiffness: 120, damping: 18, mass: 0.4 })
+
+  const handleEmblemMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (reduce) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const relX = (event.clientX - rect.left) / rect.width - 0.5
+    const relY = (event.clientY - rect.top) / rect.height - 0.5
+    parallaxX.set(relX * 16)
+    parallaxY.set(relY * 12)
+  }
+
+  const resetEmblem = () => {
+    parallaxX.set(0)
+    parallaxY.set(0)
+  }
 
   const readouts: Array<{ label: string; value: string; dot?: DotColor }> = [
     { label: 'OPERATOR ID', value: site.operatorId },
@@ -103,9 +125,15 @@ export function HeroSection() {
             </motion.div>
           </div>
 
-          {/* 右：徽记区 */}
-          <motion.div variants={fadeUp} className="mx-auto w-full max-w-sm">
-            <CornerFrame size={22} className="p-6 sm:p-8">
+          {/* 右：徽记区（鼠标视差） */}
+          <motion.div
+            variants={fadeUp}
+            className="mx-auto w-full max-w-sm"
+            onPointerMove={handleEmblemMove}
+            onPointerLeave={resetEmblem}
+          >
+            <motion.div style={{ x: springX, y: springY }}>
+              <CornerFrame size={22} className="p-6 sm:p-8">
               <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden border border-rhine-line/70 bg-rhine-panel/60">
                 {/* 扫描线纹理 */}
                 <div className="pointer-events-none absolute inset-0 scanlines opacity-25" />
@@ -123,6 +151,15 @@ export function HeroSection() {
                   aria-hidden
                   className="absolute h-[64%] w-[64%] animate-spin-reverse rounded-full border border-rhine-cyan/30"
                 />
+                {/* 轨道粒子 */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute h-[80%] w-[80%] animate-spin-slower"
+                >
+                  <span className="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rotate-45 border border-rhine-gold/80 bg-rhine-gold/40 shadow-[0_0_10px_rgb(211_178_122/0.6)]" />
+                  <span className="absolute right-0 top-1/2 h-1 w-1 -translate-y-1/2 rotate-45 border border-rhine-cyan/80 bg-rhine-cyan/40" />
+                  <span className="absolute bottom-0 left-1/2 h-1 w-1 -translate-x-1/2 rotate-45 border border-rhine-gold/60" />
+                </span>
                 {/* 六边形 */}
                 <svg
                   viewBox="0 0 100 100"
@@ -152,6 +189,7 @@ export function HeroSection() {
                 </div>
               </div>
             </CornerFrame>
+          </motion.div>
           </motion.div>
         </motion.div>
 
