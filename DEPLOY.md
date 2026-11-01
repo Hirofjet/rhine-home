@@ -219,15 +219,18 @@ sudo systemctl status rhine-home
 journalctl -u rhine-home -n 100 -f
 ```
 
-### 或者 PM2
+### 或者 PM2（使用 ecosystem.config.cjs）
 
 ```bash
 npm i -g pm2
 cd /srv/rhine-home/server
-pm2 start index.mjs --name rhine-home --update-env
+pm2 start ecosystem.config.cjs
 pm2 save
 pm2 startup
 ```
+
+> 不要直接 `pm2 start index.mjs`：`server/ecosystem.config.cjs` 已固定 `cwd` 和脚本绝对路径，`.env` 由 `server/config.mjs` 从 `server/.env` 主动加载；直接起 `index.mjs` 在错误的目录下会读不到数据库配置。
+> 如果之前起过同名进程，先 `pm2 delete rhine-home` 再用 ecosystem 启动。
 
 > 保持**单实例**即可（会话存数据库，单实例足够，且避免上传目录竞争）。
 

@@ -254,6 +254,31 @@ GitHub → Releases 可基于 tag 发布。
 
 ## 9. 本项目的 Git 工作流（重要）
 
+### 自动发布到 GitHub（v0.8 起）
+
+本项目约定：**每次更新完网站，都通过一个命令提交、打版本号并推送到 GitHub**。
+
+```bash
+npm run release -- "fix: 修复手机端通知栏溢出"
+npm run release -- "feat: 新增关注系统"
+```
+
+脚本会自动：
+
+1. `git add -A`（`.gitignore` 已排除 `.env`、`node_modules`、`dist`、数据库与上传）；
+2. 用你写的备注 + 版本号生成 commit，例如 `fix: ... (v0.8.0)`；
+3. 创建 tag `v0.8.0`、`v0.8.1`……；
+4. 推送 `main` 与 tag 到 `origin`；
+5. 把 `package.json` 版本升到下一个小版本并推送，下一次发布继续递增。
+
+第一次从 **v0.8.0** 开始。推送失败时先修复 SSH/网络，然后：
+
+```bash
+git push origin main --follow-tags
+```
+
+再手动把 `package.json` 版本 +1 并提交，或删除本地 tag 后重新执行 release。
+
 ### 不要提交的内容
 
 `.gitignore` 已忽略：
@@ -369,10 +394,11 @@ git commit -m "chore: remove env from git"
 # 迁移后的项目目录
 cd F:\文档\GitHub\rhine-home
 
-# 开发
+# 常用命令
 npm run dev
 npm run lint
 npm run build
+npm run release -- "docs: 更新说明"
 
 # 后端
 cd server
