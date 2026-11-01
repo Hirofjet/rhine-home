@@ -60,7 +60,9 @@ export function NotificationMenu() {
   const important = notifications.filter(
     (item) => !item.read && IMPORTANT_TYPES.has(item.type),
   )
-  const recentNotifications = notifications.slice(0, 4)
+  const recentNotifications = notifications
+    .filter((item) => item.type !== 'dm')
+    .slice(0, 4)
   const recentConversations = conversations.slice(0, 3)
 
   return (
@@ -80,13 +82,13 @@ export function NotificationMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 border border-rhine-line bg-rhine-panel/95 shadow-[0_16px_40px_rgb(0_0_0/0.5)] backdrop-blur">
+        <div className="fixed inset-x-3 top-16 z-50 w-auto border border-rhine-line bg-rhine-panel/95 shadow-[0_16px_40px_rgb(0_0_0/0.5)] backdrop-blur sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80">
           <div className="flex items-center justify-between border-b border-rhine-line/60 px-3 py-2">
             <p className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
-              通知与私信
+              消息
             </p>
             <Link
-              to="/profile?tab=notifications"
+              to="/profile?tab=messages"
               onClick={() => setOpen(false)}
               className="font-mono text-[9px] text-rhine-cyan hover:text-rhine-gold"
             >
@@ -102,7 +104,7 @@ export function NotificationMenu() {
               {important.slice(0, 2).map((item) => (
                 <Link
                   key={item.id}
-                  to={item.link || '/profile?tab=notifications'}
+                  to={item.link || '/profile?tab=messages'}
                   onClick={() => setOpen(false)}
                   className="mt-1 block truncate text-xs text-rhine-gold/90"
                 >
@@ -119,7 +121,7 @@ export function NotificationMenu() {
             {recentNotifications.map((item) => (
               <Link
                 key={`n-${item.id}`}
-                to={item.link || '/profile?tab=notifications'}
+                to={item.link || '/profile?tab=messages'}
                 onClick={() => setOpen(false)}
                 className={`block border-b border-rhine-line/40 px-3 py-2 hover:bg-rhine-gold/5 ${
                   item.read ? 'opacity-60' : ''
@@ -141,12 +143,21 @@ export function NotificationMenu() {
                 key={`c-${conversation.user.id}`}
                 to="/profile?tab=messages"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2 border-b border-rhine-line/40 px-3 py-2 hover:bg-rhine-gold/5"
+                className={`flex items-center gap-2 border-b border-rhine-line/40 px-3 py-2 hover:bg-rhine-gold/5 ${
+                  conversation.user.isFollowing && conversation.unread > 0
+                    ? 'border-l-2 border-l-rhine-cyan bg-rhine-cyan/[0.04]'
+                    : ''
+                }`}
               >
-                <MessageSquare className="h-3 w-3 text-rhine-cyan" />
+                <MessageSquare className="h-3 w-3 shrink-0 text-rhine-cyan" />
                 <span className="min-w-0 flex-1 truncate text-xs text-rhine-ink">
                   {conversation.user.username}
                 </span>
+                {conversation.user.isFollowing && (
+                  <span className="border border-rhine-cyan/40 px-1 font-mono text-[8px] text-rhine-cyan">
+                    关注
+                  </span>
+                )}
                 <span className="font-mono text-[9px] text-rhine-faint">
                   {conversation.unread > 0 ? `${conversation.unread} 条` : ''}
                 </span>

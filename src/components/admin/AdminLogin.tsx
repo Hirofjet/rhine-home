@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { Diamond, Eye, EyeOff, LogIn, ShieldAlert } from 'lucide-react'
 import { authApi, errorMessage } from '../../lib/api'
 import { useSession } from '../auth/useSession'
@@ -220,6 +221,13 @@ export function AdminLogin() {
             </div>
           </div>
         )}
+
+        <Link
+          to="/"
+          className="mt-5 block border-t border-rhine-line/50 pt-3 text-center font-mono text-[10px] tracking-[0.18em] text-rhine-faint transition-colors hover:text-rhine-gold"
+        >
+          ← 返回主页
+        </Link>
       </div>
     </div>
   )

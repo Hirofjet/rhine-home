@@ -28,21 +28,25 @@ import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { formatDateTime, STATUS_LABELS, STATUS_STYLES } from '../lib/format'
 
-type Tab = 'profile' | 'notifications' | 'messages' | 'posts' | 'follows' | 'account'
+type Tab = 'profile' | 'messages' | 'posts' | 'follows' | 'account'
 
 const IMPORTANT_TYPES = new Set(['review', 'permission', 'ban', 'access'])
 
 const isTab = (value: string | null): value is Tab =>
-  ['profile', 'notifications', 'messages', 'posts', 'follows', 'account'].includes(value ?? '')
+  ['profile', 'messages', 'posts', 'follows', 'account'].includes(value ?? '')
 
 export function ProfilePage() {
   const { user, loading, refresh, logout } = useSession()
   const navigate = useNavigate()
-  const [search] = useSearchParams()
-  const [tab, setTab] = useState<Tab>(() => {
-    const queryTab = search.get('tab')
-    return isTab(queryTab) ? queryTab : 'profile'
-  })
+  const [search, setSearch] = useSearchParams()
+  const tabParam = search.get('tab')
+  const tab: Tab = isTab(tabParam) ? tabParam : 'profile'
+  const setTab = (next: Tab) => {
+    const params = new URLSearchParams(search)
+    if (next === 'profile') params.delete('tab')
+    else params.set('tab', next)
+    setSearch(params, { replace: true })
+  }
   const [authOpen, setAuthOpen] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -303,6 +307,10 @@ export function ProfilePage() {
     }
   }
 
+  const levelOf = (type: string) =>
+    IMPORTANT_TYPES.has(type) ? 1 : type === 'follow' ? 2 : 0
+  const systemNotifications = notifications.filter((item) => item.type !== 'dm')
+
   if (loading) {
     return (
       <section className="mx-auto w-full max-w-4xl px-4 pb-24 pt-28 sm:px-6">
@@ -388,8 +396,16 @@ export function ProfilePage() {
         {(
           [
             ['profile', '资料'],
-            ['notifications', `通知${notifications.filter((n) => !n.read).length ? ' •' : ''}`],
-            ['messages', '私信'],
+            [
+              'messages',
+              `消息${
+                notifications.filter((item) => !item.read).length +
+                  conversations.reduce((sum, item) => sum + item.unread, 0) >
+                0
+                  ? ' •'
+                  : ''
+              }`,
+            ],
             ['posts', '我的帖子'],
             ['follows', '关注'],
             ['account', '账号'],
@@ -490,143 +506,180 @@ export function ProfilePage() {
         </div>
       )}
 
-      {tab === 'notifications' && (
-        <div className="mt-5 border border-rhine-line/70 bg-rhine-panel/30">
-          <div className="flex items-center justify-between border-b border-rhine-line/60 px-4 py-2">
-            <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
-              <Bell className="h-3 w-3" /> 通知
-            </p>
-            <button
-              type="button"
-              onClick={() => void readAll()}
-              className="flex items-center gap-1 font-mono text-[10px] text-rhine-dim hover:text-rhine-gold"
-            >
-              <CheckCheck className="h-3 w-3" /> 全部已读
-            </button>
-          </div>
-          {notifications.length === 0 ? (
-            <p className="px-4 py-6 font-mono text-[10px] text-rhine-faint">暂无通知</p>
-          ) : (
-            <ul className="divide-y divide-rhine-line/50">
-              {notifications.map((item) => (
-                <li
-                  key={item.id}
-                  className={`px-4 py-3 ${
-                    !item.read && IMPORTANT_TYPES.has(item.type)
-                      ? 'border-l-2 border-l-rhine-gold bg-rhine-gold/[0.06]'
-                      : item.read
-                        ? 'opacity-60'
-                        : ''
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`text-xs ${
-                        IMPORTANT_TYPES.has(item.type) ? 'text-rhine-gold' : 'text-rhine-ink'
-                      }`}
-                    >
-                      {item.title}
-                    </span>
-                    <span className="font-mono text-[9px] text-rhine-faint">
-                      {formatDateTime(item.createdAt)}
-                    </span>
-                  </div>
-                  {item.content && (
-                    <p className="mt-1 whitespace-pre-wrap text-xs text-rhine-dim">{item.content}</p>
-                  )}
-                  {item.link && item.link.startsWith('/') && (
-                    <Link to={item.link} className="mt-1 inline-block font-mono text-[10px] text-rhine-cyan">
-                      查看详情 →
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
       {tab === 'messages' && (
-        <div className="mt-5 grid gap-3 md:grid-cols-[220px_1fr]">
+        <div className="mt-5 space-y-4">
           <div className="border border-rhine-line/70 bg-rhine-panel/30">
-            <p className="border-b border-rhine-line/60 px-3 py-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
-              私信
-            </p>
-            {conversations.length === 0 ? (
-              <p className="px-3 py-4 font-mono text-[10px] text-rhine-faint">暂无私信</p>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rhine-line/60 px-4 py-2">
+              <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+                <Bell className="h-3 w-3" /> 消息
+              </p>
+              <button
+                type="button"
+                onClick={() => void readAll()}
+                className="flex items-center gap-1 font-mono text-[10px] text-rhine-dim hover:text-rhine-gold"
+              >
+                <CheckCheck className="h-3 w-3" /> 全部已读
+              </button>
+            </div>
+            {systemNotifications.length === 0 ? (
+              <p className="px-4 py-5 font-mono text-[10px] text-rhine-faint">暂无通知</p>
             ) : (
-              <ul>
-                {conversations.map((conversation) => (
-                  <li key={conversation.user.id}>
-                    <button
-                      type="button"
-                      onClick={() => setChatUser(conversation.user)}
-                      className={`flex w-full items-center gap-2 px-3 py-2 text-left ${
-                        chatUser?.id === conversation.user.id
-                          ? 'bg-rhine-gold/10 text-rhine-gold'
-                          : 'text-rhine-dim hover:bg-rhine-gold/5'
+              <ul className="divide-y divide-rhine-line/50">
+                {systemNotifications.map((item) => {
+                  const level = levelOf(item.type)
+                  return (
+                    <li
+                      key={item.id}
+                      className={`px-4 py-3 ${
+                        !item.read && level === 1
+                          ? 'border-l-2 border-l-rhine-red bg-rhine-red/[0.05]'
+                          : !item.read && level === 2
+                            ? 'border-l-2 border-l-rhine-cyan bg-rhine-cyan/[0.05]'
+                            : item.read
+                              ? 'opacity-60'
+                              : ''
                       }`}
                     >
-                      <MessageSquare className="h-3 w-3" />
-                      <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
-                        {conversation.user.username}
-                      </span>
-                      {conversation.unread > 0 && (
-                        <span className="rounded-full bg-rhine-red/20 px-1.5 font-mono text-[9px] text-rhine-red">
-                          {conversation.unread}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {level > 0 && (
+                          <span
+                            className={`border px-1.5 py-0.5 font-mono text-[9px] tracking-wider ${
+                              level === 1
+                                ? 'border-rhine-red/50 text-rhine-red'
+                                : 'border-rhine-cyan/50 text-rhine-cyan'
+                            }`}
+                          >
+                            {level === 1 ? '一级重要' : '二级关注'}
+                          </span>
+                        )}
+                        <span
+                          className={`text-xs ${
+                            level === 1
+                              ? 'text-rhine-gold'
+                              : level === 2
+                                ? 'text-rhine-cyan'
+                                : 'text-rhine-ink'
+                          }`}
+                        >
+                          {item.title}
                         </span>
+                        <span className="font-mono text-[9px] text-rhine-faint">
+                          {formatDateTime(item.createdAt)}
+                        </span>
+                      </div>
+                      {item.content && (
+                        <p className="mt-1 whitespace-pre-wrap text-xs text-rhine-dim">
+                          {item.content}
+                        </p>
                       )}
-                    </button>
-                  </li>
-                ))}
+                      {item.link && item.link.startsWith('/') && (
+                        <Link
+                          to={item.link}
+                          className="mt-1 inline-block font-mono text-[10px] text-rhine-cyan"
+                        >
+                          查看详情 →
+                        </Link>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
-          <div className="flex min-h-64 flex-col border border-rhine-line/70 bg-rhine-panel/30">
-            {chatUser ? (
-              <>
-                <p className="border-b border-rhine-line/60 px-3 py-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
-                  {chatUser.username}
-                </p>
-                <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
-                  {chatMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`max-w-[80%] border px-2 py-1.5 text-xs ${
-                        message.fromMe
-                          ? 'ml-auto border-rhine-gold/40 bg-rhine-gold/10 text-rhine-gold'
-                          : 'border-rhine-line bg-rhine-abyss/50 text-rhine-dim'
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2 border-t border-rhine-line/60 p-2">
-                  <input
-                    value={chatText}
-                    onChange={(event) => setChatText(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') void sendChat()
-                    }}
-                    placeholder="输入私信…"
-                    className="min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-rhine-ink outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void sendChat()}
-                    className="border border-rhine-gold/50 px-2 text-rhine-gold"
-                    aria-label="发送"
-                  >
-                    <Send className="h-3 w-3" />
-                  </button>
-                </div>
-              </>
-            ) : (
-              <p className="flex flex-1 items-center justify-center font-mono text-[10px] text-rhine-faint">
-                选择一个会话
+
+          <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+            <div className="border border-rhine-line/70 bg-rhine-panel/30">
+              <p className="border-b border-rhine-line/60 px-3 py-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+                私信
               </p>
-            )}
+              {conversations.length === 0 ? (
+                <p className="px-3 py-4 font-mono text-[10px] text-rhine-faint">暂无私信</p>
+              ) : (
+                <ul>
+                  {conversations.map((conversation) => (
+                    <li key={conversation.user.id}>
+                      <button
+                        type="button"
+                        onClick={() => setChatUser(conversation.user)}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left ${
+                          chatUser?.id === conversation.user.id
+                            ? 'bg-rhine-gold/10 text-rhine-gold'
+                            : conversation.user.isFollowing && conversation.unread > 0
+                              ? 'border-l-2 border-l-rhine-cyan bg-rhine-cyan/[0.04] text-rhine-dim'
+                              : 'text-rhine-dim hover:bg-rhine-gold/5'
+                        }`}
+                      >
+                        <MessageSquare className="h-3 w-3 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate font-mono text-[11px]">
+                          {conversation.user.username}
+                        </span>
+                        {conversation.user.isFollowing && (
+                          <span className="border border-rhine-cyan/40 px-1 font-mono text-[8px] text-rhine-cyan">
+                            关注
+                          </span>
+                        )}
+                        {conversation.unread > 0 && (
+                          <span className="rounded-full bg-rhine-red/20 px-1.5 font-mono text-[9px] text-rhine-red">
+                            {conversation.unread}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex min-h-64 flex-col border border-rhine-line/70 bg-rhine-panel/30">
+              {chatUser ? (
+                <>
+                  <p className="flex flex-wrap items-center gap-2 border-b border-rhine-line/60 px-3 py-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+                    {chatUser.username}
+                    {chatUser.isFollowing && (
+                      <span className="border border-rhine-cyan/40 px-1 text-[8px] text-rhine-cyan">
+                        二级关注
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+                    {chatMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`max-w-[80%] border px-2 py-1.5 text-xs ${
+                          message.fromMe
+                            ? 'ml-auto border-rhine-gold/40 bg-rhine-gold/10 text-rhine-gold'
+                            : 'border-rhine-line bg-rhine-abyss/50 text-rhine-dim'
+                        }`}
+                      >
+                        {message.content}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 border-t border-rhine-line/60 p-2">
+                    <input
+                      value={chatText}
+                      onChange={(event) => setChatText(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') void sendChat()
+                      }}
+                      placeholder="输入私信…"
+                      className="min-w-0 flex-1 bg-transparent px-2 py-1 font-mono text-xs text-rhine-ink outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void sendChat()}
+                      className="border border-rhine-gold/50 px-2 text-rhine-gold"
+                      aria-label="发送"
+                    >
+                      <Send className="h-3 w-3" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="flex flex-1 items-center justify-center font-mono text-[10px] text-rhine-faint">
+                  选择一个会话
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}

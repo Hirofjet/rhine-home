@@ -1806,6 +1806,13 @@ app.get('/api/messages/conversations', requireAuth, async (req, res) => {
      GROUP BY other_id ORDER BY last_id DESC LIMIT 50`,
     [userId, userId, userId],
   )
+  const followRows = await query(
+    'SELECT following_id FROM follows WHERE follower_id = ?',
+    [userId],
+  )
+  const followingIds = new Set(
+    followRows.map((row) => Number(row.following_id)),
+  )
   const conversations = []
   for (const row of rows) {
     const otherId = Number(row.other_id)
@@ -1828,6 +1835,7 @@ app.get('/api/messages/conversations', requireAuth, async (req, res) => {
         id: otherId,
         username: users[0].nickname || users[0].username,
         avatarUrl: users[0].avatar_url ?? '',
+        isFollowing: followingIds.has(otherId),
       },
       last: last.length
         ? {
@@ -1861,11 +1869,16 @@ app.get('/api/messages/with/:id', requireAuth, async (req, res) => {
     'UPDATE direct_messages SET read_at = NOW() WHERE receiver_id = ? AND sender_id = ? AND read_at IS NULL',
     [req.user.id, otherId],
   )
+  const followRows = await query(
+    'SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? LIMIT 1',
+    [req.user.id, otherId],
+  )
   res.json({
     user: {
       id: otherId,
       username: users[0].nickname || users[0].username,
       avatarUrl: users[0].avatar_url ?? '',
+      isFollowing: followRows.length > 0,
     },
     messages: messages.map((row) => ({
       id: Number(row.id),

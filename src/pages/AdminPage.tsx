@@ -1,3 +1,4 @@
+import { Link, useNavigate } from 'react-router-dom'
 import { useSession } from '../components/auth/useSession'
 import { AdminLogin } from '../components/admin/AdminLogin'
 import { AdminDashboard } from '../components/admin/AdminDashboard'
@@ -9,6 +10,7 @@ import { ROLE_LABELS } from '../lib/api'
  */
 export function AdminPage() {
   const { user, loading, staff, logout } = useSession()
+  const navigate = useNavigate()
 
   if (loading) {
     return (
@@ -35,17 +37,32 @@ export function AdminPage() {
           <p className="mt-2 font-mono text-[10px] tracking-wider text-rhine-dim">
             当前账号：{user.username}（{ROLE_LABELS[user.role]}）
           </p>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="mt-5 border border-rhine-line px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
-          >
-            退出登录
-          </button>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="border border-rhine-line px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
+            >
+              退出登录
+            </button>
+            <Link
+              to="/"
+              className="border border-rhine-gold/50 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-rhine-gold"
+            >
+              返回主页
+            </Link>
+          </div>
         </div>
       </div>
     )
   }
 
-  return <AdminDashboard user={user} onLogout={() => void logout()} />
+  return (
+    <AdminDashboard
+      user={user}
+      onLogout={() => {
+        void logout().then(() => navigate('/'))
+      }}
+    />
+  )
 }
