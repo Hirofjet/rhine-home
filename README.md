@@ -54,7 +54,7 @@ Vite 已配置 `/api`、`/uploads` 代理到 `http://127.0.0.1:3001`。
 - 论坛：<http://localhost:5173/forum>
 - 后台：<http://localhost:5173/admin>（默认 `admin / <ADMIN_PASSWORD>`，**不在前台导航中**）
 
-> 生产部署请看 **[DEPLOY.md](DEPLOY.md)**（MySQL、systemd、Nginx、HTTPS、备份、故障排查）。
+> 生产部署请看 **[DEPLOY.md](DEPLOY.md)**（通用）与 **[TENCENT_DEPLOY.md](TENCENT_DEPLOY.md)**（腾讯云轻量应用服务器）。
 
 ---
 
@@ -179,7 +179,7 @@ server/
 
 ## 部署
 
-完整步骤见 **[DEPLOY.md](DEPLOY.md)**，核心要点：
+完整步骤见 **[DEPLOY.md](DEPLOY.md)**；腾讯云轻量应用服务器专用步骤（镜像选择、OrcaTerm、宝塔/命令行、备案、SSL、快照）见 **[TENCENT_DEPLOY.md](TENCENT_DEPLOY.md)**。核心要点：
 
 - 单域名同源：前端默认请求相对路径 `/api`，Nginx 同时转发 `/api`、`/uploads`；
 - Node 用 systemd / PM2 常驻并自动重启；
