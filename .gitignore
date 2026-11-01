@@ -12,12 +12,17 @@ dist
 dist-ssr
 *.local
 
+# 临时/测试文件
+.tmp-*
+tmp/
+tmp-*
+
 # 环境变量（保留示例文件）
 .env
 .env.*
 !.env.example
 
-# 后端运行时数据（上传文件、JSON 存储）
+# 后端运行时数据（上传文件、旧版 JSON 数据）
 server/node_modules
 server/data
 server/uploads

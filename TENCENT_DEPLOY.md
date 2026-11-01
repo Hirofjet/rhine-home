@@ -281,8 +281,10 @@ sudo systemctl enable --now rhine-home
 sudo systemctl status rhine-home
 ```
 
-> 也可以用 PM2：`sudo npm i -g pm2 && pm2 start index.mjs --name rhine-home && pm2 save && pm2 startup`。
-> 二选一即可，不要同时用。
+> 也可以用 PM2（推荐用项目自带配置）：
+> `cd /srv/rhine-home/server && sudo npm i -g pm2 && pm2 start ecosystem.config.cjs && pm2 save && pm2 startup`。
+> 不要直接 `pm2 start index.mjs`；`.env` 已由 `server/config.mjs` 自动加载，PM2 的 `cwd` 也已固定。
+> 二选一即可，不要同时用 systemd 和 PM2。
 
 ---
 
@@ -516,7 +518,7 @@ bt 14          # 查看面板端口（不同版本可能不同，以 bt 菜单�
 | Nginx | 1.24 / 1.26 | 网站与反向代理 |
 | MySQL | 8.0 | 数据库 |
 | Node.js | 22 LTS | 运行后端（二选一，见下） |
-| PM2 | 最新 | 进程守护（也可用面板 Node 项目管理） |
+| PM2 | 最新 | 进程守护（使用 `server/ecosystem.config.cjs`） |
 
 **Node 的两种安装方式：**
 
@@ -648,7 +650,16 @@ curl http://127.0.0.1:3001/api/health
 
 看到 `{"ok":true,"storage":"mysql"}` 后 `Ctrl+C`。
 
-### B.7 用 PM2 启动后端
+### B.7 用 PM2 启动后端（重要：使用 ecosystem.config.cjs）
+
+> **之前部署失败的原因**
+>
+> 旧版 `server/ecosystem.config.cjs` 只写了 `script: 'index.mjs'` 和 `node_args: '--env-file=.env'`，存在两个问题：
+>
+> 1. 没有设置 `cwd`：如果从项目根目录或宝塔面板执行 `pm2 start server/ecosystem.config.cjs`，PM2 的工作目录不是 `server/`，`--env-file=.env` 找不到文件，Node 直接启动失败；
+> 2. `.env` 依赖 Node 参数加载，一旦 Node 版本或 PM2 参数传递不兼容，数据库配置就是空的，表现为“启动即退出 / 数据库连接失败”。
+>
+> 现在已修复：`ecosystem.config.cjs` 固定 `cwd` 与绝对 `script` 路径；`.env` 由 `server/config.mjs` 主动加载，不再依赖启动参数和工作目录。
 
 面板终端：
 
@@ -656,7 +667,11 @@ curl http://127.0.0.1:3001/api/health
 npm i -g pm2
 
 cd /www/wwwroot/rhine-home/server
-pm2 start index.mjs --name rhine-home
+
+# 如果之前用 pm2 start index.mjs 起过同名进程，先删掉
+pm2 delete rhine-home 2>/dev/null || true
+
+pm2 start ecosystem.config.cjs
 pm2 save
 
 # 设置开机自启（按输出提示执行它给出的命令）
@@ -670,6 +685,7 @@ pm2 status
 pm2 logs rhine-home --lines 100
 pm2 restart rhine-home
 pm2 stop rhine-home
+pm2 describe rhine-home     # 查看 cwd、script 是否正确
 ```
 
 验证：
@@ -677,6 +693,12 @@ pm2 stop rhine-home
 ```bash
 curl http://127.0.0.1:3001/api/health
 ```
+
+> 如果日志报 “Cannot find module” 或 `.env` 相关错误，先确认：
+> - 是在 `server/` 目录执行 `pm2 start ecosystem.config.cjs`；
+> - `pm2 describe rhine-home` 的 `exec cwd` 是 `/www/wwwroot/rhine-home/server`；
+> - `.env` 确实存在且可读；
+> - Node 是 22（`node -v`）。
 
 权限说明：
 

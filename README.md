@@ -2,6 +2,8 @@
 
 > 二次元 × 科幻终端风格的个人站点：首页、档案库、日志、论坛、留言板与完整管理后台。
 > 视觉致敬《明日方舟》莱茵生命：黑曜石底色、白金与数据青、四角刻度面板、扫描线与开机终端动画。
+>
+> **当前版本：v0.8.x**（发布记录见 Git tags；更新后执行 `npm run release -- "说明"` 自动推送 GitHub）
 
 ---
 
@@ -195,6 +197,7 @@ server/
 npm run dev        # 前端开发
 npm run build      # 类型检查 + 生产构建（dist/）
 npm run lint       # oxlint
+npm run release -- "fix: 本次更新说明"   # 提交 + 版本号 + 推送 GitHub
 cd server && npm start
 cd server && npm run import-legacy   # 从旧版 markdown / JSON 恢复内容
 ```

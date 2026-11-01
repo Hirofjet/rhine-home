@@ -1,6 +1,39 @@
 /* ============================================================
    配置（全部来自环境变量；生产环境请使用 .env 或系统环境变量）
+   ------------------------------------------------------------
+   这里会主动加载 server/.env：
+   · 不依赖启动时的工作目录（PM2 的 cwd 不再是问题）
+   · 不依赖 node --env-file（Node 版本/参数写错也能启动）
+   · 已存在的系统环境变量优先，不会被 .env 覆盖
    ============================================================ */
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const ENV_FILE = path.join(__dirname, '.env')
+
+function loadEnvFile() {
+  if (!fs.existsSync(ENV_FILE)) return
+  const content = fs.readFileSync(ENV_FILE, 'utf8')
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const separator = line.indexOf('=')
+    if (separator <= 0) continue
+    const key = line.slice(0, separator).trim()
+    let value = line.slice(separator + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    if (process.env[key] === undefined) process.env[key] = value
+  }
+}
+
+loadEnvFile()
 
 export const config = {
   port: Number(process.env.PORT ?? 3001),
