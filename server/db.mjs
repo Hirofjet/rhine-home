@@ -69,6 +69,7 @@ const TABLES = [
   `CREATE TABLE IF NOT EXISTS users (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     username VARCHAR(64) NOT NULL,
+    nickname VARCHAR(64) NULL,
     email VARCHAR(190) NOT NULL,
     email_verified TINYINT(1) NOT NULL DEFAULT 0,
     password_hash VARCHAR(255) NOT NULL,
@@ -220,6 +221,14 @@ const TABLES = [
     KEY idx_messages_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS follows (
+    follower_id BIGINT UNSIGNED NOT NULL,
+    following_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (follower_id, following_id),
+    KEY idx_follows_following (following_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS notifications (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NOT NULL,
@@ -292,6 +301,7 @@ async function ensureColumn(table, column, definition) {
 /** 兼容已部署的旧表：缺少的列与状态枚举自动补齐 */
 async function ensureSchemaUpgrades() {
   await ensureColumn('users', 'avatar_url', 'avatar_url VARCHAR(500) NULL')
+  await ensureColumn('users', 'nickname', 'nickname VARCHAR(64) NULL')
   await ensureColumn('users', 'gender', 'gender VARCHAR(16) NULL')
   await ensureColumn('users', 'birthday', 'birthday VARCHAR(16) NULL')
   await ensureColumn('users', 'bio', 'bio VARCHAR(500) NULL')

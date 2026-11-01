@@ -39,6 +39,7 @@ export function NavBar() {
   }, [menuOpen])
 
   const avatar = user?.avatarUrl ? resolveMediaUrl(user.avatarUrl) : ''
+  const displayName = user ? user.nickname || user.username : ''
 
   return (
     <>
@@ -142,14 +143,14 @@ export function NavBar() {
               {avatar ? (
                 <img
                   src={avatar}
-                  alt={user?.username ?? '头像'}
+                  alt={displayName || '头像'}
                   className="h-6 w-6 rounded-full border border-rhine-gold/40 object-cover"
                 />
               ) : (
                 <span className="flex h-6 w-6 items-center justify-center rounded-full border border-rhine-line bg-rhine-abyss text-rhine-gold">
                   {user ? (
                     <span className="font-mono text-[10px]">
-                      {user.username.slice(0, 1).toUpperCase()}
+                      {displayName.slice(0, 1).toUpperCase()}
                     </span>
                   ) : (
                     <UserRound className="h-3 w-3" />
@@ -157,7 +158,7 @@ export function NavBar() {
                 </span>
               )}
               <span className="hidden font-mono text-[10px] tracking-wider text-rhine-dim sm:inline">
-                {user ? user.username : '登录'}
+                {user ? displayName : '登录'}
               </span>
             </Link>
 
@@ -231,7 +232,7 @@ export function NavBar() {
                 onClick={() => setMenuOpenFor(null)}
                 className="mt-5 border border-rhine-gold/50 bg-rhine-gold/5 px-3 py-3 text-center text-sm text-rhine-gold"
               >
-                {user ? `我的主页 · ${user.username}` : '登录 / 注册'}
+                {user ? `我的主页 · ${displayName}` : '登录 / 注册'}
               </Link>
               {staff && (
                 <Link

@@ -872,7 +872,7 @@ app.get('/api/forum/boards', async (req, res) => {
 app.get('/api/forum/announcements', async (req, res) => {
   const boardId = Number(req.query.boardId) || null
   const rows = await query(
-    `SELECT a.*, u.username AS author
+    `SELECT a.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author
      FROM announcements a JOIN users u ON u.id = a.author_id
      WHERE a.board_id IS NULL${boardId ? ' OR a.board_id = ?' : ''}
      ORDER BY a.created_at DESC LIMIT 12`,
@@ -913,7 +913,7 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
   )
   const posts = await query(
     `SELECT p.id, p.title, p.created_at, p.updated_at, p.tags, p.pinned,
-            u.username AS author, u.id AS author_id, u.avatar_url AS author_avatar,
+            COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.id AS author_id, u.avatar_url AS author_avatar,
             (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
      FROM forum_posts p JOIN users u ON u.id = p.author_id
      WHERE p.board_id = ? AND p.status = 'approved'
@@ -941,7 +941,7 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
 app.get('/api/forum/posts/:id', async (req, res) => {
   const id = Number(req.params.id)
   const rows = await query(
-    `SELECT p.*, u.username AS author, u.avatar_url AS author_avatar,
+    `SELECT p.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar,
             b.slug AS board_slug, b.name AS board_name
      FROM forum_posts p
      JOIN users u ON u.id = p.author_id
@@ -952,7 +952,7 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
   const post = rows[0]
   const replies = await query(
-    `SELECT r.*, u.username AS author, u.avatar_url AS author_avatar
+    `SELECT r.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar
      FROM forum_replies r JOIN users u ON u.id = r.author_id
      WHERE r.post_id = ? AND r.status = 'approved'
      ORDER BY r.created_at ASC LIMIT 300`,
@@ -1285,7 +1285,7 @@ app.get('/api/admin/forum/pending', requireAuth, requireForumAccess, async (req,
   const { page, limit, offset } = pageParams(req, 20)
   const posts = await query(
     `SELECT p.id, p.title, p.content, p.attachments, p.created_at,
-            p.board_id, b.name AS board_name, u.username AS author
+            p.board_id, b.name AS board_name, COALESCE(NULLIF(u.nickname,''), u.username) AS author
      FROM forum_posts p
      JOIN forum_boards b ON b.id = p.board_id
      JOIN users u ON u.id = p.author_id
@@ -1294,7 +1294,7 @@ app.get('/api/admin/forum/pending', requireAuth, requireForumAccess, async (req,
   )
   const replies = await query(
     `SELECT r.id, r.content, r.attachments, r.created_at,
-            r.post_id, p.title AS post_title, p.board_id, b.name AS board_name, u.username AS author
+            r.post_id, p.title AS post_title, p.board_id, b.name AS board_name, COALESCE(NULLIF(u.nickname,''), u.username) AS author
      FROM forum_replies r
      JOIN forum_posts p ON p.id = r.post_id
      JOIN forum_boards b ON b.id = p.board_id
@@ -1393,7 +1393,7 @@ app.get(
     const { page, limit, offset } = pageParams(req, 30)
     const rows = await query(
       `SELECT p.id, p.title, p.status, p.pinned, p.created_at, p.updated_at,
-              u.username AS author,
+              COALESCE(NULLIF(u.nickname,''), u.username) AS author,
               (SELECT COUNT(*) FROM forum_replies r
                WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
        FROM forum_posts p JOIN users u ON u.id = p.author_id
@@ -1476,7 +1476,7 @@ app.get(
   async (req, res) => {
     const id = Number(req.params.id)
     const rows = await query(
-      `SELECT p.*, b.name AS board_name, u.username AS author
+      `SELECT p.*, b.name AS board_name, COALESCE(NULLIF(u.nickname,''), u.username) AS author
        FROM forum_posts p
        JOIN forum_boards b ON b.id = p.board_id
        JOIN users u ON u.id = p.author_id
@@ -1555,7 +1555,8 @@ app.post('/api/forum/boards/:id/request', requireAuth, async (req, res) => {
 
 app.get('/api/admin/forum/requests', requireAuth, requireForumAccess, async (req, res) => {
   const rows = await query(
-    `SELECT r.*, b.name AS board_name, b.access, u.username
+    `SELECT r.*, b.name AS board_name, b.access,
+            COALESCE(NULLIF(u.nickname,''), u.username) AS username
      FROM forum_access_requests r
      JOIN forum_boards b ON b.id = r.board_id
      JOIN users u ON u.id = r.user_id
@@ -1733,9 +1734,10 @@ app.get('/api/messages/conversations', requireAuth, async (req, res) => {
   const conversations = []
   for (const row of rows) {
     const otherId = Number(row.other_id)
-    const users = await query('SELECT id, username, avatar_url FROM users WHERE id = ?', [
-      otherId,
-    ])
+    const users = await query(
+      'SELECT id, username, nickname, avatar_url FROM users WHERE id = ?',
+      [otherId],
+    )
     if (!users.length) continue
     const last = await query(
       'SELECT id, sender_id, content, created_at FROM direct_messages WHERE id = ?',
@@ -1749,7 +1751,7 @@ app.get('/api/messages/conversations', requireAuth, async (req, res) => {
     conversations.push({
       user: {
         id: otherId,
-        username: users[0].username,
+        username: users[0].nickname || users[0].username,
         avatarUrl: users[0].avatar_url ?? '',
       },
       last: last.length
@@ -1768,9 +1770,10 @@ app.get('/api/messages/conversations', requireAuth, async (req, res) => {
 app.get('/api/messages/with/:id', requireAuth, async (req, res) => {
   const otherId = Number(req.params.id)
   if (!otherId) return res.status(400).json({ error: 'invalid_input' })
-  const users = await query('SELECT id, username, avatar_url FROM users WHERE id = ?', [
-    otherId,
-  ])
+  const users = await query(
+    'SELECT id, username, nickname, avatar_url FROM users WHERE id = ?',
+    [otherId],
+  )
   if (!users.length) return res.status(404).json({ error: 'not_found' })
   const messages = await query(
     `SELECT id, sender_id, content, created_at
@@ -1786,7 +1789,7 @@ app.get('/api/messages/with/:id', requireAuth, async (req, res) => {
   res.json({
     user: {
       id: otherId,
-      username: users[0].username,
+      username: users[0].nickname || users[0].username,
       avatarUrl: users[0].avatar_url ?? '',
     },
     messages: messages.map((row) => ({
@@ -1867,6 +1870,13 @@ app.post('/api/profile/email', requireAuth, async (req, res) => {
 
 app.put('/api/profile', requireAuth, async (req, res) => {
   const patch = {}
+  if (req.body?.nickname !== undefined) {
+    const nickname = asString(req.body.nickname, 64)
+    if (nickname.length < 2) {
+      return res.status(400).json({ error: 'invalid_nickname' })
+    }
+    patch.nickname = nickname
+  }
   if (req.body?.avatarUrl !== undefined) {
     const avatarUrl = asString(req.body.avatarUrl, 500)
     if (avatarUrl && !avatarUrl.startsWith('/uploads/') && !/^https?:\/\//.test(avatarUrl)) {
@@ -1908,10 +1918,34 @@ app.get('/api/users/:id', async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
   const user = normalizeUser(rows[0])
   const self = req.user?.id === user.id
+  const followers = await query(
+    'SELECT COUNT(*) AS n FROM follows WHERE following_id = ?',
+    [id],
+  )
+  const following = await query(
+    'SELECT COUNT(*) AS n FROM follows WHERE follower_id = ?',
+    [id],
+  )
+  let isFollowing = false
+  if (req.user && !self) {
+    const rowsFollow = await query(
+      'SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? LIMIT 1',
+      [req.user.id, id],
+    )
+    isFollowing = rowsFollow.length > 0
+  }
+  const posts = await query(
+    `SELECT p.id, p.title, p.created_at, b.slug AS board_slug, b.name AS board_name
+     FROM forum_posts p JOIN forum_boards b ON b.id = p.board_id
+     WHERE p.author_id = ? AND p.status = 'approved'
+     ORDER BY p.created_at DESC LIMIT 20`,
+    [id],
+  )
   res.json({
     user: {
       id: user.id,
       username: user.username,
+      nickname: user.nickname || user.username,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
       tags: user.tags,
@@ -1920,7 +1954,81 @@ app.get('/api/users/:id', async (req, res) => {
       birthday: self || req.user?.isSuper ? user.birthday : '',
       createdAt: user.createdAt,
       banned: banActive(user),
+      followers: Number(followers[0].n),
+      following: Number(following[0].n),
+      isFollowing,
     },
+    posts: posts.map((post) => ({
+      id: Number(post.id),
+      title: post.title,
+      createdAt: post.created_at,
+      board: { slug: post.board_slug, name: post.board_name },
+    })),
+  })
+})
+
+app.post('/api/users/:id/follow', requireAuth, async (req, res) => {
+  const targetId = Number(req.params.id)
+  if (targetId === req.user.id) {
+    return res.status(400).json({ error: 'cannot_follow_self' })
+  }
+  const target = await query('SELECT id, nickname, username FROM users WHERE id = ?', [
+    targetId,
+  ])
+  if (!target.length) return res.status(404).json({ error: 'not_found' })
+  await execute(
+    'INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)',
+    [req.user.id, targetId],
+  )
+  await notify(
+    targetId,
+    'follow',
+    '有人关注了你',
+    `${req.user.nickname || req.user.username} 关注了你`,
+    `/u/${req.user.id}`,
+  )
+  res.json({ ok: true })
+})
+
+app.delete('/api/users/:id/follow', requireAuth, async (req, res) => {
+  await execute(
+    'DELETE FROM follows WHERE follower_id = ? AND following_id = ?',
+    [req.user.id, Number(req.params.id)],
+  )
+  res.json({ ok: true })
+})
+
+app.get('/api/users/:id/followers', async (req, res) => {
+  const rows = await query(
+    `SELECT u.id, u.username, u.nickname, u.avatar_url
+     FROM follows f JOIN users u ON u.id = f.follower_id
+     WHERE f.following_id = ? ORDER BY f.created_at DESC LIMIT 100`,
+    [Number(req.params.id)],
+  )
+  res.json({
+    users: rows.map((row) => ({
+      id: Number(row.id),
+      username: row.username,
+      nickname: row.nickname || row.username,
+      avatarUrl: row.avatar_url ?? '',
+    })),
+  })
+})
+
+app.get('/api/users/:id/following', async (req, res) => {
+  const rows = await query(
+    `SELECT u.id, u.username, u.nickname, u.avatar_url
+     FROM follows f JOIN users u ON u.id = f.following_id
+     WHERE f.follower_id = ? ORDER BY f.created_at DESC LIMIT 100`,
+    [Number(req.params.id)],
+  )
+  res.json({
+    users: rows.map((row) => ({
+      id: Number(row.id),
+      username: row.username,
+      nickname: row.nickname || row.username,
+      avatarUrl: row.avatar_url ?? '',
+    })),
   })
 })
 

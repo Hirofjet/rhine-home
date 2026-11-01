@@ -28,12 +28,12 @@ import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { formatDateTime, STATUS_LABELS, STATUS_STYLES } from '../lib/format'
 
-type Tab = 'profile' | 'notifications' | 'messages' | 'posts' | 'account'
+type Tab = 'profile' | 'notifications' | 'messages' | 'posts' | 'follows' | 'account'
 
 const IMPORTANT_TYPES = new Set(['review', 'permission', 'ban', 'access'])
 
 const isTab = (value: string | null): value is Tab =>
-  ['profile', 'notifications', 'messages', 'posts', 'account'].includes(value ?? '')
+  ['profile', 'notifications', 'messages', 'posts', 'follows', 'account'].includes(value ?? '')
 
 export function ProfilePage() {
   const { user, loading, refresh, logout } = useSession()
@@ -48,6 +48,7 @@ export function ProfilePage() {
   const [notice, setNotice] = useState('')
 
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? '')
+  const [nickname, setNickname] = useState(user?.nickname ?? '')
   const [gender, setGender] = useState(user?.gender ?? '')
   const [birthday, setBirthday] = useState(user?.birthday ?? '')
   const [bio, setBio] = useState(user?.bio ?? '')
@@ -79,6 +80,12 @@ export function ProfilePage() {
       post: { id: number; title: string }
     }>
   >([])
+  const [followers, setFollowers] = useState<
+    Array<{ id: number; username: string; nickname: string; avatarUrl?: string }>
+  >([])
+  const [following, setFollowing] = useState<
+    Array<{ id: number; username: string; nickname: string; avatarUrl?: string }>
+  >([])
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -93,6 +100,7 @@ export function ProfilePage() {
   useEffect(() => {
     if (!user) return
     setAvatarUrl(user.avatarUrl ?? '')
+    setNickname(user.nickname ?? '')
     setGender(user.gender ?? '')
     setBirthday(user.birthday ?? '')
     setBio(user.bio ?? '')
@@ -121,6 +129,18 @@ export function ProfilePage() {
           setMyPosts(data.posts)
           setMyReplies(data.replies)
         }
+      })
+      .catch(() => undefined)
+    userApi
+      .followers(user.id)
+      .then((data) => {
+        if (alive) setFollowers(data.users)
+      })
+      .catch(() => undefined)
+    userApi
+      .following(user.id)
+      .then((data) => {
+        if (alive) setFollowing(data.users)
       })
       .catch(() => undefined)
     return () => {
@@ -170,6 +190,7 @@ export function ProfilePage() {
     setNotice('')
     try {
       await userApi.updateProfile({
+        nickname: nickname.trim() || user?.username || '',
         avatarUrl,
         gender,
         birthday,
@@ -346,7 +367,7 @@ export function ProfilePage() {
           </button>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-lg text-rhine-ink">{user.username}</p>
+          <p className="text-lg text-rhine-ink">{user.nickname || user.username}</p>
           <p className="mt-1 font-mono text-[10px] tracking-wider text-rhine-faint">
             {ROLE_LABELS[user.role]} · {user.email}
           </p>
@@ -370,6 +391,7 @@ export function ProfilePage() {
             ['notifications', `通知${notifications.filter((n) => !n.read).length ? ' •' : ''}`],
             ['messages', '私信'],
             ['posts', '我的帖子'],
+            ['follows', '关注'],
             ['account', '账号'],
           ] as Array<[Tab, string]>
         ).map(([key, label]) => (
@@ -401,6 +423,18 @@ export function ProfilePage() {
 
       {tab === 'profile' && (
         <div className="mt-5 space-y-3 border border-rhine-line/70 bg-rhine-panel/30 p-4">
+          <label className="block space-y-1">
+            <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">昵称</span>
+            <input
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
+              placeholder="显示昵称"
+              className="w-full border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-xs text-rhine-ink outline-none"
+            />
+          </label>
+          <p className="font-mono text-[9px] tracking-wider text-rhine-faint">
+            登录用户名：{user.username}（不可修改）
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1">
               <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">性别</span>
@@ -649,6 +683,70 @@ export function ProfilePage() {
               </ul>
             )}
           </div>
+        </div>
+      )}
+
+      {tab === 'follows' && (
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {(
+            [
+              ['关注', following, true],
+              ['粉丝', followers, false],
+            ] as Array<[string, typeof followers, boolean]>
+          ).map(([label, list, canUnfollow]) => (
+            <div key={label} className="border border-rhine-line/70 bg-rhine-panel/30">
+              <p className="border-b border-rhine-line/60 px-4 py-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+                {label}（{list.length}）
+              </p>
+              {list.length === 0 ? (
+                <p className="px-4 py-6 font-mono text-[10px] text-rhine-faint">
+                  暂无{label}
+                </p>
+              ) : (
+                <ul className="divide-y divide-rhine-line/50">
+                  {list.map((item) => (
+                    <li key={item.id} className="flex items-center gap-2 px-3 py-2.5">
+                      {item.avatarUrl ? (
+                        <img
+                          src={resolveMediaUrl(item.avatarUrl)}
+                          alt={item.nickname}
+                          className="h-7 w-7 rounded-full border border-rhine-line object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-rhine-line font-mono text-[10px] text-rhine-gold">
+                          {item.nickname.slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <Link
+                        to={`/u/${item.id}`}
+                        className="min-w-0 flex-1 truncate text-xs text-rhine-ink hover:text-rhine-gold"
+                      >
+                        {item.nickname}
+                        <span className="ml-2 font-mono text-[9px] text-rhine-faint">
+                          @{item.username}
+                        </span>
+                      </Link>
+                      {canUnfollow && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void userApi.unfollow(item.id).then(() => {
+                              setFollowing((current) =>
+                                current.filter((entry) => entry.id !== item.id),
+                              )
+                            })
+                          }}
+                          className="font-mono text-[9px] text-rhine-faint hover:text-rhine-red"
+                        >
+                          取消关注
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

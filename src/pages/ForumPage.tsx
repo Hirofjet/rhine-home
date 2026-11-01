@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Lock, MessageSquare, Plus, Radio, Search, Shield } from 'lucide-react'
 import {
   errorMessage,
@@ -27,6 +27,7 @@ const ACCESS_TONE: Record<string, string> = {
 
 export function ForumPage() {
   const { user } = useSession()
+  const navigate = useNavigate()
   const [boards, setBoards] = useState<Board[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -198,7 +199,14 @@ export function ForumPage() {
             const pending = board.requestStatus === 'pending'
             return (
               <motion.div key={board.id} variants={fadeUp}>
-                <div className="relative flex h-full flex-col border border-rhine-line/80 bg-rhine-panel/50 p-4 transition-colors hover:border-rhine-gold/40">
+                <div
+                  onClick={() => {
+                    if (accessible) navigate(`/forum/${board.slug}`)
+                  }}
+                  className={`relative flex h-full flex-col border border-rhine-line/80 bg-rhine-panel/50 p-4 transition-colors hover:border-rhine-gold/40 ${
+                    accessible ? 'cursor-pointer' : ''
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span
                       className={`border px-1.5 py-0.5 font-mono text-[9px] tracking-[0.16em] ${ACCESS_TONE[board.access] ?? ACCESS_TONE.public}`}
@@ -206,12 +214,7 @@ export function ForumPage() {
                       {ACCESS_LABEL[board.access] ?? '公开'}
                     </span>
                     {accessible ? (
-                      <Link
-                        to={`/forum/${board.slug}`}
-                        className="font-mono text-[10px] tracking-[0.16em] text-rhine-cyan hover:text-rhine-gold"
-                      >
-                        进入 →
-                      </Link>
+                      <ArrowRight className="h-3 w-3 text-rhine-faint" />
                     ) : (
                       <Lock className="h-3 w-3 text-rhine-faint" />
                     )}
@@ -239,7 +242,10 @@ export function ForumPage() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => void applyAccess(board)}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void applyAccess(board)
+                            }}
                             disabled={applying === board.id}
                             className="border border-rhine-cyan/50 px-2 py-1 font-mono text-[10px] tracking-[0.14em] text-rhine-cyan hover:bg-rhine-cyan/10 disabled:opacity-50"
                           >
@@ -255,14 +261,6 @@ export function ForumPage() {
                         </Link>
                       )}
                     </div>
-                  )}
-                  {accessible && (
-                    <Link
-                      to={`/forum/${board.slug}`}
-                      className="mt-3 inline-flex items-center gap-1 border-t border-rhine-line/50 pt-2 font-mono text-[10px] text-rhine-dim hover:text-rhine-gold"
-                    >
-                      查看帖子 <ArrowRight className="h-3 w-3" />
-                    </Link>
                   )}
                 </div>
               </motion.div>
