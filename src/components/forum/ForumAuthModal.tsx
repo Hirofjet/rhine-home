@@ -56,6 +56,14 @@ function ForumAuthModalBody({
     }
   }, [cooldown])
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   const sendCode = async () => {
     setError('')
     setNotice('')
@@ -138,7 +146,6 @@ function ForumAuthModalBody({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose}
     >
           <motion.div
             className="relative w-full max-w-md border border-rhine-gold/30 bg-rhine-panel/95 shadow-[0_0_60px_rgb(211_178_122/0.12)]"

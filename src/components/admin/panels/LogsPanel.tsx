@@ -207,6 +207,7 @@ export function LogsPanel() {
                   value={draft.markdown}
                   onChange={(event) => updateDraft({ markdown: event.target.value })}
                   placeholder={'# 日志标题\n\n今天做了什么…'}
+                  className="min-h-[420px]"
                 />
               )}
             </AdminField>

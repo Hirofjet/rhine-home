@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, MessageSquare, Plus, User } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Pin, Plus, Search, User } from 'lucide-react'
 import {
   errorMessage,
   forumApi,
+  resolveMediaUrl,
+  type Announcement,
   type Board,
   type PostSummary,
 } from '../lib/api'
@@ -23,6 +25,8 @@ export function ForumBoardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -47,6 +51,29 @@ export function ForumBoardPage() {
   }, [slug, page])
 
   const pageCount = Math.max(1, Math.ceil(total / 12))
+  const filtered = posts.filter((post) => {
+    if (!search.trim()) return true
+    const keyword = search.trim().toLowerCase()
+    return (
+      post.title.toLowerCase().includes(keyword) ||
+      post.author.toLowerCase().includes(keyword) ||
+      (post.tags ?? []).some((tag) => tag.toLowerCase().includes(keyword))
+    )
+  })
+
+  useEffect(() => {
+    if (!board) return undefined
+    let alive = true
+    forumApi
+      .announcements(board.id)
+      .then((data) => {
+        if (alive) setAnnouncements(data.announcements)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [board])
 
   return (
     <section className="mx-auto w-full max-w-4xl px-4 pb-24 pt-28 sm:px-6">
@@ -102,6 +129,34 @@ export function ForumBoardPage() {
         )}
       </div>
 
+      {announcements.length > 0 && (
+        <div className="mt-5 space-y-2">
+          {announcements.map((item) => (
+            <div
+              key={item.id}
+              className="border border-rhine-gold/30 bg-rhine-gold/[0.04] px-4 py-3"
+            >
+              <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.18em] text-rhine-gold">
+                <Pin className="h-3 w-3" /> 公告 · {item.title}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-rhine-dim">
+                {item.content}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-5 flex items-center gap-2 border border-rhine-line/60 bg-rhine-abyss/40 px-3 py-2">
+        <Search className="h-3.5 w-3.5 text-rhine-faint" />
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="搜索标题、作者或标签"
+          className="w-full bg-transparent font-mono text-xs text-rhine-ink outline-none placeholder:text-rhine-faint"
+        />
+      </div>
+
       {error && (
         <p className="mt-6 border border-rhine-red/40 bg-rhine-red/5 px-4 py-3 font-mono text-[11px] text-rhine-red">
           {error}
@@ -112,9 +167,9 @@ export function ForumBoardPage() {
         <p className="mt-10 animate-pulse-soft font-mono text-xs tracking-[0.3em] text-rhine-faint">
           LOADING THREADS …
         </p>
-      ) : posts.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <p className="mt-10 border border-rhine-line/60 bg-rhine-panel/30 px-4 py-8 text-center font-mono text-[11px] tracking-wider text-rhine-faint">
-          还没有帖子，来发第一帖吧。
+          没有匹配的帖子。
         </p>
       ) : (
         <motion.ul
@@ -123,14 +178,26 @@ export function ForumBoardPage() {
           animate="show"
           className="mt-5 divide-y divide-rhine-line/60 border border-rhine-line/70 bg-rhine-panel/30"
         >
-          {posts.map((post) => (
+          {filtered.map((post) => (
             <motion.li key={post.id} variants={fadeUp}>
               <Link
                 to={`/forum/post/${post.id}`}
-                className="group flex items-center gap-4 px-4 py-4 transition-colors hover:bg-rhine-gold/[0.04]"
+                className="group flex items-center gap-3 px-4 py-4 transition-colors hover:bg-rhine-gold/[0.04]"
               >
+                {post.authorAvatar ? (
+                  <img
+                    src={resolveMediaUrl(post.authorAvatar)}
+                    alt={post.author}
+                    className="h-8 w-8 rounded-full border border-rhine-line object-cover"
+                  />
+                ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-rhine-line bg-rhine-abyss font-mono text-[10px] text-rhine-gold">
+                    {post.author.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-rhine-ink group-hover:text-rhine-gold">
+                  <p className="flex items-center gap-2 truncate text-sm text-rhine-ink group-hover:text-rhine-gold">
+                    {post.pinned && <Pin className="h-3 w-3 shrink-0 text-rhine-gold" />}
                     {post.title}
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-3 font-mono text-[9px] tracking-wider text-rhine-faint">
@@ -138,6 +205,11 @@ export function ForumBoardPage() {
                       <User className="h-2.5 w-2.5" /> {post.author}
                     </span>
                     <span>{formatDateTime(post.createdAt)}</span>
+                    {(post.tags ?? []).map((tag) => (
+                      <span key={tag} className="border border-rhine-line/70 px-1.5 py-0.5 text-rhine-cyan">
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
                 <span className="flex items-center gap-1 font-mono text-[10px] text-rhine-dim">

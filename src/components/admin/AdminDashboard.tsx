@@ -4,6 +4,7 @@ import { cx } from '../../lib/cx'
 import { hasPerm, ROLE_LABELS, type ApiUser } from '../../lib/api'
 import { AdminBadge, AdminButton } from './AdminUi'
 import { ArticlesPanel } from './panels/ArticlesPanel'
+import { AdminBoardPostsPanel } from './panels/AdminBoardPostsPanel'
 import { ForumBoardsPanel } from './panels/ForumBoardsPanel'
 import { LogsPanel } from './panels/LogsPanel'
 import { MembersPanel } from './panels/MembersPanel'
@@ -20,6 +21,7 @@ type PanelKey =
   | 'videos'
   | 'logs'
   | 'forum-boards'
+  | 'forum-posts'
   | 'review'
   | 'members'
   | 'settings'
@@ -74,6 +76,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     const forum: MenuItem[] = []
     if (forumAccess) {
       forum.push({ key: 'forum-boards', label: '板块管理', labelEn: 'BOARDS' })
+      forum.push({ key: 'forum-posts', label: '帖子管理', labelEn: 'THREADS' })
       forum.push({ key: 'review', label: '内容审核', labelEn: 'REVIEW' })
     }
     if (forum.length) list.push({ title: '论坛', items: forum })
@@ -167,6 +170,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           {current === 'videos' && <VideosPanel />}
           {current === 'logs' && <LogsPanel />}
           {current === 'forum-boards' && <ForumBoardsPanel user={user} />}
+          {current === 'forum-posts' && <AdminBoardPostsPanel user={user} />}
           {current === 'review' && <ReviewPanel />}
           {current === 'members' && <MembersPanel user={user} />}
           {current === 'settings' && <SettingsPanel user={user} />}

@@ -3,7 +3,9 @@ import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import {
   adminApi,
   errorMessage,
+  forumApi,
   hasPerm,
+  type Announcement,
   type ApiUser,
   type Board,
 } from '../../../lib/api'
@@ -39,13 +41,20 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
   const [form, setForm] = useState<BoardForm>(emptyForm)
   const [busy, setBusy] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Board | null>(null)
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [annTitle, setAnnTitle] = useState('')
+  const [annContent, setAnnContent] = useState('')
 
   const canManageAll = user.isSuper || hasPerm(user, 'forum')
 
   const load = useCallback(async () => {
     try {
-      const data = await adminApi.forumBoards()
+      const [data, annData] = await Promise.all([
+        adminApi.forumBoards(),
+        forumApi.announcements(),
+      ])
       setBoards(data.boards)
+      setAnnouncements(annData.announcements)
       setError('')
     } catch (err) {
       setError(errorMessage(err))
@@ -53,6 +62,38 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
       setLoading(false)
     }
   }, [])
+
+  const removeAnnouncement = async (id: number) => {
+    try {
+      await adminApi.removeAnnouncement(id)
+      setNotice('公告已删除')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const publishAnnouncement = async () => {
+    if (!annTitle.trim() || !annContent.trim()) {
+      setError('公告标题和内容不能为空')
+      return
+    }
+    setBusy(true)
+    try {
+      await adminApi.createAnnouncement({
+        title: annTitle.trim(),
+        content: annContent.trim(),
+      })
+      setAnnTitle('')
+      setAnnContent('')
+      setNotice('公告已发布')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -155,6 +196,42 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
           <p className="mb-3 border border-rhine-gold/30 bg-rhine-gold/5 px-3 py-2 font-mono text-[10px] tracking-wider text-rhine-gold">
             当前账号只能管理已授权的板块内容，不能创建 / 删除板块。
           </p>
+        )}
+
+        {canManageAll && (
+          <div className="mb-4 space-y-2 border border-rhine-line/60 bg-rhine-abyss/30 p-3">
+            <p className="font-mono text-[9px] tracking-[0.25em] text-rhine-faint">发布公告</p>
+            <AdminInput
+              value={annTitle}
+              onChange={(event) => setAnnTitle(event.target.value)}
+              placeholder="公告标题"
+            />
+            <AdminTextarea
+              value={annContent}
+              onChange={(event) => setAnnContent(event.target.value)}
+              placeholder="公告内容"
+              className="min-h-16"
+            />
+            <div className="flex justify-end">
+              <AdminButton onClick={() => void publishAnnouncement()} disabled={busy}>
+                {busy ? '发布中…' : '发布公告'}
+              </AdminButton>
+            </div>
+            {announcements.length > 0 && (
+              <ul className="divide-y divide-rhine-line/50">
+                {announcements.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-xs text-rhine-ink">
+                      {item.title}
+                    </span>
+                    <AdminButton variant="danger" onClick={() => void removeAnnouncement(item.id)}>
+                      删除
+                    </AdminButton>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         {loading ? (

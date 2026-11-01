@@ -18,12 +18,16 @@ export function PhotosPanel() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [descriptions, setDescriptions] = useState<Record<number, string>>({})
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const load = useCallback(async () => {
     try {
       const data = (await adminApi.list('photos')) as { items: ContentPhoto[] }
       setItems(data.items)
+      setDescriptions(
+        Object.fromEntries(data.items.map((item) => [item.id, item.description ?? ''])),
+      )
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
@@ -35,7 +39,12 @@ export function PhotosPanel() {
     adminApi
       .list('photos')
       .then((data) => {
-        if (alive) setItems((data as { items: ContentPhoto[] }).items)
+        if (!alive) return
+        const list = (data as { items: ContentPhoto[] }).items
+        setItems(list)
+        setDescriptions(
+          Object.fromEntries(list.map((item) => [item.id, item.description ?? ''])),
+        )
       })
       .catch((err: unknown) => {
         if (alive) setError(err instanceof Error ? err.message : '加载失败')
@@ -98,6 +107,20 @@ export function PhotosPanel() {
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败')
+    }
+  }
+
+  const saveDescription = async (item: ContentPhoto) => {
+    try {
+      await adminApi.update('photos', item.id, {
+        url: item.url,
+        name: item.name,
+        date: item.date ?? '',
+        description: descriptions[item.id] ?? '',
+      })
+      setNotice('描述已保存')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败')
     }
   }
 
@@ -172,18 +195,38 @@ export function PhotosPanel() {
                     className="h-32 w-full object-cover"
                   />
                 </a>
-                <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                  <div className="min-w-0">
-                    <p className="truncate font-mono text-[10px] text-rhine-ink">
-                      {item.name}
-                    </p>
-                    <p className="font-mono text-[9px] text-rhine-faint">
-                      {item.date || '日期未知'}
-                    </p>
+                <div className="space-y-1.5 px-2 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-[10px] text-rhine-ink">
+                        {item.name}
+                      </p>
+                      <p className="font-mono text-[9px] text-rhine-faint">
+                        {item.date || '日期未知'}
+                      </p>
+                    </div>
+                    <AdminButton variant="danger" onClick={() => void remove(item)}>
+                      删除
+                    </AdminButton>
                   </div>
-                  <AdminButton variant="danger" onClick={() => void remove(item)}>
-                    删除
-                  </AdminButton>
+                  <div className="flex gap-1.5">
+                    <AdminInput
+                      value={descriptions[item.id] ?? ''}
+                      onChange={(event) =>
+                        setDescriptions((current) => ({
+                          ...current,
+                          [item.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="照片描述（可选）"
+                    />
+                    <AdminButton
+                      variant="ghost"
+                      onClick={() => void saveDescription(item)}
+                    >
+                      保存
+                    </AdminButton>
+                  </div>
                 </div>
               </li>
             ))}

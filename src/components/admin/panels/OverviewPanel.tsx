@@ -105,6 +105,37 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
           </p>
         )}
 
+        {Object.keys(counts).length > 0 && (
+          <div className="mt-5 space-y-1.5 border-t border-rhine-line/60 pt-4">
+            <p className="mb-2 font-mono text-[9px] tracking-[0.25em] text-rhine-faint">
+              数据分布 / DISTRIBUTION
+            </p>
+            {(() => {
+              const max = Math.max(...Object.values(counts), 1)
+              return CARDS.filter((card) => counts[card.key] !== undefined).map((card) => {
+                const value = counts[card.key] ?? 0
+                const percent = Math.round((value / max) * 100)
+                return (
+                  <div key={card.key} className="flex items-center gap-2">
+                    <span className="w-20 font-mono text-[10px] text-rhine-dim">
+                      {card.label}
+                    </span>
+                    <div className="h-2 flex-1 bg-rhine-abyss">
+                      <div
+                        className="h-full bg-rhine-gold/60"
+                        style={{ width: `${Math.max(percent, 2)}%` }}
+                      />
+                    </div>
+                    <span className="w-8 text-right font-mono text-[10px] text-rhine-gold">
+                      {value}
+                    </span>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        )}
+
         <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-rhine-line/60 pt-4 font-mono text-[10px] tracking-wider text-rhine-dim">
           <span className="flex items-center gap-2">
             <Activity
@@ -130,7 +161,7 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
         </div>
 
         <p className="mt-3 font-mono text-[10px] leading-relaxed tracking-wider text-rhine-faint">
-          提示：后台入口不会出现在前台导航；账号与权限修改会记录在成员列表中。
+          数据实时读取自 MySQL。
         </p>
       </AdminPanel>
     </div>

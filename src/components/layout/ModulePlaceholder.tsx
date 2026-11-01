@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, Construction } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import type { SlotModule } from '../../content/slots'
 import { fadeUp, viewportOnce } from '../../lib/motion'
 import { SlotGrid } from '../slots/SlotGrid'
-import { GlowButton, Panel, SectionTitle } from '../ui'
+import { GlowButton, SectionTitle } from '../ui'
 
 interface ModulePlaceholderProps {
   /** 模块编号，如 RL-EXT-01 */
@@ -33,21 +33,16 @@ export function ModulePlaceholder({
     <main className="mx-auto min-h-screen w-full max-w-4xl px-4 pb-24 pt-28 sm:px-6">
       <SectionTitle index={code} en={titleEn} zh={titleZh} />
 
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        className="mt-10"
-      >
-        <Panel code={code} title="UNDER CONSTRUCTION" titleZh="模块建设中" accent="cyan">
-          <div className="flex items-start gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center border border-rhine-cyan/40 bg-rhine-cyan/5 text-rhine-cyan">
-              <Construction className="h-5 w-5 animate-pulse-soft" />
-            </span>
-            <p className="text-sm leading-relaxed text-rhine-dim">{description}</p>
-          </div>
-        </Panel>
-      </motion.div>
+      {description && (
+        <motion.p
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          className="mt-6 max-w-2xl text-sm leading-relaxed text-rhine-dim"
+        >
+          {description}
+        </motion.p>
+      )}
 
       {/* 槽位模块 */}
       {slots.length > 0 && (
