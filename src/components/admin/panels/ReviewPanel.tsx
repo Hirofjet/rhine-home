@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, RefreshCw, X } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   adminApi,
   errorMessage,
@@ -7,6 +9,7 @@ import {
   type PendingReply,
 } from '../../../lib/api'
 import { formatDateTime } from '../../../lib/format'
+import { AttachmentGrid } from '../../forum/AttachmentGrid'
 import {
   AdminBadge,
   AdminButton,
@@ -107,14 +110,12 @@ export function ReviewPanel() {
                       {post.boardName} · {post.author} · {formatDateTime(post.createdAt)}
                     </span>
                   </div>
-                  <p className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-rhine-dim">
-                    {post.content}
-                  </p>
-                  {post.attachments.length > 0 && (
-                    <p className="mt-2 font-mono text-[9px] tracking-wider text-rhine-cyan">
-                      附件：{post.attachments.map((file) => file.name).join(' / ')}
-                    </p>
-                  )}
+                  <div className="mt-2 border border-rhine-line/50 bg-rhine-panel/30 px-3 py-2">
+                    <div className="md-body max-h-72 overflow-y-auto text-sm">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
+                    </div>
+                    <AttachmentGrid attachments={post.attachments} />
+                  </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <AdminInput
                       value={notes[key] ?? ''}

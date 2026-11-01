@@ -57,6 +57,17 @@ export function HeroSection() {
               CODENAME //{' '}
               <span className="text-rhine-cyan">{profile.codeName}</span>
             </motion.p>
+            <motion.div variants={fadeUp} className="mt-5 flex items-center gap-4">
+              <img
+                src={`${import.meta.env.BASE_URL}avatar.svg`}
+                alt="站长头像"
+                className="h-20 w-20 rounded-full border border-rhine-gold/50 object-cover shadow-[0_0_24px_rgb(211_178_122/0.18)]"
+              />
+              <div className="font-mono text-[10px] leading-relaxed tracking-[0.2em] text-rhine-faint">
+                <p className="text-rhine-dim">OPERATOR</p>
+                <p>{profile.codeName}</p>
+              </div>
+            </motion.div>
             <motion.h1
               variants={fadeUp}
               className="text-glow-gold mt-3 text-5xl font-bold leading-tight text-rhine-ink sm:text-6xl md:text-7xl"

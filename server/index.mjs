@@ -16,6 +16,7 @@ import exifrNamespace from 'exifr'
 import { config } from './config.mjs'
 import { initSchema, ping, query, execute, transaction } from './db.mjs'
 import {
+  banActive,
   createSession,
   destroySession,
   hasPermission,
@@ -321,6 +322,13 @@ app.post('/api/auth/register', async (req, res) => {
     [username, email],
   )
   if (taken.length) return res.status(409).json({ error: 'account_taken' })
+  const blacklisted = await query(
+    'SELECT email FROM email_blacklist WHERE email = ? LIMIT 1',
+    [email],
+  )
+  if (blacklisted.length) {
+    return res.status(403).json({ error: 'email_blacklisted' })
+  }
   if (!(await consumeCode(email, 'register', code))) {
     return res.status(400).json({ error: 'invalid_code' })
   }
@@ -353,6 +361,23 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ error: 'invalid_credentials' })
   }
   const user = normalizeUser(rows[0])
+  if (banActive(user)) {
+    const until = user.bannedUntil
+      ? new Date(String(user.bannedUntil).replace(' ', 'T'))
+      : null
+    if (until && until.getTime() <= Date.now()) {
+      await execute(
+        'UPDATE users SET banned = 0, banned_until = NULL, banned_reason = NULL WHERE id = ?',
+        [user.id],
+      )
+    } else {
+      return res.status(403).json({
+        error: 'account_banned',
+        until: user.bannedUntil,
+        reason: user.bannedReason,
+      })
+    }
+  }
   const token = await createSession(user.id)
   res.json({ token, user: publicUser(user) })
 })
@@ -419,8 +444,16 @@ app.post('/api/admin/me/password', requireAuth, async (req, res) => {
 // ============================================================
 // 成员管理
 // ============================================================
-app.get('/api/admin/users', requireAuth, requireUserAdmin, async (_req, res) => {
-  const rows = await query('SELECT * FROM users ORDER BY id ASC')
+app.get('/api/admin/users', requireAuth, requireUserAdmin, async (req, res) => {
+  const q = asString(req.query.q, 64)
+  const rows = q
+    ? await query(
+        `SELECT * FROM users
+         WHERE username LIKE ? OR email LIKE ?
+         ORDER BY id ASC LIMIT 500`,
+        [`%${q}%`, `%${q}%`],
+      )
+    : await query('SELECT * FROM users ORDER BY id ASC LIMIT 500')
   res.json({ users: rows.map(normalizeUser).map(publicUser) })
 })
 
@@ -519,6 +552,13 @@ app.put(
       JSON.stringify(permissions),
       id,
     ])
+    await notify(
+      id,
+      'permission',
+      '你的权限已更新',
+      permissions.length ? `当前权限：${permissions.join(' / ')}` : '当前没有管理权限',
+      '/profile',
+    )
     const updatedRows = await query('SELECT * FROM users WHERE id = ?', [id])
     res.json({ user: publicUser(normalizeUser(updatedRows[0])) })
   },
@@ -583,6 +623,7 @@ const photoSanitize = (body) => {
     url,
     name: asString(body?.name, 500) || url.split('/').pop() || 'photo',
     date: asDate(body?.date) || '',
+    description: asString(body?.description, 300),
   }
 }
 
@@ -655,7 +696,7 @@ registerContent('articles', 'archive.articles', articleSanitize, [
   'downloads',
 ], 'author_id')
 registerContent('logs', 'logs', logSanitize, ['title', 'date', 'markdown'], 'author_id')
-registerContent('photos', 'archive.photos', photoSanitize, ['url', 'name', 'date'], 'uploaded_by')
+registerContent('photos', 'archive.photos', photoSanitize, ['url', 'name', 'date', 'description'], 'uploaded_by')
 registerContent('videos', 'archive.videos', videoSanitize, [
   'title',
   'description',
@@ -778,6 +819,27 @@ app.get('/api/forum/boards', async (_req, res) => {
   res.json({ boards: rows.map(boardPublic) })
 })
 
+app.get('/api/forum/announcements', async (req, res) => {
+  const boardId = Number(req.query.boardId) || null
+  const rows = await query(
+    `SELECT a.*, u.username AS author
+     FROM announcements a JOIN users u ON u.id = a.author_id
+     WHERE a.board_id IS NULL${boardId ? ' OR a.board_id = ?' : ''}
+     ORDER BY a.created_at DESC LIMIT 12`,
+    boardId ? [boardId] : [],
+  )
+  res.json({
+    announcements: rows.map((row) => ({
+      id: Number(row.id),
+      boardId: row.board_id ? Number(row.board_id) : null,
+      title: row.title,
+      content: row.content,
+      author: row.author,
+      createdAt: row.created_at,
+    })),
+  })
+})
+
 app.get('/api/forum/boards/:slug', async (req, res) => {
   const slug = asString(req.params.slug, 64)
   const boards = await query('SELECT * FROM forum_boards WHERE slug = ? LIMIT 1', [slug])
@@ -789,12 +851,12 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
     [board.id],
   )
   const posts = await query(
-    `SELECT p.id, p.title, p.created_at, p.updated_at,
-            u.username AS author, u.id AS author_id,
+    `SELECT p.id, p.title, p.created_at, p.updated_at, p.tags, p.pinned,
+            u.username AS author, u.id AS author_id, u.avatar_url AS author_avatar,
             (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
      FROM forum_posts p JOIN users u ON u.id = p.author_id
      WHERE p.board_id = ? AND p.status = 'approved'
-     ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+     ORDER BY p.pinned DESC, p.created_at DESC LIMIT ? OFFSET ?`,
     [board.id, limit, offset],
   )
   res.json({
@@ -804,6 +866,15 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
       title: p.title,
       author: p.author,
       authorId: Number(p.author_id),
+      authorAvatar: p.author_avatar ?? '',
+      tags: (() => {
+        try {
+          return JSON.parse(p.tags ?? '[]')
+        } catch {
+          return []
+        }
+      })(),
+      pinned: Boolean(p.pinned),
       createdAt: p.created_at,
       updatedAt: p.updated_at,
       replyCount: Number(p.reply_count),
@@ -815,7 +886,8 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
 app.get('/api/forum/posts/:id', async (req, res) => {
   const id = Number(req.params.id)
   const rows = await query(
-    `SELECT p.*, u.username AS author, b.slug AS board_slug, b.name AS board_name
+    `SELECT p.*, u.username AS author, u.avatar_url AS author_avatar,
+            b.slug AS board_slug, b.name AS board_name
      FROM forum_posts p
      JOIN users u ON u.id = p.author_id
      JOIN forum_boards b ON b.id = p.board_id
@@ -825,10 +897,10 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
   const post = rows[0]
   const replies = await query(
-    `SELECT r.*, u.username AS author
+    `SELECT r.*, u.username AS author, u.avatar_url AS author_avatar
      FROM forum_replies r JOIN users u ON u.id = r.author_id
      WHERE r.post_id = ? AND r.status = 'approved'
-     ORDER BY r.created_at ASC LIMIT 200`,
+     ORDER BY r.created_at ASC LIMIT 300`,
     [id],
   )
   res.json({
@@ -837,16 +909,27 @@ app.get('/api/forum/posts/:id', async (req, res) => {
       title: post.title,
       content: post.content,
       attachments: asAttachments(post.attachments),
+      tags: (() => {
+        try {
+          return JSON.parse(post.tags ?? '[]')
+        } catch {
+          return []
+        }
+      })(),
+      pinned: Boolean(post.pinned),
       author: post.author,
+      authorAvatar: post.author_avatar ?? '',
       authorId: Number(post.author_id),
       board: { id: Number(post.board_id), slug: post.board_slug, name: post.board_name },
       createdAt: post.created_at,
     },
     replies: replies.map((r) => ({
       id: Number(r.id),
+      parentId: r.parent_id ? Number(r.parent_id) : null,
       content: r.content,
       attachments: asAttachments(r.attachments),
       author: r.author,
+      authorAvatar: r.author_avatar ?? '',
       authorId: Number(r.author_id),
       createdAt: r.created_at,
     })),
@@ -884,11 +967,24 @@ app.get('/api/forum/my', requireAuth, async (req, res) => {
   })
 })
 
+async function notify(userId, type, title, content, link) {
+  try {
+    await execute(
+      `INSERT INTO notifications (user_id, type, title, content, link)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, type, title, asString(content, 500), asString(link, 300)],
+    )
+  } catch (error) {
+    console.error('[notify]', error.message)
+  }
+}
+
 app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res) => {
   const boardId = Number(req.body?.boardId)
   const title = asString(req.body?.title, 200)
   const content = String(req.body?.content ?? '').slice(0, 200000)
   const attachments = asAttachments(req.body?.attachments)
+  const tags = asTags(req.body?.tags)
   if (!title || !content.trim()) {
     return res.status(400).json({ error: 'invalid_input' })
   }
@@ -897,15 +993,24 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
   if (!rateLimit(`post:${req.user.id}`, 60 * 1000, 5)) {
     return res.status(429).json({ error: 'too_many_requests' })
   }
+  const autoApprove = canModerateBoard(req.user, boardId)
   const result = await execute(
-    `INSERT INTO forum_posts (board_id, author_id, title, content, attachments, status)
-     VALUES (?, ?, ?, ?, ?, 'pending')`,
-    [boardId, req.user.id, title, content, JSON.stringify(attachments)],
+    `INSERT INTO forum_posts (board_id, author_id, title, content, attachments, tags, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      boardId,
+      req.user.id,
+      title,
+      content,
+      JSON.stringify(attachments),
+      JSON.stringify(tags),
+      autoApprove ? 'approved' : 'pending',
+    ],
   )
   res.status(201).json({
     id: Number(result.insertId),
-    status: 'pending',
-    message: '已提交，等待论坛管理员审核',
+    status: autoApprove ? 'approved' : 'pending',
+    message: autoApprove ? '帖子已发布' : '已提交，等待论坛管理员审核',
   })
 })
 
@@ -916,28 +1021,124 @@ app.post(
   async (req, res) => {
     const postId = Number(req.params.id)
     const content = String(req.body?.content ?? '').slice(0, 20000)
-    const attachments = asAttachments(req.body?.attachments)
-    if (!content.trim()) return res.status(400).json({ error: 'invalid_input' })
+    const parentId = Number(req.body?.parentId) || null
+    // 回复只允许图片 / GIF 表情；不允许视频与文件
+    const attachments = asAttachments(req.body?.attachments).filter(
+      (item) =>
+        item.type === 'image' &&
+        item.size <= 30 * 1024 * 1024 &&
+        (item.url.startsWith('/uploads/photo/') || /^https?:\/\//.test(item.url)),
+    )
+    if (!content.trim() && attachments.length === 0) {
+      return res.status(400).json({ error: 'invalid_input' })
+    }
     const posts = await query(
-      `SELECT id FROM forum_posts WHERE id = ? AND status = 'approved' LIMIT 1`,
+      `SELECT id, author_id, board_id FROM forum_posts
+       WHERE id = ? AND status = 'approved' LIMIT 1`,
       [postId],
     )
     if (!posts.length) return res.status(404).json({ error: 'post_not_found' })
+    let validParent = null
+    if (parentId) {
+      const parents = await query(
+        `SELECT id FROM forum_replies WHERE id = ? AND post_id = ? AND status = 'approved'`,
+        [parentId, postId],
+      )
+      if (parents.length) validParent = parentId
+    }
     if (!rateLimit(`reply:${req.user.id}`, 60 * 1000, 10)) {
       return res.status(429).json({ error: 'too_many_requests' })
     }
     const result = await execute(
-      `INSERT INTO forum_replies (post_id, author_id, content, attachments, status)
-       VALUES (?, ?, ?, ?, 'pending')`,
-      [postId, req.user.id, content, JSON.stringify(attachments)],
+      `INSERT INTO forum_replies (post_id, author_id, parent_id, content, attachments, status)
+       VALUES (?, ?, ?, ?, ?, 'approved')`,
+      [postId, req.user.id, validParent, content, JSON.stringify(attachments)],
     )
+    if (posts[0].author_id !== req.user.id) {
+      await notify(
+        posts[0].author_id,
+        'reply',
+        '你的帖子收到新回复',
+        `${req.user.username}：${content.slice(0, 80) || '[图片]'}`,
+        `/forum/post/${postId}`,
+      )
+    }
     res.status(201).json({
       id: Number(result.insertId),
-      status: 'pending',
-      message: '回复已提交，等待审核',
+      status: 'approved',
+      message: '回复已发布',
     })
   },
 )
+
+/** 帖主 / 版主删除帖子（软删除，管理员后台仍可见） */
+app.delete('/api/forum/posts/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id)
+  const rows = await query(
+    'SELECT id, author_id, board_id FROM forum_posts WHERE id = ?',
+    [id],
+  )
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  const allowed =
+    rows[0].author_id === req.user.id ||
+    canModerateBoard(req.user, Number(rows[0].board_id))
+  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  await execute(`UPDATE forum_posts SET status = 'deleted' WHERE id = ?`, [id])
+  res.json({ ok: true })
+})
+
+/** 版主操作：隐藏 / 恢复 / 置顶 / 取消置顶 / 删除 */
+app.post(
+  '/api/admin/forum/posts/:id/moderate',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const id = Number(req.params.id)
+    const action = asString(req.body?.action, 20)
+    const rows = await query(
+      'SELECT id, board_id, status FROM forum_posts WHERE id = ?',
+      [id],
+    )
+    if (!rows.length) return res.status(404).json({ error: 'not_found' })
+    if (!canModerateBoard(req.user, Number(rows[0].board_id))) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    if (action === 'hide') {
+      await execute(`UPDATE forum_posts SET status = 'hidden' WHERE id = ?`, [id])
+    } else if (action === 'restore') {
+      await execute(`UPDATE forum_posts SET status = 'approved' WHERE id = ?`, [id])
+    } else if (action === 'pin') {
+      await execute('UPDATE forum_posts SET pinned = 1 WHERE id = ?', [id])
+    } else if (action === 'unpin') {
+      await execute('UPDATE forum_posts SET pinned = 0 WHERE id = ?', [id])
+    } else if (action === 'delete') {
+      await execute(`UPDATE forum_posts SET status = 'deleted' WHERE id = ?`, [id])
+    } else {
+      return res.status(400).json({ error: 'invalid_action' })
+    }
+    res.json({ ok: true })
+  },
+)
+
+/** 回复删除：回复作者 / 帖主 / 版主 */
+app.delete('/api/forum/replies/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id)
+  const rows = await query(
+    `SELECT r.id, r.author_id, p.author_id AS post_author, p.board_id
+     FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id
+     WHERE r.id = ?`,
+    [id],
+  )
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  const row = rows[0]
+  const allowed =
+    row.author_id === req.user.id ||
+    row.post_author === req.user.id ||
+    canModerateBoard(req.user, Number(row.board_id))
+  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  await execute(`UPDATE forum_replies SET status = 'deleted' WHERE id = ?`, [id])
+  res.json({ ok: true })
+})
 
 // ============================================================
 // 后台：论坛管理 + 审核
@@ -1073,7 +1274,10 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
   const note = asString(req.body?.note, 255)
   let boardId = null
   if (type === 'post') {
-    const rows = await query('SELECT board_id FROM forum_posts WHERE id = ?', [id])
+    const rows = await query(
+      'SELECT board_id, author_id, title FROM forum_posts WHERE id = ?',
+      [id],
+    )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
     boardId = Number(rows[0].board_id)
     if (!canModerateBoard(req.user, boardId)) {
@@ -1083,6 +1287,15 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
       `UPDATE forum_posts SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
       [approve ? 'approved' : 'rejected', note, req.user.id, id],
     )
+    if (Number(rows[0].author_id) !== req.user.id) {
+      await notify(
+        Number(rows[0].author_id),
+        'review',
+        approve ? '帖子已通过审核' : '帖子未通过审核',
+        note || rows[0].title,
+        `/forum/post/${id}`,
+      )
+    }
   } else {
     const rows = await query(
       `SELECT p.board_id FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE r.id = ?`,
@@ -1099,6 +1312,367 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
     )
   }
   res.json({ ok: true })
+})
+
+// ============================================================
+// 后台：板块内帖子管理
+// ============================================================
+app.get(
+  '/api/admin/forum/boards/:id/posts',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const boardId = Number(req.params.id)
+    if (!canModerateBoard(req.user, boardId)) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const { page, limit, offset } = pageParams(req, 30)
+    const rows = await query(
+      `SELECT p.id, p.title, p.status, p.pinned, p.created_at, p.updated_at,
+              u.username AS author,
+              (SELECT COUNT(*) FROM forum_replies r
+               WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
+       FROM forum_posts p JOIN users u ON u.id = p.author_id
+       WHERE p.board_id = ?
+       ORDER BY p.pinned DESC, p.created_at DESC LIMIT ? OFFSET ?`,
+      [boardId, limit, offset],
+    )
+    res.json({
+      posts: rows.map((row) => ({
+        id: Number(row.id),
+        title: row.title,
+        status: row.status,
+        pinned: Boolean(row.pinned),
+        author: row.author,
+        replyCount: Number(row.reply_count),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      pagination: { page, limit },
+    })
+  },
+)
+
+// ============================================================
+// 论坛公告（仅论坛管理权限）
+// ============================================================
+app.post(
+  '/api/admin/forum/announcements',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const boardId = Number(req.body?.boardId) || null
+    const allowed = boardId
+      ? canModerateBoard(req.user, boardId)
+      : req.user.isSuper || hasPermission(req.user, 'forum')
+    if (!allowed) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const title = asString(req.body?.title, 200)
+    const content = String(req.body?.content ?? '').slice(0, 5000)
+    if (!title || !content.trim()) {
+      return res.status(400).json({ error: 'invalid_input' })
+    }
+    if (boardId) {
+      const boards = await query('SELECT id FROM forum_boards WHERE id = ?', [boardId])
+      if (!boards.length) return res.status(400).json({ error: 'invalid_board' })
+    }
+    const result = await execute(
+      'INSERT INTO announcements (board_id, title, content, author_id) VALUES (?, ?, ?, ?)',
+      [boardId, title, content, req.user.id],
+    )
+    res.status(201).json({ id: Number(result.insertId) })
+  },
+)
+
+app.delete(
+  '/api/admin/forum/announcements/:id',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    if (!(req.user.isSuper || hasPermission(req.user, 'forum'))) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const rows = await query('SELECT board_id FROM announcements WHERE id = ?', [
+      Number(req.params.id),
+    ])
+    if (!rows.length) return res.status(404).json({ error: 'not_found' })
+    if (rows[0].board_id && !canModerateBoard(req.user, Number(rows[0].board_id))) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    await execute('DELETE FROM announcements WHERE id = ?', [Number(req.params.id)])
+    res.json({ ok: true })
+  },
+)
+
+// ============================================================
+// 封禁 / 解封（临时或永久拉黑邮箱）
+// ============================================================
+app.post('/api/admin/users/:id/ban', requireAuth, requireMembersManage, async (req, res) => {
+  const id = Number(req.params.id)
+  if (id === req.user.id) return res.status(400).json({ error: 'cannot_ban_self' })
+  const targetRows = await query('SELECT * FROM users WHERE id = ?', [id])
+  const target = normalizeUser(targetRows[0])
+  if (!target) return res.status(404).json({ error: 'not_found' })
+  if (target.isSuper) return res.status(403).json({ error: 'cannot_ban_super' })
+  if (!canManageTarget(req.user, target)) {
+    return res.status(403).json({ error: 'forbidden' })
+  }
+  const permanent = req.body?.permanent === true
+  const days = Number(req.body?.days)
+  const reason = asString(req.body?.reason, 200)
+  if (permanent) {
+    await execute(
+      `UPDATE users SET banned = 1, banned_until = NULL, banned_reason = ? WHERE id = ?`,
+      [reason, id],
+    )
+    await execute(
+      `INSERT INTO email_blacklist (email, reason) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE reason = ?`,
+      [target.email, reason, reason],
+    )
+  } else {
+    if (!Number.isFinite(days) || days < 1 || days > 3650) {
+      return res.status(400).json({ error: 'invalid_days' })
+    }
+    await execute(
+      `UPDATE users SET banned = 1, banned_until = DATE_ADD(NOW(), INTERVAL ? DAY), banned_reason = ?
+       WHERE id = ?`,
+      [Math.floor(days), reason, id],
+    )
+  }
+  await execute('DELETE FROM sessions WHERE user_id = ?', [id])
+  await notify(
+    id,
+    'ban',
+    permanent ? '账号已被永久封禁' : '账号已被封禁',
+    reason || (permanent ? '邮箱已加入黑名单' : `封禁 ${days} 天`),
+    '/profile',
+  )
+  res.json({ ok: true })
+})
+
+app.delete('/api/admin/users/:id/ban', requireAuth, requireMembersManage, async (req, res) => {
+  const id = Number(req.params.id)
+  const targetRows = await query('SELECT * FROM users WHERE id = ?', [id])
+  const target = normalizeUser(targetRows[0])
+  if (!target) return res.status(404).json({ error: 'not_found' })
+  if (!canManageTarget(req.user, target)) {
+    return res.status(403).json({ error: 'forbidden' })
+  }
+  await execute(
+    'UPDATE users SET banned = 0, banned_until = NULL, banned_reason = NULL WHERE id = ?',
+    [id],
+  )
+  await execute('DELETE FROM email_blacklist WHERE email = ?', [target.email])
+  res.json({ ok: true })
+})
+
+// ============================================================
+// 通知中心
+// ============================================================
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  const rows = await query(
+    `SELECT id, type, title, content, link, read_at, created_at
+     FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 50`,
+    [req.user.id],
+  )
+  const unreadRows = await query(
+    'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL',
+    [req.user.id],
+  )
+  res.json({
+    notifications: rows.map((row) => ({
+      id: Number(row.id),
+      type: row.type,
+      title: row.title,
+      content: row.content ?? '',
+      link: row.link ?? '',
+      read: Boolean(row.read_at),
+      createdAt: row.created_at,
+    })),
+    unread: Number(unreadRows[0].n),
+  })
+})
+
+app.post('/api/notifications/read', requireAuth, async (req, res) => {
+  const id = Number(req.body?.id) || null
+  if (id) {
+    await execute(
+      'UPDATE notifications SET read_at = NOW() WHERE id = ? AND user_id = ?',
+      [id, req.user.id],
+    )
+  } else {
+    await execute(
+      'UPDATE notifications SET read_at = NOW() WHERE user_id = ? AND read_at IS NULL',
+      [req.user.id],
+    )
+  }
+  res.json({ ok: true })
+})
+
+// ============================================================
+// 私信
+// ============================================================
+app.get('/api/messages/conversations', requireAuth, async (req, res) => {
+  const userId = req.user.id
+  const rows = await query(
+    `SELECT CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS other_id,
+            MAX(id) AS last_id
+     FROM direct_messages
+     WHERE sender_id = ? OR receiver_id = ?
+     GROUP BY other_id ORDER BY last_id DESC LIMIT 50`,
+    [userId, userId, userId],
+  )
+  const conversations = []
+  for (const row of rows) {
+    const otherId = Number(row.other_id)
+    const users = await query('SELECT id, username, avatar_url FROM users WHERE id = ?', [
+      otherId,
+    ])
+    if (!users.length) continue
+    const last = await query(
+      'SELECT id, sender_id, content, created_at FROM direct_messages WHERE id = ?',
+      [row.last_id],
+    )
+    const unread = await query(
+      `SELECT COUNT(*) AS n FROM direct_messages
+       WHERE receiver_id = ? AND sender_id = ? AND read_at IS NULL`,
+      [userId, otherId],
+    )
+    conversations.push({
+      user: {
+        id: otherId,
+        username: users[0].username,
+        avatarUrl: users[0].avatar_url ?? '',
+      },
+      last: last.length
+        ? {
+            content: last[0].content.slice(0, 80),
+            createdAt: last[0].created_at,
+            fromMe: Number(last[0].sender_id) === userId,
+          }
+        : null,
+      unread: Number(unread[0].n),
+    })
+  }
+  res.json({ conversations })
+})
+
+app.get('/api/messages/with/:id', requireAuth, async (req, res) => {
+  const otherId = Number(req.params.id)
+  if (!otherId) return res.status(400).json({ error: 'invalid_input' })
+  const users = await query('SELECT id, username, avatar_url FROM users WHERE id = ?', [
+    otherId,
+  ])
+  if (!users.length) return res.status(404).json({ error: 'not_found' })
+  const messages = await query(
+    `SELECT id, sender_id, content, created_at
+     FROM direct_messages
+     WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+     ORDER BY id ASC LIMIT 200`,
+    [req.user.id, otherId, otherId, req.user.id],
+  )
+  await execute(
+    'UPDATE direct_messages SET read_at = NOW() WHERE receiver_id = ? AND sender_id = ? AND read_at IS NULL',
+    [req.user.id, otherId],
+  )
+  res.json({
+    user: {
+      id: otherId,
+      username: users[0].username,
+      avatarUrl: users[0].avatar_url ?? '',
+    },
+    messages: messages.map((row) => ({
+      id: Number(row.id),
+      fromMe: Number(row.sender_id) === req.user.id,
+      content: row.content,
+      createdAt: row.created_at,
+    })),
+  })
+})
+
+app.post('/api/messages/dm', requireAuth, async (req, res) => {
+  const toId = Number(req.body?.to)
+  const content = String(req.body?.content ?? '').trim().slice(0, 2000)
+  if (!toId || !content) return res.status(400).json({ error: 'invalid_input' })
+  if (toId === req.user.id) return res.status(400).json({ error: 'cannot_message_self' })
+  const users = await query(
+    "SELECT id FROM users WHERE id = ? AND status = 'active' LIMIT 1",
+    [toId],
+  )
+  if (!users.length) return res.status(404).json({ error: 'not_found' })
+  if (!rateLimit(`dm:${req.user.id}`, 60 * 1000, 30)) {
+    return res.status(429).json({ error: 'too_many_requests' })
+  }
+  const result = await execute(
+    'INSERT INTO direct_messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
+    [req.user.id, toId, content],
+  )
+  await notify(toId, 'dm', '收到新私信', content.slice(0, 120), `/profile?chat=${req.user.id}`)
+  res.status(201).json({ id: Number(result.insertId) })
+})
+
+// ============================================================
+// 个人资料
+// ============================================================
+app.put('/api/profile', requireAuth, async (req, res) => {
+  const patch = {}
+  if (req.body?.avatarUrl !== undefined) {
+    const avatarUrl = asString(req.body.avatarUrl, 500)
+    if (avatarUrl && !avatarUrl.startsWith('/uploads/') && !/^https?:\/\//.test(avatarUrl)) {
+      return res.status(400).json({ error: 'invalid_avatar' })
+    }
+    patch.avatar_url = avatarUrl
+  }
+  if (req.body?.gender !== undefined) {
+    const gender = asString(req.body.gender, 16)
+    if (!['', 'male', 'female', 'other'].includes(gender)) {
+      return res.status(400).json({ error: 'invalid_gender' })
+    }
+    patch.gender = gender
+  }
+  if (req.body?.birthday !== undefined) {
+    patch.birthday = asDate(req.body.birthday)
+  }
+  if (req.body?.bio !== undefined) {
+    patch.bio = String(req.body.bio).slice(0, 500)
+  }
+  if (req.body?.tags !== undefined) {
+    patch.tags = JSON.stringify(asTags(req.body.tags))
+  }
+  if (!Object.keys(patch).length) {
+    return res.status(400).json({ error: 'nothing_to_update' })
+  }
+  const columns = Object.keys(patch)
+  await execute(
+    `UPDATE users SET ${columns.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+    [...columns.map((c) => patch[c]), req.user.id],
+  )
+  const rows = await query('SELECT * FROM users WHERE id = ?', [req.user.id])
+  res.json({ user: publicUser(normalizeUser(rows[0])) })
+})
+
+app.get('/api/users/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  const rows = await query('SELECT * FROM users WHERE id = ?', [id])
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  const user = normalizeUser(rows[0])
+  const self = req.user?.id === user.id
+  res.json({
+    user: {
+      id: user.id,
+      username: user.username,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
+      tags: user.tags,
+      role: roleLabel(user),
+      gender: self || req.user?.isSuper ? user.gender : '',
+      birthday: self || req.user?.isSuper ? user.birthday : '',
+      createdAt: user.createdAt,
+      banned: banActive(user),
+    },
+  })
 })
 
 // ============================================================

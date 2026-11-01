@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { ArrowRight, MessageSquare, Plus, Radio } from 'lucide-react'
-import { errorMessage, forumApi, ROLE_LABELS, type Board } from '../lib/api'
+import { ArrowRight, MessageSquare, Plus, Radio, Search } from 'lucide-react'
+import {
+  errorMessage,
+  forumApi,
+  ROLE_LABELS,
+  type Announcement,
+  type Board,
+} from '../lib/api'
 import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { fadeUp, stagger } from '../lib/motion'
@@ -32,6 +38,8 @@ export function ForumPage() {
   const [error, setError] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
   const [mine, setMine] = useState<MineData | null>(null)
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -65,7 +73,29 @@ export function ForumPage() {
     }
   }, [user])
 
+  useEffect(() => {
+    let alive = true
+    forumApi
+      .announcements()
+      .then((data) => {
+        if (alive) setAnnouncements(data.announcements)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const totalPosts = boards.reduce((sum, board) => sum + board.postCount, 0)
+  const filteredBoards = boards.filter((board) => {
+    if (!search.trim()) return true
+    const keyword = search.trim().toLowerCase()
+    return (
+      board.name.toLowerCase().includes(keyword) ||
+      board.slug.toLowerCase().includes(keyword) ||
+      board.description.toLowerCase().includes(keyword)
+    )
+  })
 
   return (
     <section className="mx-auto w-full max-w-5xl px-4 pb-24 pt-28 sm:px-6">
@@ -86,8 +116,26 @@ export function ForumPage() {
           variants={fadeUp}
           className="mt-4 max-w-2xl text-sm leading-relaxed text-rhine-dim"
         >
-          注册用户可发布帖子、图片、视频与文章，所有内容经论坛管理员审核后公开。
+          讨论区 · 支持图片、视频与长文
         </motion.p>
+
+        {announcements.length > 0 && (
+          <motion.div variants={fadeUp} className="mt-5 space-y-2">
+            {announcements.map((item) => (
+              <div
+                key={item.id}
+                className="border border-rhine-gold/30 bg-rhine-gold/[0.04] px-4 py-2.5"
+              >
+                <p className="font-mono text-[10px] tracking-[0.16em] text-rhine-gold">
+                  公告 · {item.title}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-rhine-dim">
+                  {item.content}
+                </p>
+              </div>
+            ))}
+          </motion.div>
+        )}
 
         <motion.div
           variants={fadeUp}
@@ -108,6 +156,16 @@ export function ForumPage() {
         </p>
       )}
 
+      <div className="mt-6 flex items-center gap-2 border border-rhine-line/60 bg-rhine-abyss/40 px-3 py-2">
+        <Search className="h-3.5 w-3.5 text-rhine-faint" />
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="搜索板块"
+          className="w-full bg-transparent font-mono text-xs text-rhine-ink outline-none placeholder:text-rhine-faint"
+        />
+      </div>
+
       {loading ? (
         <p className="mt-10 animate-pulse-soft font-mono text-xs tracking-[0.3em] text-rhine-faint">
           LOADING BOARDS …
@@ -119,7 +177,7 @@ export function ForumPage() {
           animate="show"
           className="mt-8 grid gap-4 sm:grid-cols-2"
         >
-          {boards.map((board) => (
+          {filteredBoards.map((board) => (
             <motion.div key={board.id} variants={fadeUp}>
               <Link
                 to={`/forum/${board.slug}`}
@@ -147,6 +205,11 @@ export function ForumPage() {
               </Link>
             </motion.div>
           ))}
+          {filteredBoards.length === 0 && (
+            <p className="border border-rhine-line/60 bg-rhine-panel/30 px-4 py-6 text-center font-mono text-[11px] text-rhine-faint">
+              没有匹配的板块
+            </p>
+          )}
         </motion.div>
       )}
 

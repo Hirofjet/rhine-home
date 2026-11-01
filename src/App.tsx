@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { BootScreen } from './components/boot/BootScreen'
 import { SessionProvider } from './components/auth/SessionProvider'
 import { BackgroundFX } from './components/layout/BackgroundFX'
+import { MouseTrail } from './components/layout/MouseTrail'
 import { Footer } from './components/layout/Footer'
 import { NavBar } from './components/layout/NavBar'
 import { HomePage } from './pages/HomePage'
@@ -39,6 +40,9 @@ const ForumComposePage = lazy(() =>
   import('./pages/ForumComposePage').then((m) => ({
     default: m.ForumComposePage,
   })),
+)
+const ProfilePage = lazy(() =>
+  import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 )
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
@@ -133,6 +137,7 @@ function AnimatedRoutes() {
             <Route path="/forum/new" element={<ForumComposePage />} />
             <Route path="/forum/post/:id" element={<ForumPostPage />} />
             <Route path="/forum/:slug" element={<ForumBoardPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/guestbook" element={<GuestbookPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
@@ -147,6 +152,7 @@ function PublicSite() {
   return (
     <>
       <BackgroundFX />
+      <MouseTrail />
       <NavBar />
       <AnimatedRoutes />
       <Footer />

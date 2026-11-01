@@ -21,6 +21,14 @@ export interface ApiUser {
   status: 'active' | 'disabled'
   permissions: string[]
   role: Role
+  avatarUrl?: string
+  gender?: string
+  birthday?: string
+  bio?: string
+  tags?: string[]
+  banned?: boolean
+  bannedUntil?: string | null
+  bannedReason?: string
   createdAt?: string
 }
 
@@ -52,6 +60,7 @@ export interface ContentPhoto {
   url: string
   name: string
   date?: string | null
+  description?: string
 }
 
 export interface ContentVideo {
@@ -87,9 +96,82 @@ export interface PostSummary {
   title: string
   author: string
   authorId: number
+  authorAvatar?: string
+  tags?: string[]
+  pinned?: boolean
   createdAt: string
   updatedAt?: string
   replyCount: number
+}
+
+export interface ForumPost {
+  id: number
+  title: string
+  content: string
+  attachments: Attachment[]
+  tags?: string[]
+  pinned?: boolean
+  author: string
+  authorAvatar?: string
+  authorId: number
+  board: { id: number; slug: string; name: string }
+  createdAt: string
+}
+
+export interface ForumReply {
+  id: number
+  parentId?: number | null
+  content: string
+  attachments: Attachment[]
+  author: string
+  authorAvatar?: string
+  authorId: number
+  createdAt: string
+}
+
+export interface Announcement {
+  id: number
+  boardId: number | null
+  title: string
+  content: string
+  author: string
+  createdAt: string
+}
+
+export interface NotificationItem {
+  id: number
+  type: string
+  title: string
+  content: string
+  link: string
+  read: boolean
+  createdAt: string
+}
+
+export interface Conversation {
+  user: { id: number; username: string; avatarUrl?: string }
+  last: { content: string; createdAt: string; fromMe: boolean } | null
+  unread: number
+}
+
+export interface ChatMessage {
+  id: number
+  fromMe: boolean
+  content: string
+  createdAt: string
+}
+
+export interface PublicProfile {
+  id: number
+  username: string
+  avatarUrl?: string
+  bio?: string
+  tags?: string[]
+  role: Role
+  gender?: string
+  birthday?: string
+  createdAt: string
+  banned?: boolean
 }
 
 export interface ForumPost {
@@ -186,6 +268,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   too_soon: '发送太频繁，请稍后再试',
   too_many_requests: '操作过于频繁，请稍后再试',
   email_not_found: '该邮箱未注册',
+  email_blacklisted: '该邮箱已被列入黑名单',
+  account_banned: '账号已被封禁，请联系管理员',
+  invalid_days: '封禁天数不合法',
+  cannot_message_self: '不能给自己发私信',
+  cannot_ban_self: '不能封禁自己',
+  cannot_ban_super: '不能封禁超级管理员',
+  invalid_avatar: '头像地址不合法',
+  invalid_gender: '性别选项不合法',
   cannot_change_own_permissions: '不能修改自己的权限',
   cannot_delete_self: '不能删除自己',
   cannot_delete_super: '不能删除超级管理员',
@@ -360,6 +450,12 @@ export const forumApi = {
   boards() {
     return api<{ boards: Board[] }>('/api/forum/boards', { auth: false })
   },
+  announcements(boardId?: number) {
+    return api<{ announcements: Announcement[] }>(
+      `/api/forum/announcements${boardId ? `?boardId=${boardId}` : ''}`,
+      { auth: false },
+    )
+  },
   board(slug: string, page = 1) {
     return api<{
       board: Board
@@ -380,17 +476,27 @@ export const forumApi = {
     title: string
     content: string
     attachments: Attachment[]
+    tags: string[]
   }) {
     return api<{ id: number; status: string; message: string }>('/api/forum/posts', {
       method: 'POST',
       body: input,
     })
   },
-  reply(postId: number, input: { content: string; attachments: Attachment[] }) {
+  reply(
+    postId: number,
+    input: { content: string; attachments: Attachment[]; parentId?: number | null },
+  ) {
     return api<{ id: number; status: string; message: string }>(
       `/api/forum/posts/${postId}/replies`,
       { method: 'POST', body: input },
     )
+  },
+  deletePost(id: number) {
+    return api<{ ok: boolean }>(`/api/forum/posts/${id}`, { method: 'DELETE' })
+  },
+  deleteReply(id: number) {
+    return api<{ ok: boolean }>(`/api/forum/replies/${id}`, { method: 'DELETE' })
   },
   my() {
     return api<{
@@ -440,8 +546,10 @@ export const adminApi = {
     return api<{ ok: boolean }>(`/api/admin/${name}/${id}`, { method: 'DELETE' })
   },
   upload: uploadFile,
-  users() {
-    return api<{ users: ApiUser[] }>('/api/admin/users')
+  users(q?: string) {
+    return api<{ users: ApiUser[] }>(
+      `/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+    )
   },
   createUser(data: {
     username: string
@@ -498,6 +606,88 @@ export const adminApi = {
     return api<{ ok: boolean }>('/api/admin/forum/review', {
       method: 'POST',
       body: input,
+    })
+  },
+  moderatePost(id: number, action: 'hide' | 'restore' | 'pin' | 'unpin' | 'delete') {
+    return api<{ ok: boolean }>(`/api/admin/forum/posts/${id}/moderate`, {
+      method: 'POST',
+      body: { action },
+    })
+  },
+  boardPosts(boardId: number, page = 1) {
+    return api<{
+      posts: Array<{
+        id: number
+        title: string
+        status: string
+        pinned: boolean
+        author: string
+        replyCount: number
+        createdAt: string
+        updatedAt: string
+      }>
+    }>(`/api/admin/forum/boards/${boardId}/posts?page=${page}`)
+  },
+  createAnnouncement(input: { boardId?: number | null; title: string; content: string }) {
+    return api<{ id: number }>('/api/admin/forum/announcements', {
+      method: 'POST',
+      body: input,
+    })
+  },
+  removeAnnouncement(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/forum/announcements/${id}`, {
+      method: 'DELETE',
+    })
+  },
+  banUser(id: number, input: { days?: number; permanent?: boolean; reason?: string }) {
+    return api<{ ok: boolean }>(`/api/admin/users/${id}/ban`, {
+      method: 'POST',
+      body: input,
+    })
+  },
+  unbanUser(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/users/${id}/ban`, { method: 'DELETE' })
+  },
+}
+
+// ---------- 个人资料 / 通知 / 私信 ----------
+export const userApi = {
+  profile(id: number) {
+    return api<{ user: PublicProfile }>(`/api/users/${id}`, { auth: false })
+  },
+  updateProfile(input: {
+    avatarUrl?: string
+    gender?: string
+    birthday?: string
+    bio?: string
+    tags?: string[]
+  }) {
+    return api<{ user: ApiUser }>('/api/profile', { method: 'PUT', body: input })
+  },
+  notifications() {
+    return api<{ notifications: NotificationItem[]; unread: number }>(
+      '/api/notifications',
+    )
+  },
+  readNotifications(id?: number) {
+    return api<{ ok: boolean }>('/api/notifications/read', {
+      method: 'POST',
+      body: id ? { id } : {},
+    })
+  },
+  conversations() {
+    return api<{ conversations: Conversation[] }>('/api/messages/conversations')
+  },
+  messagesWith(id: number) {
+    return api<{
+      user: { id: number; username: string; avatarUrl?: string }
+      messages: ChatMessage[]
+    }>(`/api/messages/with/${id}`)
+  },
+  sendDm(to: number, content: string) {
+    return api<{ id: number }>('/api/messages/dm', {
+      method: 'POST',
+      body: { to, content },
     })
   },
 }

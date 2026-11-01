@@ -226,6 +226,7 @@ export function ArticlesPanel() {
                   value={draft.markdown}
                   onChange={(event) => updateDraft({ markdown: event.target.value })}
                   placeholder={'# 标题\n\n正文内容…'}
+                  className="min-h-[420px]"
                 />
               )}
             </AdminField>

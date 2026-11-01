@@ -105,8 +105,7 @@ export function AdminLogin() {
           </div>
         </div>
 
-        {!resetOpen ? (
-          <form onSubmit={(event) => void submit(event)} className="mt-6 space-y-4">
+        {!resetOpen ? (          <form onSubmit={(event) => void submit(event)} className="mt-6 space-y-4">
             <AdminField label="账号 / USERNAME">
               <AdminInput
                 value={username}
@@ -221,10 +220,6 @@ export function AdminLogin() {
             </div>
           </div>
         )}
-
-        <p className="mt-6 border-t border-rhine-line/50 pt-3 font-mono text-[9px] leading-relaxed tracking-wider text-rhine-faint">
-          后台入口不在前台导航中显示；建议部署后立即修改初始密码。
-        </p>
       </div>
     </div>
   )

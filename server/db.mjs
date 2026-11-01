@@ -74,6 +74,14 @@ const TABLES = [
     password_hash VARCHAR(255) NOT NULL,
     is_super TINYINT(1) NOT NULL DEFAULT 0,
     permissions JSON NULL,
+    avatar_url VARCHAR(500) NULL,
+    gender VARCHAR(16) NULL,
+    birthday VARCHAR(16) NULL,
+    bio VARCHAR(500) NULL,
+    tags JSON NULL,
+    banned TINYINT(1) NOT NULL DEFAULT 0,
+    banned_until DATETIME NULL,
+    banned_reason VARCHAR(200) NULL,
     status ENUM('active','disabled') NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -135,6 +143,7 @@ const TABLES = [
     url VARCHAR(500) NOT NULL,
     name VARCHAR(500) NOT NULL,
     date VARCHAR(32) NULL,
+    description VARCHAR(300) NULL,
     uploaded_by BIGINT UNSIGNED NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -171,7 +180,9 @@ const TABLES = [
     title VARCHAR(200) NOT NULL,
     content LONGTEXT NOT NULL,
     attachments JSON NULL,
-    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    tags JSON NULL,
+    pinned TINYINT(1) NOT NULL DEFAULT 0,
+    status ENUM('pending','approved','rejected','hidden','deleted') NOT NULL DEFAULT 'pending',
     review_note VARCHAR(255) NULL,
     reviewed_by BIGINT UNSIGNED NULL,
     reviewed_at DATETIME NULL,
@@ -186,9 +197,10 @@ const TABLES = [
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     post_id BIGINT UNSIGNED NOT NULL,
     author_id BIGINT UNSIGNED NOT NULL,
+    parent_id BIGINT UNSIGNED NULL,
     content TEXT NOT NULL,
     attachments JSON NULL,
-    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    status ENUM('pending','approved','rejected','deleted') NOT NULL DEFAULT 'approved',
     review_note VARCHAR(255) NULL,
     reviewed_by BIGINT UNSIGNED NULL,
     reviewed_at DATETIME NULL,
@@ -206,10 +218,93 @@ const TABLES = [
     PRIMARY KEY (id),
     KEY idx_messages_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    type VARCHAR(32) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    content VARCHAR(500) NULL,
+    link VARCHAR(300) NULL,
+    read_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_notifications_user (user_id, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS direct_messages (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    sender_id BIGINT UNSIGNED NOT NULL,
+    receiver_id BIGINT UNSIGNED NOT NULL,
+    content TEXT NOT NULL,
+    read_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_dm_sender (sender_id, created_at),
+    KEY idx_dm_receiver (receiver_id, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS announcements (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    board_id BIGINT UNSIGNED NULL,
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    author_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_ann_board (board_id, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS email_blacklist (
+    email VARCHAR(190) NOT NULL,
+    reason VARCHAR(200) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (email)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ]
+
+async function ensureColumn(table, column, definition) {
+  const [rows] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column],
+  )
+  if (!rows.length) {
+    await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN ${definition}`)
+  }
+}
+
+/** 兼容已部署的旧表：缺少的列与状态枚举自动补齐 */
+async function ensureSchemaUpgrades() {
+  await ensureColumn('users', 'avatar_url', 'avatar_url VARCHAR(500) NULL')
+  await ensureColumn('users', 'gender', 'gender VARCHAR(16) NULL')
+  await ensureColumn('users', 'birthday', 'birthday VARCHAR(16) NULL')
+  await ensureColumn('users', 'bio', 'bio VARCHAR(500) NULL')
+  await ensureColumn('users', 'tags', 'tags JSON NULL')
+  await ensureColumn('users', 'banned', "banned TINYINT(1) NOT NULL DEFAULT 0")
+  await ensureColumn('users', 'banned_until', 'banned_until DATETIME NULL')
+  await ensureColumn('users', 'banned_reason', 'banned_reason VARCHAR(200) NULL')
+  await ensureColumn('photos', 'description', 'description VARCHAR(300) NULL')
+  await ensureColumn('forum_posts', 'tags', 'tags JSON NULL')
+  await ensureColumn(
+    'forum_posts',
+    'pinned',
+    'pinned TINYINT(1) NOT NULL DEFAULT 0',
+  )
+  await ensureColumn('forum_replies', 'parent_id', 'parent_id BIGINT UNSIGNED NULL')
+  await pool.query(
+    `ALTER TABLE forum_posts MODIFY status
+     ENUM('pending','approved','rejected','hidden','deleted') NOT NULL DEFAULT 'pending'`,
+  )
+  await pool.query(
+    `ALTER TABLE forum_replies MODIFY status
+     ENUM('pending','approved','rejected','deleted') NOT NULL DEFAULT 'approved'`,
+  )
+}
 
 export async function initSchema() {
   for (const sql of TABLES) await pool.query(sql)
+  await ensureSchemaUpgrades()
   // 默认板块（仅首次）
   const [rows] = await pool.query(
     'SELECT COUNT(*) AS total FROM forum_boards',

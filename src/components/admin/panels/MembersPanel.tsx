@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { KeyRound, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { Ban, KeyRound, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import {
   adminApi,
   errorMessage,
@@ -11,6 +11,7 @@ import {
 import {
   AdminBadge,
   AdminButton,
+  AdminCheckbox,
   AdminError,
   AdminField,
   AdminInput,
@@ -49,6 +50,12 @@ export function MembersPanel({ user }: MembersPanelProps) {
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [banTarget, setBanTarget] = useState<ApiUser | null>(null)
+  const [banDays, setBanDays] = useState('7')
+  const [banPermanent, setBanPermanent] = useState(false)
+  const [banReason, setBanReason] = useState('')
 
   const actorCanManage =
     user.isSuper || user.permissions.includes('members.manage')
@@ -206,6 +213,52 @@ export function MembersPanel({ user }: MembersPanelProps) {
     }
   }
 
+  const submitBan = async () => {
+    if (!banTarget) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      await adminApi.banUser(banTarget.id, {
+        permanent: banPermanent,
+        days: Number(banDays) || 7,
+        reason: banReason,
+      })
+      setNotice(banPermanent ? '已永久封禁并拉黑邮箱' : `已封禁 ${banDays} 天`)
+      setBanTarget(null)
+      setBanReason('')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const unban = async (target: ApiUser) => {
+    try {
+      await adminApi.unbanUser(target.id)
+      setNotice('已解除封禁')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const filteredUsers = users.filter((target) => {
+    const keyword = query.trim().toLowerCase()
+    if (
+      keyword &&
+      !target.username.toLowerCase().includes(keyword) &&
+      !target.email.toLowerCase().includes(keyword)
+    ) {
+      return false
+    }
+    if (roleFilter === 'banned') return Boolean(target.banned)
+    if (roleFilter !== 'all' && target.role !== roleFilter) return false
+    return true
+  })
+
   const summarize = (target: ApiUser) => {
     if (target.isSuper) return '全部权限'
     const labels: string[] = []
@@ -250,93 +303,143 @@ export function MembersPanel({ user }: MembersPanelProps) {
         {loading ? (
           <p className="font-mono text-[10px] tracking-wider text-rhine-faint">加载中…</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-rhine-line/60 font-mono text-[9px] tracking-[0.22em] text-rhine-faint">
-                  <th className="py-2 pr-3 font-normal">成员</th>
-                  <th className="py-2 pr-3 font-normal">邮箱</th>
-                  <th className="py-2 pr-3 font-normal">角色</th>
-                  <th className="py-2 pr-3 font-normal">权限</th>
-                  <th className="py-2 text-right font-normal">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((target) => {
-                  const self = target.id === user.id
-                  return (
-                    <tr
-                      key={target.id}
-                      className="border-b border-rhine-line/40 align-top font-mono text-[11px] text-rhine-dim"
-                    >
-                      <td className="py-3 pr-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-rhine-ink">{target.username}</span>
-                          {self && <AdminBadge tone="gold">当前账号</AdminBadge>}
-                          {target.status === 'disabled' && (
-                            <AdminBadge tone="red">已禁用</AdminBadge>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <span className="text-rhine-dim">{target.email}</span>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <AdminBadge tone={target.isSuper ? 'gold' : target.role === 'admin' ? 'cyan' : 'line'}>
-                          {ROLE_LABELS[target.role]}
-                        </AdminBadge>
-                      </td>
-                      <td className="max-w-[260px] py-3 pr-3 text-[10px] leading-relaxed tracking-wider">
-                        {summarize(target)}
-                      </td>
-                      <td className="py-3 text-right">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {canEditPermissions(target) && (
-                            <AdminButton
-                              variant="ghost"
-                              onClick={() => openPermissions(target)}
-                            >
-                              <ShieldCheck className="h-3 w-3" /> 权限
-                            </AdminButton>
-                          )}
-                          {canResetPassword(target) && (
-                            <AdminButton
-                              variant="ghost"
-                              onClick={() => openPassword(target)}
-                            >
-                              <KeyRound className="h-3 w-3" /> 重置密码
-                            </AdminButton>
-                          )}
-                          {canDelete(target) && (
-                            <AdminButton
-                              variant="danger"
-                              onClick={() => setModal({ type: 'delete', target })}
-                            >
-                              <Trash2 className="h-3 w-3" /> 删除
-                            </AdminButton>
-                          )}
-                          {!canEditPermissions(target) &&
-                            !canResetPassword(target) &&
-                            !canDelete(target) && (
-                              <span className="font-mono text-[9px] tracking-wider text-rhine-faint">
-                                —
-                              </span>
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="flex min-w-48 flex-1 items-center gap-2 border border-rhine-line bg-rhine-abyss/50 px-2 py-1.5">
+                <Search className="h-3 w-3 text-rhine-faint" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索用户名或邮箱"
+                  className="w-full bg-transparent font-mono text-[11px] text-rhine-ink outline-none placeholder:text-rhine-faint"
+                />
+              </div>
+              <select
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value)}
+                className="border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-[11px] text-rhine-dim outline-none"
+              >
+                <option value="all">全部角色</option>
+                <option value="super">超级用户</option>
+                <option value="admin">管理员</option>
+                <option value="moderator">论坛管理员</option>
+                <option value="user">普通用户</option>
+                <option value="banned">已封禁</option>
+              </select>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-rhine-line/60 font-mono text-[9px] tracking-[0.22em] text-rhine-faint">
+                    <th className="py-2 pr-3 font-normal">成员</th>
+                    <th className="py-2 pr-3 font-normal">邮箱</th>
+                    <th className="py-2 pr-3 font-normal">角色</th>
+                    <th className="py-2 pr-3 font-normal">权限</th>
+                    <th className="py-2 text-right font-normal">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((target) => {
+                    const self = target.id === user.id
+                    return (
+                      <tr
+                        key={target.id}
+                        className="border-b border-rhine-line/40 align-top font-mono text-[11px] text-rhine-dim"
+                      >
+                        <td className="py-3 pr-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-rhine-ink">{target.username}</span>
+                            {self && <AdminBadge tone="gold">当前账号</AdminBadge>}
+                            {target.banned && (
+                              <AdminBadge tone="red">
+                                {target.bannedUntil
+                                  ? `封禁至 ${target.bannedUntil.slice(0, 10)}`
+                                  : '永久封禁'}
+                              </AdminBadge>
                             )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                            {target.status === 'disabled' && (
+                              <AdminBadge tone="red">已禁用</AdminBadge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <span className="text-rhine-dim">{target.email}</span>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <AdminBadge
+                            tone={
+                              target.isSuper
+                                ? 'gold'
+                                : target.role === 'admin'
+                                  ? 'cyan'
+                                  : 'line'
+                            }
+                          >
+                            {ROLE_LABELS[target.role]}
+                          </AdminBadge>
+                        </td>
+                        <td className="max-w-[260px] py-3 pr-3 text-[10px] leading-relaxed tracking-wider">
+                          {summarize(target)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {canEditPermissions(target) && (
+                              <AdminButton
+                                variant="ghost"
+                                onClick={() => openPermissions(target)}
+                              >
+                                <ShieldCheck className="h-3 w-3" /> 权限
+                              </AdminButton>
+                            )}
+                            {canResetPassword(target) && (
+                              <AdminButton
+                                variant="ghost"
+                                onClick={() => openPassword(target)}
+                              >
+                                <KeyRound className="h-3 w-3" /> 重置密码
+                              </AdminButton>
+                            )}
+                            {canResetPassword(target) &&
+                              (target.banned ? (
+                                <AdminButton
+                                  variant="ghost"
+                                  onClick={() => void unban(target)}
+                                >
+                                  解封
+                                </AdminButton>
+                              ) : (
+                                <AdminButton
+                                  variant="danger"
+                                  onClick={() => {
+                                    setBanTarget(target)
+                                    setBanPermanent(false)
+                                    setBanReason('')
+                                  }}
+                                >
+                                  <Ban className="h-3 w-3" /> 封禁
+                                </AdminButton>
+                              ))}
+                            {canDelete(target) && (
+                              <AdminButton
+                                variant="danger"
+                                onClick={() => setModal({ type: 'delete', target })}
+                              >
+                                <Trash2 className="h-3 w-3" /> 删除
+                              </AdminButton>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
-        <div className="mt-4 space-y-1 border-t border-rhine-line/50 pt-3 font-mono text-[9px] leading-relaxed tracking-wider text-rhine-faint">
-          <p>· 所有成员（除超级用户）必须填写邮箱；注册用户需邮箱验证码。</p>
-          <p>· 只有拥有「授权权限」的账号可以修改他人权限，且不能修改自己的权限。</p>
-          <p>· 拥有管理类权限的账号之间不能互相操作，只有超级用户可以。</p>
-          <p>· 超级管理员不可删除；其密码只能由本人在「设置」中修改。</p>
+        <div className="mt-4 border-t border-rhine-line/50 pt-3 font-mono text-[9px] leading-relaxed tracking-wider text-rhine-faint">
+          管理类账号之间互不可操作，仅超级用户例外。
         </div>
       </AdminPanel>
 
@@ -490,6 +593,45 @@ export function MembersPanel({ user }: MembersPanelProps) {
           <AdminButton variant="danger" onClick={() => void submitDelete()} disabled={busy}>
             {busy ? '删除中…' : '确认删除'}
           </AdminButton>
+        </div>
+      </AdminModal>
+      {/* 封禁 */}
+      <AdminModal
+        open={Boolean(banTarget)}
+        onClose={() => setBanTarget(null)}
+        title={`封禁 · ${banTarget?.username ?? ''}`}
+        subtitle="BAN"
+      >
+        <div className="space-y-3">
+          <AdminField label="封禁期限（天）" hint="1 - 3650">
+            <AdminInput
+              type="number"
+              value={banDays}
+              onChange={(event) => setBanDays(event.target.value)}
+              disabled={banPermanent}
+            />
+          </AdminField>
+          <AdminCheckbox
+            checked={banPermanent}
+            onChange={setBanPermanent}
+            label="永久封禁（同时拉黑邮箱，无法再注册）"
+          />
+          <AdminField label="原因（可选）">
+            <AdminInput
+              value={banReason}
+              onChange={(event) => setBanReason(event.target.value)}
+              placeholder="违规原因"
+            />
+          </AdminField>
+          <AdminError message={error} />
+          <div className="flex justify-end gap-2">
+            <AdminButton variant="ghost" onClick={() => setBanTarget(null)}>
+              取消
+            </AdminButton>
+            <AdminButton variant="danger" onClick={() => void submitBan()} disabled={busy}>
+              {busy ? '处理中…' : '确认封禁'}
+            </AdminButton>
+          </div>
         </div>
       </AdminModal>
     </div>

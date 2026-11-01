@@ -12,6 +12,7 @@ export function ForumComposePage() {
   const [boards, setBoards] = useState<Board[]>([])
   const [boardSlug, setBoardSlug] = useState(search.get('board') ?? '')
   const [title, setTitle] = useState('')
+  const [tags, setTags] = useState('')
   const [value, setValue] = useState<ComposerValue>({ content: '', attachments: [] })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -60,14 +61,19 @@ export function ForumComposePage() {
     setSubmitting(true)
     setError('')
     try {
-      await forumApi.createPost({
+      const result = await forumApi.createPost({
         boardId: board.id,
         title: title.trim(),
         content: value.content,
         attachments: value.attachments,
+        tags: tags
+          .split(/[,，\s]+/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .slice(0, 8),
       })
       setDone(true)
-      setNotice('已提交，等待论坛管理员审核')
+      setNotice(result.message || '帖子已发布')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -122,6 +128,7 @@ export function ForumComposePage() {
               onClick={() => {
                 setDone(false)
                 setTitle('')
+                setTags('')
                 setValue({ content: '', attachments: [] })
                 setNotice('')
               }}
@@ -162,13 +169,25 @@ export function ForumComposePage() {
             />
           </label>
 
+          <label className="block space-y-1">
+            <span className="font-mono text-[9px] tracking-[0.25em] text-rhine-faint">
+              标签 / TAGS
+            </span>
+            <input
+              value={tags}
+              onChange={(event) => setTags(event.target.value)}
+              placeholder="用空格或逗号分隔，最多 8 个"
+              className="w-full border border-rhine-line bg-rhine-abyss/70 px-3 py-2 font-mono text-xs text-rhine-ink outline-none placeholder:text-rhine-faint focus:border-rhine-gold/60"
+            />
+          </label>
+
           <ContentComposer
             value={value}
             onChange={setValue}
             onSubmit={() => void submit()}
             submitting={submitting}
-            submitLabel="提交审核"
-            placeholder="正文（支持 markdown），也可以上传图片、视频或文件…"
+            submitLabel="发布"
+            placeholder="正文（markdown），图片会插入到光标位置"
           />
 
           {error && (

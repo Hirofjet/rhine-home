@@ -15,6 +15,7 @@ interface TimelinePhoto {
   url: string
   name: string
   date: Date | null
+  description?: string
 }
 
 /** 读取照片 EXIF 拍摄时间（优先 DateTimeOriginal，其次 CreateDate） */
@@ -100,6 +101,7 @@ export function PhotoTimeline({ className }: { className?: string }) {
             url: resolveMediaUrl(photo.url),
             name: photo.name,
             date: photo.date ? new Date(photo.date) : null,
+            description: photo.description ?? '',
           })),
         )
       })
@@ -197,6 +199,11 @@ export function PhotoTimeline({ className }: { className?: string }) {
                   <p className="font-mono text-[11px] tracking-wider text-rhine-ink">
                     {formatDate(p.date)}
                   </p>
+                  {p.description && (
+                    <p className="mt-1 text-xs leading-relaxed text-rhine-dim">
+                      {p.description}
+                    </p>
+                  )}
                   <p className="mt-1 truncate font-mono text-[10px] text-rhine-faint">
                     {p.name}
                   </p>

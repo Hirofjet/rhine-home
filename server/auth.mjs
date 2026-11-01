@@ -69,9 +69,32 @@ export function normalizeUser(row) {
     isSuper: Boolean(row.is_super),
     status: row.status,
     permissions: permissions.filter((p) => typeof p === 'string'),
+    avatarUrl: row.avatar_url ?? '',
+    gender: row.gender ?? '',
+    birthday: row.birthday ?? '',
+    bio: row.bio ?? '',
+    tags: (() => {
+      try {
+        const value = Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags ?? '[]')
+        return Array.isArray(value) ? value.filter((t) => typeof t === 'string') : []
+      } catch {
+        return []
+      }
+    })(),
+    banned: Boolean(row.banned),
+    bannedUntil: row.banned_until ?? null,
+    bannedReason: row.banned_reason ?? '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+/** 封禁是否仍然生效（到期自动失效） */
+export function banActive(user) {
+  if (!user?.banned) return false
+  if (!user.bannedUntil) return true
+  const until = new Date(String(user.bannedUntil).replace(' ', 'T'))
+  return Number.isNaN(until.getTime()) ? true : until.getTime() > Date.now()
 }
 
 /** 对外返回的用户信息（不含密码哈希） */
@@ -85,6 +108,14 @@ export function publicUser(user) {
     status: user.status,
     permissions: user.permissions,
     role: roleLabel(user),
+    avatarUrl: user.avatarUrl,
+    gender: user.gender,
+    birthday: user.birthday,
+    bio: user.bio,
+    tags: user.tags,
+    banned: banActive(user),
+    bannedUntil: user.banned ? user.bannedUntil : null,
+    bannedReason: user.banned ? user.bannedReason : '',
     createdAt: user.createdAt,
   }
 }

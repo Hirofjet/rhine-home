@@ -321,3 +321,20 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 整体字号：小字在 1080p 下也清晰可读 */
+html {
+  font-size: 17px;
+}
+
+[class~="text-[9px]"] {
+  font-size: 10px;
+}
+
+[class~="text-[10px]"] {
+  font-size: 11px;
+}
+
+[class~="text-[11px]"] {
+  font-size: 12px;
+}
