@@ -3,11 +3,11 @@
 # RHINE//HOME 服务器自动重新部署脚本
 # ------------------------------------------------------------
 # 用法（在服务器上执行）：
-#   cd /srv/rhine-home
+#   cd /www/wwwroot/rhine-home
 #   ./scripts/deploy.sh
 #
 # 可选环境变量：
-#   APP_DIR=/srv/rhine-home       项目目录
+#   APP_DIR=/www/wwwroot/rhine-home  项目目录
 #   BRANCH=main                    要部署的分支
 #   SERVICE=rhine-home             systemd 服务名
 #   HEALTH_URL=http://127.0.0.1:3001/api/health
@@ -19,7 +19,7 @@
 # ============================================================
 set -Eeuo pipefail
 
-APP_DIR="${APP_DIR:-/srv/rhine-home}"
+APP_DIR="${APP_DIR:-/www/wwwroot/rhine-home}"
 BRANCH="${BRANCH:-main}"
 SERVICE="${SERVICE:-rhine-home}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3001/api/health}"

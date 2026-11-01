@@ -189,12 +189,12 @@ git clone <你的仓库地址> rhine-home
 # 本地执行：scp -r rhine-home ubuntu@公网IP:/srv/
 ```
 
-目录约定：`/srv/rhine-home`（前端根目录）、`/srv/rhine-home/server`（后端）。
+目录约定：`/www/wwwroot/rhine-home`（前端根目录）、`/www/wwwroot/rhine-home/server`（后端）。
 
 ### 5. 构建前端
 
 ```bash
-cd /srv/rhine-home
+cd /www/wwwroot/rhine-home
 npm ci
 npm run build
 ```
@@ -204,7 +204,7 @@ npm run build
 ### 6. 配置并启动后端
 
 ```bash
-cd /srv/rhine-home/server
+cd /www/wwwroot/rhine-home/server
 npm ci --omit=dev
 cp .env.example .env
 nano .env
@@ -225,7 +225,7 @@ DB_NAME=rhine_home
 ADMIN_USER=admin
 ADMIN_PASSWORD=换成强密码
 SESSION_HOURS=12
-UPLOAD_DIR=/srv/rhine-home/server/uploads
+UPLOAD_DIR=/www/wwwroot/rhine-home/server/uploads
 ALLOW_DEV_CODES=0
 ```
 
@@ -243,7 +243,7 @@ SMTP_FROM=RHINE//HOME <你的QQ邮箱@qq.com>
 先手动验证：
 
 ```bash
-cd /srv/rhine-home/server
+cd /www/wwwroot/rhine-home/server
 node index.mjs
 # 另开终端：
 curl http://127.0.0.1:3001/api/health
@@ -263,8 +263,8 @@ Wants=mysql.service
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/srv/rhine-home/server
-EnvironmentFile=/srv/rhine-home/server/.env
+WorkingDirectory=/www/wwwroot/rhine-home/server
+EnvironmentFile=/www/wwwroot/rhine-home/server/.env
 ExecStart=/usr/bin/node index.mjs
 Restart=always
 RestartSec=3
@@ -275,14 +275,14 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo chown -R www-data:www-data /srv/rhine-home/server/uploads
+sudo chown -R www-data:www-data /www/wwwroot/rhine-home/server/uploads
 sudo systemctl daemon-reload
 sudo systemctl enable --now rhine-home
 sudo systemctl status rhine-home
 ```
 
 > 也可以用 PM2（推荐用项目自带配置）：
-> `cd /srv/rhine-home/server && sudo npm i -g pm2 && pm2 start ecosystem.config.cjs && pm2 save && pm2 startup`。
+> `cd /www/wwwroot/rhine-home/server && sudo npm i -g pm2 && pm2 start ecosystem.config.cjs && pm2 save && pm2 startup`。
 > 不要直接 `pm2 start index.mjs`；`.env` 已由 `server/config.mjs` 自动加载，PM2 的 `cwd` 也已固定。
 > 二选一即可，不要同时用 systemd 和 PM2。
 
@@ -297,7 +297,7 @@ server {
     listen 80;
     server_name example.com www.example.com;
 
-    root /srv/rhine-home/dist;
+    root /www/wwwroot/rhine-home/dist;
     index index.html;
 
     client_max_body_size 500m;
@@ -428,7 +428,7 @@ gunzip -c /srv/backup/rhine-2026-11-01.sql.gz | mysql -u rhine -p rhine_home
 ### 上传文件
 
 ```bash
-rsync -a /srv/rhine-home/server/uploads/ /srv/backup/uploads/
+rsync -a /www/wwwroot/rhine-home/server/uploads/ /srv/backup/uploads/
 ```
 
 ### 整机快照
