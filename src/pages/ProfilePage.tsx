@@ -1,15 +1,19 @@
 /* oxlint-disable react/set-state-in-effect */
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Bell,
   CheckCheck,
+  KeyRound,
+  LogOut,
+  Mail,
   MessageSquare,
   Send,
   Upload,
   UserRound,
 } from 'lucide-react'
 import {
+  authApi,
   errorMessage,
   forumApi,
   resolveMediaUrl,
@@ -24,11 +28,21 @@ import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { formatDateTime, STATUS_LABELS, STATUS_STYLES } from '../lib/format'
 
-type Tab = 'profile' | 'notifications' | 'messages' | 'posts'
+type Tab = 'profile' | 'notifications' | 'messages' | 'posts' | 'account'
+
+const IMPORTANT_TYPES = new Set(['review', 'permission', 'ban', 'access'])
+
+const isTab = (value: string | null): value is Tab =>
+  ['profile', 'notifications', 'messages', 'posts', 'account'].includes(value ?? '')
 
 export function ProfilePage() {
-  const { user, loading, refresh } = useSession()
-  const [tab, setTab] = useState<Tab>('profile')
+  const { user, loading, refresh, logout } = useSession()
+  const navigate = useNavigate()
+  const [search] = useSearchParams()
+  const [tab, setTab] = useState<Tab>(() => {
+    const queryTab = search.get('tab')
+    return isTab(queryTab) ? queryTab : 'profile'
+  })
   const [authOpen, setAuthOpen] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -56,6 +70,25 @@ export function ProfilePage() {
       board: { slug: string; name: string }
     }>
   >([])
+  const [myReplies, setMyReplies] = useState<
+    Array<{
+      id: number
+      content: string
+      status: string
+      createdAt: string
+      post: { id: number; title: string }
+    }>
+  >([])
+
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordBusy, setPasswordBusy] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+  const [emailDevCode, setEmailDevCode] = useState('')
+  const [emailCooldown, setEmailCooldown] = useState(0)
+  const [emailBusy, setEmailBusy] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -84,7 +117,10 @@ export function ProfilePage() {
     forumApi
       .my()
       .then((data) => {
-        if (alive) setMyPosts(data.posts)
+        if (alive) {
+          setMyPosts(data.posts)
+          setMyReplies(data.replies)
+        }
       })
       .catch(() => undefined)
     return () => {
@@ -167,6 +203,82 @@ export function ProfilePage() {
       setChatMessages(data.messages)
     } catch (err) {
       setError(errorMessage(err))
+    }
+  }
+
+  const changePassword = async () => {
+    setError('')
+    setNotice('')
+    if (newPassword.length < 6) {
+      setError('新密码至少 6 位')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('两次输入的新密码不一致')
+      return
+    }
+    setPasswordBusy(true)
+    try {
+      await authApi.changePassword({ currentPassword, newPassword, confirmPassword })
+      setNotice('密码已更新')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setPasswordBusy(false)
+    }
+  }
+
+  const sendBindCode = async () => {
+    setError('')
+    setNotice('')
+    if (!newEmail.trim()) {
+      setError('请填写新邮箱')
+      return
+    }
+    try {
+      const data = await userApi.bindEmailCode(newEmail.trim())
+      setNotice('验证码已发送到新邮箱')
+      if (data.devCode) {
+        setEmailDevCode(data.devCode)
+        setNotice('开发模式：验证码已显示在下方')
+      }
+      setEmailCooldown(60)
+      const timer = window.setInterval(() => {
+        setEmailCooldown((current) => {
+          if (current <= 1) {
+            window.clearInterval(timer)
+            return 0
+          }
+          return current - 1
+        })
+      }, 1000)
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const bindEmail = async () => {
+    setError('')
+    setNotice('')
+    if (!newEmail.trim() || !emailCode.trim()) {
+      setError('请填写新邮箱和验证码')
+      return
+    }
+    setEmailBusy(true)
+    try {
+      await userApi.bindEmail(newEmail.trim(), emailCode.trim())
+      await refresh()
+      setNotice('邮箱已重新绑定')
+      setNewEmail('')
+      setEmailCode('')
+      setEmailDevCode('')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setEmailBusy(false)
     }
   }
 
@@ -258,6 +370,7 @@ export function ProfilePage() {
             ['notifications', `通知${notifications.filter((n) => !n.read).length ? ' •' : ''}`],
             ['messages', '私信'],
             ['posts', '我的帖子'],
+            ['account', '账号'],
           ] as Array<[Tab, string]>
         ).map(([key, label]) => (
           <button
@@ -362,9 +475,24 @@ export function ProfilePage() {
           ) : (
             <ul className="divide-y divide-rhine-line/50">
               {notifications.map((item) => (
-                <li key={item.id} className={`px-4 py-3 ${item.read ? 'opacity-60' : ''}`}>
+                <li
+                  key={item.id}
+                  className={`px-4 py-3 ${
+                    !item.read && IMPORTANT_TYPES.has(item.type)
+                      ? 'border-l-2 border-l-rhine-gold bg-rhine-gold/[0.06]'
+                      : item.read
+                        ? 'opacity-60'
+                        : ''
+                  }`}
+                >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-rhine-ink">{item.title}</span>
+                    <span
+                      className={`text-xs ${
+                        IMPORTANT_TYPES.has(item.type) ? 'text-rhine-gold' : 'text-rhine-ink'
+                      }`}
+                    >
+                      {item.title}
+                    </span>
                     <span className="font-mono text-[9px] text-rhine-faint">
                       {formatDateTime(item.createdAt)}
                     </span>
@@ -470,31 +598,155 @@ export function ProfilePage() {
       )}
 
       {tab === 'posts' && (
-        <div className="mt-5 border border-rhine-line/70 bg-rhine-panel/30">
-          {myPosts.length === 0 ? (
-            <p className="px-4 py-6 font-mono text-[10px] text-rhine-faint">还没有发布帖子</p>
-          ) : (
-            <ul className="divide-y divide-rhine-line/50">
-              {myPosts.map((post) => (
-                <li key={post.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
-                  <Link
-                    to={`/forum/post/${post.id}`}
-                    className="min-w-0 flex-1 truncate text-xs text-rhine-ink hover:text-rhine-gold"
-                  >
-                    {post.title}
-                  </Link>
-                  <span className="font-mono text-[9px] text-rhine-faint">{post.board.name}</span>
-                  <span
-                    className={`border px-1.5 py-0.5 font-mono text-[9px] ${
-                      STATUS_STYLES[post.status] ?? 'border-rhine-line text-rhine-faint'
-                    }`}
-                  >
-                    {STATUS_LABELS[post.status] ?? post.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+        <div className="mt-5 space-y-4">
+          <div className="border border-rhine-line/70 bg-rhine-panel/30">
+            {myPosts.length === 0 ? (
+              <p className="px-4 py-6 font-mono text-[10px] text-rhine-faint">还没有发布帖子</p>
+            ) : (
+              <ul className="divide-y divide-rhine-line/50">
+                {myPosts.map((post) => (
+                  <li key={post.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
+                    <Link
+                      to={`/forum/post/${post.id}`}
+                      className="min-w-0 flex-1 truncate text-xs text-rhine-ink hover:text-rhine-gold"
+                    >
+                      {post.title}
+                    </Link>
+                    <span className="font-mono text-[9px] text-rhine-faint">{post.board.name}</span>
+                    <span
+                      className={`border px-1.5 py-0.5 font-mono text-[9px] ${
+                        STATUS_STYLES[post.status] ?? 'border-rhine-line text-rhine-faint'
+                      }`}
+                    >
+                      {STATUS_LABELS[post.status] ?? post.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="border border-rhine-line/70 bg-rhine-panel/30">
+            <p className="border-b border-rhine-line/60 px-4 py-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+              我的回复
+            </p>
+            {myReplies.length === 0 ? (
+              <p className="px-4 py-6 font-mono text-[10px] text-rhine-faint">还没有回复</p>
+            ) : (
+              <ul className="divide-y divide-rhine-line/50">
+                {myReplies.map((reply) => (
+                  <li key={reply.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
+                    <Link
+                      to={`/forum/post/${reply.post.id}`}
+                      className="min-w-0 flex-1 truncate text-xs text-rhine-dim hover:text-rhine-gold"
+                    >
+                      {reply.content.slice(0, 50) || '（图片回复）'}
+                    </Link>
+                    <span className="max-w-[160px] truncate font-mono text-[9px] text-rhine-faint">
+                      {reply.post.title}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'account' && (
+        <div className="mt-5 space-y-4">
+          <div className="space-y-3 border border-rhine-line/70 bg-rhine-panel/30 p-4">
+            <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+              <KeyRound className="h-3 w-3" /> 修改密码
+            </p>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              placeholder="当前密码"
+              className="w-full border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-xs text-rhine-ink outline-none"
+            />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="新密码（至少 6 位）"
+                className="border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-xs text-rhine-ink outline-none"
+              />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="确认新密码"
+                className="border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-xs text-rhine-ink outline-none"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void changePassword()}
+                disabled={passwordBusy}
+                className="border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] text-rhine-gold"
+              >
+                {passwordBusy ? '保存中…' : '更新密码'}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3 border border-rhine-line/70 bg-rhine-panel/30 p-4">
+            <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+              <Mail className="h-3 w-3" /> 重新绑定邮箱
+            </p>
+            <p className="font-mono text-[10px] text-rhine-dim">当前邮箱：{user.email}</p>
+            <div className="flex gap-2">
+              <input
+                value={newEmail}
+                onChange={(event) => setNewEmail(event.target.value)}
+                placeholder="新邮箱"
+                className="min-w-0 flex-1 border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-xs text-rhine-ink outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => void sendBindCode()}
+                disabled={emailCooldown > 0}
+                className="shrink-0 border border-rhine-line px-3 py-1.5 font-mono text-[10px] text-rhine-dim disabled:opacity-50"
+              >
+                {emailCooldown > 0 ? `${emailCooldown}s` : '发送验证码'}
+              </button>
+            </div>
+            <input
+              value={emailCode}
+              onChange={(event) => setEmailCode(event.target.value)}
+              placeholder="6 位验证码"
+              className="w-full border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-xs text-rhine-ink outline-none"
+            />
+            {emailDevCode && (
+              <p className="font-mono text-[10px] text-rhine-cyan">开发模式验证码：{emailDevCode}</p>
+            )}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void bindEmail()}
+                disabled={emailBusy}
+                className="border border-rhine-cyan/60 bg-rhine-cyan/10 px-4 py-2 font-mono text-[11px] text-rhine-cyan"
+              >
+                {emailBusy ? '绑定中…' : '绑定新邮箱'}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-end border border-rhine-line/70 bg-rhine-panel/30 p-4">
+            <button
+              type="button"
+              onClick={() => {
+                void logout()
+                navigate('/')
+              }}
+              className="flex items-center gap-2 border border-rhine-red/50 px-4 py-2 font-mono text-[11px] text-rhine-red"
+            >
+              <LogOut className="h-3 w-3" /> 退出账号
+            </button>
+          </div>
         </div>
       )}
     </section>

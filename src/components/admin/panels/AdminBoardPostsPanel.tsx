@@ -1,17 +1,22 @@
 /* oxlint-disable react/set-state-in-effect */
 import { useCallback, useEffect, useState } from 'react'
 import { Eye, EyeOff, Pin, RefreshCw, Trash2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   adminApi,
   errorMessage,
-  type Board,
   type ApiUser,
+  type Attachment,
+  type Board,
 } from '../../../lib/api'
 import { formatDateTime } from '../../../lib/format'
+import { AttachmentGrid } from '../../forum/AttachmentGrid'
 import {
   AdminBadge,
   AdminButton,
   AdminError,
+  AdminModal,
   AdminNotice,
   AdminPanel,
 } from '../AdminUi'
@@ -46,6 +51,32 @@ export function AdminBoardPostsPanel({ user }: AdminBoardPostsPanelProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [viewPost, setViewPost] = useState<{
+    id: number
+    title: string
+    content: string
+    attachments: Attachment[]
+    tags: string[]
+    pinned: boolean
+    status: string
+    boardName: string
+    author: string
+    createdAt: string
+  } | null>(null)
+  const [viewLoading, setViewLoading] = useState(false)
+
+  const openPost = async (id: number) => {
+    setViewLoading(true)
+    setError('')
+    try {
+      const data = await adminApi.adminPost(id)
+      setViewPost(data.post)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setViewLoading(false)
+    }
+  }
 
   const loadBoards = useCallback(async () => {
     try {
@@ -134,15 +165,14 @@ export function AdminBoardPostsPanel({ user }: AdminBoardPostsPanelProps) {
           <ul className="divide-y divide-rhine-line/60">
             {posts.map((post) => (
               <li key={post.id} className="flex flex-wrap items-center gap-2 py-3">
-                <a
-                  href={`/forum/post/${post.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="min-w-0 flex-1 truncate text-xs text-rhine-ink hover:text-rhine-gold"
+                <button
+                  type="button"
+                  onClick={() => void openPost(post.id)}
+                  className="min-w-0 flex-1 truncate text-left text-xs text-rhine-ink hover:text-rhine-gold"
                 >
                   {post.pinned && <Pin className="mr-1 inline h-3 w-3 text-rhine-gold" />}
                   {post.title}
-                </a>
+                </button>
                 <AdminBadge tone={post.status === 'approved' ? 'green' : 'gold'}>
                   {STATUS_LABEL[post.status] ?? post.status}
                 </AdminBadge>
@@ -174,6 +204,107 @@ export function AdminBoardPostsPanel({ user }: AdminBoardPostsPanelProps) {
           </ul>
         )}
       </AdminPanel>
+
+      <AdminModal
+        open={Boolean(viewPost) || viewLoading}
+        onClose={() => setViewPost(null)}
+        title={viewPost?.title ?? '加载中…'}
+        subtitle="THREAD PREVIEW"
+        wide
+      >
+        {viewLoading ? (
+          <p className="font-mono text-[10px] text-rhine-faint">加载中…</p>
+        ) : viewPost ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <AdminBadge tone={viewPost.status === 'approved' ? 'green' : 'gold'}>
+                {STATUS_LABEL[viewPost.status] ?? viewPost.status}
+              </AdminBadge>
+              {viewPost.pinned && <AdminBadge tone="gold">置顶</AdminBadge>}
+              <span className="font-mono text-[10px] text-rhine-faint">
+                {viewPost.boardName} · {viewPost.author} · {formatDateTime(viewPost.createdAt)}
+              </span>
+            </div>
+            <div className="md-body max-h-[50vh] overflow-y-auto border border-rhine-line/60 bg-rhine-abyss/30 px-4 py-3">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewPost.content}</ReactMarkdown>
+            </div>
+            <AttachmentGrid attachments={viewPost.attachments} />
+            <div className="flex flex-wrap justify-end gap-2 border-t border-rhine-line/50 pt-3">
+              <AdminButton
+                variant="ghost"
+                onClick={() => {
+                  void moderate(
+                    {
+                      id: viewPost.id,
+                      title: viewPost.title,
+                      status: viewPost.status,
+                      pinned: viewPost.pinned,
+                      author: viewPost.author,
+                      replyCount: 0,
+                      createdAt: viewPost.createdAt,
+                    },
+                    viewPost.pinned ? 'unpin' : 'pin',
+                  )
+                  setViewPost({ ...viewPost, pinned: !viewPost.pinned })
+                }}
+              >
+                <Pin className="h-3 w-3" /> {viewPost.pinned ? '取消置顶' : '置顶'}
+              </AdminButton>
+              <AdminButton
+                variant="ghost"
+                onClick={() => {
+                  void moderate(
+                    {
+                      id: viewPost.id,
+                      title: viewPost.title,
+                      status: viewPost.status,
+                      pinned: viewPost.pinned,
+                      author: viewPost.author,
+                      replyCount: 0,
+                      createdAt: viewPost.createdAt,
+                    },
+                    viewPost.status === 'approved' ? 'hide' : 'restore',
+                  )
+                  setViewPost({
+                    ...viewPost,
+                    status: viewPost.status === 'approved' ? 'hidden' : 'approved',
+                  })
+                }}
+              >
+                {viewPost.status === 'approved' ? (
+                  <>
+                    <EyeOff className="h-3 w-3" /> 隐藏
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-3 w-3" /> 恢复
+                  </>
+                )}
+              </AdminButton>
+              <AdminButton
+                variant="danger"
+                onClick={() => {
+                  void moderate(
+                    {
+                      id: viewPost.id,
+                      title: viewPost.title,
+                      status: viewPost.status,
+                      pinned: viewPost.pinned,
+                      author: viewPost.author,
+                      replyCount: 0,
+                      createdAt: viewPost.createdAt,
+                    },
+                    'delete',
+                  )
+                  setViewPost(null)
+                }}
+              >
+                <Trash2 className="h-3 w-3" /> 删除
+              </AdminButton>
+            </div>
+          </div>
+        ) : null}
+      </AdminModal>
     </div>
   )
 }

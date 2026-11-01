@@ -16,7 +16,7 @@ interface PermissionTreeProps {
   disabled?: boolean
 }
 
-/** 权限勾选树：档案（子权限）/ 日志 / 论坛（按板块）/ 成员管理 */
+/** 权限勾选树：父级与子级双向联动 */
 export function PermissionTree({
   value,
   onChange,
@@ -25,25 +25,54 @@ export function PermissionTree({
   disabled = false,
 }: PermissionTreeProps) {
   const has = (key: string) => value.includes(key)
+  const archiveAll = ARCHIVE_CHILDREN.every(([key]) => has(key))
+  const archiveParent = has('archive') || archiveAll
+  const forumChildren = boards.map((board) => `forum.${board.id}`)
+  const forumAll = forumChildren.length > 0 && forumChildren.every((key) => has(key))
+  const forumParent = has('forum') || forumAll
 
-  const toggle = (key: string, checked: boolean) => {
-    if (disabled) return
-    let next = checked ? [...value, key] : value.filter((item) => item !== key)
+  const apply = (next: string[]) => {
+    if (!disabled) onChange([...new Set(next)])
+  }
+
+  const toggleArchiveParent = (checked: boolean) => {
+    let next = value.filter((item) => item !== 'archive')
+    next = next.filter((item) => !item.startsWith('archive.'))
+    if (checked) next.push('archive', ...ARCHIVE_CHILDREN.map(([key]) => key))
+    apply(next)
+  }
+
+  const toggleArchiveChild = (key: string, checked: boolean) => {
+    let next = value.filter((item) => item !== 'archive')
     if (checked) {
-      if (key === 'archive') {
-        next = next.filter((item) => !item.startsWith('archive.'))
+      if (!next.includes(key)) next.push(key)
+      if (ARCHIVE_CHILDREN.every(([child]) => next.includes(child))) {
+        next.push('archive')
       }
-      if (key === 'forum') {
-        next = next.filter((item) => !/^forum\.\d+$/.test(item))
-      }
-      if (key.startsWith('archive.')) {
-        next = next.filter((item) => item !== 'archive')
-      }
-      if (/^forum\.\d+$/.test(key)) {
-        next = next.filter((item) => item !== 'forum')
-      }
+    } else {
+      next = next.filter((item) => item !== key)
     }
-    onChange([...new Set(next)])
+    apply(next)
+  }
+
+  const toggleForumParent = (checked: boolean) => {
+    let next = value.filter((item) => item !== 'forum')
+    next = next.filter((item) => !/^forum\.\d+$/.test(item))
+    if (checked) next.push('forum', ...forumChildren)
+    apply(next)
+  }
+
+  const toggleForumChild = (key: string, checked: boolean) => {
+    let next = value.filter((item) => item !== 'forum')
+    if (checked) {
+      if (!next.includes(key)) next.push(key)
+      if (forumChildren.length > 0 && forumChildren.every((child) => next.includes(child))) {
+        next.push('forum')
+      }
+    } else {
+      next = next.filter((item) => item !== key)
+    }
+    apply(next)
   }
 
   const groupTitle = (text: string) => (
@@ -57,8 +86,8 @@ export function PermissionTree({
       {groupTitle('档案 / ARCHIVE')}
       <div className="space-y-2 border-l border-rhine-line/60 pl-3">
         <AdminCheckbox
-          checked={has('archive')}
-          onChange={(checked) => toggle('archive', checked)}
+          checked={archiveParent}
+          onChange={toggleArchiveParent}
           label="档案（全部）"
           disabled={disabled}
         />
@@ -66,8 +95,8 @@ export function PermissionTree({
           {ARCHIVE_CHILDREN.map(([key, label]) => (
             <AdminCheckbox
               key={key}
-              checked={has(key)}
-              onChange={(checked) => toggle(key, checked)}
+              checked={archiveParent || has(key)}
+              onChange={(checked) => toggleArchiveChild(key, checked)}
               label={label}
               disabled={disabled}
             />
@@ -79,7 +108,10 @@ export function PermissionTree({
       <div className="border-l border-rhine-line/60 pl-3">
         <AdminCheckbox
           checked={has('logs')}
-          onChange={(checked) => toggle('logs', checked)}
+          onChange={(checked) => {
+            const next = value.filter((item) => item !== 'logs')
+            apply(checked ? [...next, 'logs'] : next)
+          }}
           label="日志"
           disabled={disabled}
         />
@@ -88,8 +120,8 @@ export function PermissionTree({
       {groupTitle('论坛 / FORUM')}
       <div className="space-y-2 border-l border-rhine-line/60 pl-3">
         <AdminCheckbox
-          checked={has('forum')}
-          onChange={(checked) => toggle('forum', checked)}
+          checked={forumParent}
+          onChange={toggleForumParent}
           label="论坛（全部板块）"
           disabled={disabled}
         />
@@ -97,9 +129,15 @@ export function PermissionTree({
           {boards.map((board) => (
             <AdminCheckbox
               key={board.id}
-              checked={has(`forum.${board.id}`)}
-              onChange={(checked) => toggle(`forum.${board.id}`, checked)}
-              label={board.name}
+              checked={forumParent || has(`forum.${board.id}`)}
+              onChange={(checked) => toggleForumChild(`forum.${board.id}`, checked)}
+              label={`${board.name}${
+                board.access === 'core'
+                  ? '（核心）'
+                  : board.access === 'special'
+                    ? '（特殊）'
+                    : ''
+              }`}
               disabled={disabled}
             />
           ))}
@@ -117,13 +155,21 @@ export function PermissionTree({
           <div className="flex flex-wrap gap-5 border-l border-rhine-line/60 pl-3">
             <AdminCheckbox
               checked={has('members.manage')}
-              onChange={(checked) => toggle('members.manage', checked)}
+              onChange={(checked) => {
+                let next = value.filter((item) => item !== 'members.manage')
+                if (checked) next = [...next, 'members.manage']
+                apply(next)
+              }}
               label="管理成员"
               disabled={disabled}
             />
             <AdminCheckbox
               checked={has('members.grant')}
-              onChange={(checked) => toggle('members.grant', checked)}
+              onChange={(checked) => {
+                let next = value.filter((item) => item !== 'members.grant')
+                if (checked) next = [...next, 'members.grant']
+                apply(next)
+              }}
               label="授权权限"
               disabled={disabled}
             />

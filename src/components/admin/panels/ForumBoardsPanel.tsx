@@ -25,10 +25,23 @@ interface BoardForm {
   name: string
   slug: string
   description: string
+  access: 'public' | 'special' | 'core'
   sort: string
 }
 
-const emptyForm: BoardForm = { name: '', slug: '', description: '', sort: '0' }
+const emptyForm: BoardForm = {
+  name: '',
+  slug: '',
+  description: '',
+  access: 'public',
+  sort: '0',
+}
+
+const ACCESS_LABEL: Record<string, string> = {
+  public: '公开',
+  special: '特殊',
+  core: '核心',
+}
 
 /** 论坛板块管理（创建 / 编辑 / 删除） */
 export function ForumBoardsPanel({ user }: { user: ApiUser }) {
@@ -44,17 +57,28 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [annTitle, setAnnTitle] = useState('')
   const [annContent, setAnnContent] = useState('')
+  const [requests, setRequests] = useState<
+    Array<{
+      id: number
+      boardName: string
+      username: string
+      status: string
+      createdAt: string
+    }>
+  >([])
 
   const canManageAll = user.isSuper || hasPerm(user, 'forum')
 
   const load = useCallback(async () => {
     try {
-      const [data, annData] = await Promise.all([
+      const [data, annData, requestData] = await Promise.all([
         adminApi.forumBoards(),
         forumApi.announcements(),
+        adminApi.requests(),
       ])
       setBoards(data.boards)
       setAnnouncements(annData.announcements)
+      setRequests(requestData.requests)
       setError('')
     } catch (err) {
       setError(errorMessage(err))
@@ -62,6 +86,16 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
       setLoading(false)
     }
   }, [])
+
+  const reviewRequest = async (id: number, approve: boolean) => {
+    try {
+      await adminApi.reviewRequest(id, approve)
+      setNotice(approve ? '已通过访问申请' : '已拒绝访问申请')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   const removeAnnouncement = async (id: number) => {
     try {
@@ -127,6 +161,7 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
       name: board.name,
       slug: board.slug,
       description: board.description,
+      access: board.access ?? 'public',
       sort: String(board.sort),
     })
     setOpen(true)
@@ -145,6 +180,7 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
         name: form.name.trim(),
         slug: form.slug.trim().toLowerCase(),
         description: form.description.trim(),
+        access: form.access,
         sort: Number(form.sort) || 0,
       }
       if (editing) await adminApi.updateBoard(editing.id, payload)
@@ -244,6 +280,17 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm text-rhine-ink">{board.name}</p>
                     <AdminBadge>{board.slug}</AdminBadge>
+                    <AdminBadge
+                      tone={
+                        board.access === 'core'
+                          ? 'gold'
+                          : board.access === 'special'
+                            ? 'cyan'
+                            : 'line'
+                      }
+                    >
+                      {ACCESS_LABEL[board.access] ?? '公开'}
+                    </AdminBadge>
                     {board.pendingCount ? (
                       <AdminBadge tone="gold">{board.pendingCount} 待审</AdminBadge>
                     ) : null}
@@ -276,6 +323,56 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
         )}
       </AdminPanel>
 
+      <AdminPanel title="访问申请" subtitle="ACCESS REQUESTS">
+        {requests.length === 0 ? (
+          <p className="font-mono text-[10px] tracking-wider text-rhine-faint">
+            暂无访问申请。
+          </p>
+        ) : (
+          <ul className="divide-y divide-rhine-line/60">
+            {requests.map((request) => (
+              <li key={request.id} className="flex flex-wrap items-center gap-2 py-2.5">
+                <span className="text-xs text-rhine-ink">{request.username}</span>
+                <span className="font-mono text-[10px] text-rhine-dim">
+                  申请访问「{request.boardName}」
+                </span>
+                <AdminBadge
+                  tone={
+                    request.status === 'approved'
+                      ? 'green'
+                      : request.status === 'rejected'
+                        ? 'red'
+                        : 'gold'
+                  }
+                >
+                  {request.status === 'approved'
+                    ? '已通过'
+                    : request.status === 'rejected'
+                      ? '已拒绝'
+                      : '待审核'}
+                </AdminBadge>
+                {request.status === 'pending' && (
+                  <span className="ml-auto flex gap-2">
+                    <AdminButton
+                      variant="ghost"
+                      onClick={() => void reviewRequest(request.id, true)}
+                    >
+                      通过
+                    </AdminButton>
+                    <AdminButton
+                      variant="danger"
+                      onClick={() => void reviewRequest(request.id, false)}
+                    >
+                      拒绝
+                    </AdminButton>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </AdminPanel>
+
       <AdminModal
         open={open}
         onClose={() => setOpen(false)}
@@ -303,6 +400,22 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
               onChange={(event) => setForm({ ...form, description: event.target.value })}
               className="min-h-20"
             />
+          </AdminField>
+          <AdminField label="板块类别 / ACCESS">
+            <select
+              value={form.access}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  access: event.target.value as BoardForm['access'],
+                })
+              }
+              className="w-full border border-rhine-line bg-rhine-abyss/60 px-2.5 py-1.5 font-mono text-[11px] text-rhine-ink outline-none"
+            >
+              <option value="public">公开（所有人，包括游客）</option>
+              <option value="special">特殊（需申请 / 授权）</option>
+              <option value="core">核心（仅超级管理员与授权成员）</option>
+            </select>
           </AdminField>
           <AdminField label="排序 / SORT">
             <AdminInput

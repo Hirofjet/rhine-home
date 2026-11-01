@@ -79,12 +79,17 @@ export interface Attachment {
   size: number
 }
 
+export type BoardAccess = 'public' | 'special' | 'core'
+
 export interface Board {
   id: number
   slug: string
   name: string
   description: string
   sort: number
+  access: BoardAccess
+  canAccess?: boolean
+  requestStatus?: '' | 'pending' | 'approved' | 'rejected'
   postCount: number
   lastPostAt: string | null
   pendingCount?: number
@@ -269,6 +274,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   too_many_requests: '操作过于频繁，请稍后再试',
   email_not_found: '该邮箱未注册',
   email_blacklisted: '该邮箱已被列入黑名单',
+  board_forbidden: '需要访问权限才能进入该板块',
+  not_required: '该板块无需申请',
+  already_has_access: '你已经拥有访问权限',
+  invalid_access: '板块类别不合法',
   account_banned: '账号已被封禁，请联系管理员',
   invalid_days: '封禁天数不合法',
   cannot_message_self: '不能给自己发私信',
@@ -325,13 +334,17 @@ async function api<T>(pathname: string, options: RequestOptions = {}): Promise<T
   if (res.status === 401) clearToken()
   if (!res.ok) {
     let code = `HTTP ${res.status}`
+    let detail: unknown = null
     try {
-      const data = (await res.json()) as { error?: string }
-      if (data?.error) code = data.error
+      detail = (await res.json()) as { error?: string }
+      const errorCode = (detail as { error?: string } | null)?.error
+      if (errorCode) code = errorCode
     } catch {
       /* ignore */
     }
-    throw new Error(code)
+    const error = new Error(code) as Error & { data?: unknown }
+    error.data = detail
+    throw error
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
@@ -498,6 +511,11 @@ export const forumApi = {
   deleteReply(id: number) {
     return api<{ ok: boolean }>(`/api/forum/replies/${id}`, { method: 'DELETE' })
   },
+  requestAccess(boardId: number) {
+    return api<{ status: string }>(`/api/forum/boards/${boardId}/request`, {
+      method: 'POST',
+    })
+  },
   my() {
     return api<{
       posts: Array<{
@@ -577,7 +595,13 @@ export const adminApi = {
   forumBoards() {
     return api<{ boards: Board[] }>('/api/admin/forum/boards')
   },
-  createBoard(data: { name: string; slug: string; description?: string; sort?: number }) {
+  createBoard(data: {
+    name: string
+    slug: string
+    description?: string
+    access?: BoardAccess
+    sort?: number
+  }) {
     return api<{ id: number }>('/api/admin/forum/boards', {
       method: 'POST',
       body: data,
@@ -585,11 +609,37 @@ export const adminApi = {
   },
   updateBoard(
     id: number,
-    data: { name?: string; slug?: string; description?: string; sort?: number },
+    data: {
+      name?: string
+      slug?: string
+      description?: string
+      access?: BoardAccess
+      sort?: number
+    },
   ) {
     return api<{ ok: boolean }>(`/api/admin/forum/boards/${id}`, {
       method: 'PUT',
       body: data,
+    })
+  },
+  requests() {
+    return api<{
+      requests: Array<{
+        id: number
+        boardId: number
+        boardName: string
+        access: string
+        userId: number
+        username: string
+        status: string
+        createdAt: string
+      }>
+    }>('/api/admin/forum/requests')
+  },
+  reviewRequest(id: number, approve: boolean) {
+    return api<{ ok: boolean }>(`/api/admin/forum/requests/${id}/review`, {
+      method: 'POST',
+      body: { approve },
     })
   },
   removeBoard(id: number) {
@@ -614,8 +664,23 @@ export const adminApi = {
       body: { action },
     })
   },
-  boardPosts(boardId: number, page = 1) {
+  adminPost(id: number) {
     return api<{
+      post: {
+        id: number
+        title: string
+        content: string
+        attachments: Attachment[]
+        tags: string[]
+        pinned: boolean
+        status: string
+        boardName: string
+        author: string
+        createdAt: string
+      }
+    }>(`/api/admin/forum/posts/${id}`)
+  },
+  boardPosts(boardId: number, page = 1) {    return api<{
       posts: Array<{
         id: number
         title: string
@@ -684,10 +749,22 @@ export const userApi = {
       messages: ChatMessage[]
     }>(`/api/messages/with/${id}`)
   },
-  sendDm(to: number, content: string) {
+  async sendDm(to: number, content: string) {
     return api<{ id: number }>('/api/messages/dm', {
       method: 'POST',
       body: { to, content },
+    })
+  },
+  bindEmailCode(email: string) {
+    return api<{ ok: boolean; devCode?: string }>('/api/profile/email-code', {
+      method: 'POST',
+      body: { email },
+    })
+  },
+  bindEmail(email: string, code: string) {
+    return api<{ user: ApiUser }>('/api/profile/email', {
+      method: 'POST',
+      body: { email, code },
     })
   },
 }

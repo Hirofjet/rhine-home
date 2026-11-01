@@ -27,6 +27,14 @@ export function ForumBoardPage() {
   const [authOpen, setAuthOpen] = useState(false)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [search, setSearch] = useState('')
+  const [gate, setGate] = useState<{
+    id: number
+    slug: string
+    name: string
+    access: string
+  } | null>(null)
+  const [gatePending, setGatePending] = useState(false)
+  const [gateError, setGateError] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -40,7 +48,12 @@ export function ForumBoardPage() {
         setError('')
       })
       .catch((err: unknown) => {
-        if (alive) setError(errorMessage(err))
+        if (!alive) return
+        const detail = err as Error & {
+          data?: { board?: { id: number; slug: string; name: string; access: string } }
+        }
+        setError(errorMessage(err))
+        if (detail.data?.board) setGate(detail.data.board)
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -50,14 +63,36 @@ export function ForumBoardPage() {
     }
   }, [slug, page])
 
+  const requestGateAccess = async () => {
+    if (!gate) return
+    if (!user) {
+      setAuthOpen(true)
+      return
+    }
+    setGatePending(true)
+    setGateError('')
+    try {
+      await forumApi.requestAccess(gate.id)
+      setGatePending(true)
+    } catch (err) {
+      const code = errorMessage(err)
+      if (code === '你已经拥有访问权限') {
+        window.location.reload()
+        return
+      }
+      setGateError(code)
+    }
+  }
+
   const pageCount = Math.max(1, Math.ceil(total / 12))
   const filtered = posts.filter((post) => {
     if (!search.trim()) return true
     const keyword = search.trim().toLowerCase()
+    const tags = Array.isArray(post.tags) ? post.tags : []
     return (
       post.title.toLowerCase().includes(keyword) ||
       post.author.toLowerCase().includes(keyword) ||
-      (post.tags ?? []).some((tag) => tag.toLowerCase().includes(keyword))
+      tags.some((tag) => tag.toLowerCase().includes(keyword))
     )
   })
 
@@ -74,6 +109,51 @@ export function ForumBoardPage() {
       alive = false
     }
   }, [board])
+
+  if (gate) {
+    return (
+      <section className="mx-auto w-full max-w-2xl px-4 pb-24 pt-28 sm:px-6">
+        <Link
+          to="/forum"
+          className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] text-rhine-faint hover:text-rhine-gold"
+        >
+          <ArrowLeft className="h-3 w-3" /> 返回论坛
+        </Link>
+        <div className="mt-5 border border-rhine-line/70 bg-rhine-panel/40 p-6 text-center">
+          <p className="font-mono text-[10px] tracking-[0.25em] text-rhine-faint">
+            {gate.access === 'core' ? 'CORE BOARD' : 'RESTRICTED BOARD'}
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-rhine-ink">{gate.name}</h1>
+          {gate.access === 'core' ? (
+            <p className="mt-3 font-mono text-[11px] leading-relaxed tracking-wider text-rhine-gold">
+              核心板块仅超级管理员与拥有对应权限的成员可访问。
+            </p>
+          ) : gatePending ? (
+            <p className="mt-3 font-mono text-[11px] tracking-wider text-rhine-cyan">
+              访问申请已提交，等待管理员审核。
+            </p>
+          ) : (
+            <>
+              <p className="mt-3 font-mono text-[11px] tracking-wider text-rhine-dim">
+                该板块需要访问权限，可向板块管理员申请。
+              </p>
+              <button
+                type="button"
+                onClick={() => void requestGateAccess()}
+                className="mt-4 border border-rhine-gold/60 bg-rhine-gold/10 px-5 py-2 font-mono text-[11px] tracking-[0.18em] text-rhine-gold"
+              >
+                {user ? '申请访问' : '登录后申请'}
+              </button>
+            </>
+          )}
+          {gateError && (
+            <p className="mt-3 font-mono text-[10px] text-rhine-red">{gateError}</p>
+          )}
+        </div>
+        <ForumAuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      </section>
+    )
+  }
 
   return (
     <section className="mx-auto w-full max-w-4xl px-4 pb-24 pt-28 sm:px-6">
@@ -205,7 +285,7 @@ export function ForumBoardPage() {
                       <User className="h-2.5 w-2.5" /> {post.author}
                     </span>
                     <span>{formatDateTime(post.createdAt)}</span>
-                    {(post.tags ?? []).map((tag) => (
+                    {(Array.isArray(post.tags) ? post.tags : []).map((tag) => (
                       <span key={tag} className="border border-rhine-line/70 px-1.5 py-0.5 text-rhine-cyan">
                         #{tag}
                       </span>

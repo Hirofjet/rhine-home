@@ -207,9 +207,9 @@ export function ForumPostPage() {
           </span>
         </motion.div>
 
-        {(post.tags ?? []).length > 0 && (
+        {(Array.isArray(post.tags) ? post.tags : []).length > 0 && (
           <motion.div variants={fadeUp} className="mt-2 flex flex-wrap gap-2">
-            {(post.tags ?? []).map((tag) => (
+            {(Array.isArray(post.tags) ? post.tags : []).map((tag) => (
               <span key={tag} className="border border-rhine-line/70 px-2 py-0.5 font-mono text-[10px] text-rhine-cyan">
                 #{tag}
               </span>
