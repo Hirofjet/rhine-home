@@ -322,11 +322,12 @@ interface RequestOptions {
   body?: unknown
   form?: FormData
   auth?: boolean
+  headers?: HeadersInit
 }
 
 async function api<T>(pathname: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, form, auth = true } = options
-  const headers = new Headers()
+  const headers = new Headers(options.headers)
   if (auth) {
     const token = getToken()
     if (token) headers.set('Authorization', `Bearer ${token}`)
@@ -445,11 +446,34 @@ export interface GuestMessage {
   name: string
   content: string
   createdAt: string
+  mine?: boolean
+}
+
+const GUEST_TOKEN_KEY = 'rhine:guest-token'
+
+/** 当前标签页的访客令牌：用于删除自己刚发的留言（关闭会话后失效） */
+export function guestToken(): string {
+  try {
+    let token = sessionStorage.getItem(GUEST_TOKEN_KEY)
+    if (!token) {
+      token = crypto.randomUUID()
+      sessionStorage.setItem(GUEST_TOKEN_KEY, token)
+    }
+    return token
+  } catch {
+    return ''
+  }
+}
+
+function guestHeaders(): Record<string, string> {
+  const token = guestToken()
+  return token ? { 'X-Guest-Token': token } : {}
 }
 
 export async function listMessages(): Promise<GuestMessage[]> {
   const data = await api<{ messages?: GuestMessage[] }>('/api/messages', {
     auth: false,
+    headers: guestHeaders(),
   })
   return data.messages ?? []
 }
@@ -458,10 +482,27 @@ export async function createMessage(input: {
   name: string
   content: string
 }): Promise<GuestMessage> {
-  return api<GuestMessage>('/api/messages', {
+  const data = await api<GuestMessage & { token?: string }>('/api/messages', {
     method: 'POST',
     body: input,
     auth: false,
+    headers: guestHeaders(),
+  })
+  if (data.token) {
+    try {
+      sessionStorage.setItem(GUEST_TOKEN_KEY, data.token)
+    } catch {
+      /* ignore */
+    }
+  }
+  return data
+}
+
+export async function deleteMessage(id: number): Promise<void> {
+  await api<{ ok: boolean }>(`/api/messages/${id}`, {
+    method: 'DELETE',
+    auth: false,
+    headers: guestHeaders(),
   })
 }
 
@@ -716,6 +757,20 @@ export const adminApi = {
   },
   unbanUser(id: number) {
     return api<{ ok: boolean }>(`/api/admin/users/${id}/ban`, { method: 'DELETE' })
+  },
+  messages() {
+    return api<{
+      messages: Array<{
+        id: number
+        name: string
+        content: string
+        userId: number | null
+        createdAt: string
+      }>
+    }>('/api/admin/messages')
+  },
+  removeMessage(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/messages/${id}`, { method: 'DELETE' })
   },
 }
 

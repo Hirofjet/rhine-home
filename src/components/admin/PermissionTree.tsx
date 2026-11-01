@@ -117,6 +117,19 @@ export function PermissionTree({
         />
       </div>
 
+      {groupTitle('留言板 / GUESTBOOK')}
+      <div className="border-l border-rhine-line/60 pl-3">
+        <AdminCheckbox
+          checked={has('guestbook')}
+          onChange={(checked) => {
+            const next = value.filter((item) => item !== 'guestbook')
+            apply(checked ? [...next, 'guestbook'] : next)
+          }}
+          label="留言板管理"
+          disabled={disabled}
+        />
+      </div>
+
       {groupTitle('论坛 / FORUM')}
       <div className="space-y-2 border-l border-rhine-line/60 pl-3">
         <AdminCheckbox

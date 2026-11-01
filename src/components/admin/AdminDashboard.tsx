@@ -7,6 +7,7 @@ import { AdminBadge, AdminButton } from './AdminUi'
 import { ArticlesPanel } from './panels/ArticlesPanel'
 import { AdminBoardPostsPanel } from './panels/AdminBoardPostsPanel'
 import { ForumBoardsPanel } from './panels/ForumBoardsPanel'
+import { GuestbookPanel } from './panels/GuestbookPanel'
 import { LogsPanel } from './panels/LogsPanel'
 import { MembersPanel } from './panels/MembersPanel'
 import { OverviewPanel } from './panels/OverviewPanel'
@@ -21,6 +22,7 @@ type PanelKey =
   | 'photos'
   | 'videos'
   | 'logs'
+  | 'guestbook'
   | 'forum-boards'
   | 'forum-posts'
   | 'review'
@@ -71,6 +73,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       list.push({
         title: '日志',
         items: [{ key: 'logs', label: '日志', labelEn: 'LOGS' }],
+      })
+    }
+
+    if (hasPerm(user, 'guestbook')) {
+      list.push({
+        title: '互动',
+        items: [{ key: 'guestbook', label: '留言板', labelEn: 'GUESTBOOK' }],
       })
     }
 
@@ -184,6 +193,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           {current === 'photos' && <PhotosPanel />}
           {current === 'videos' && <VideosPanel />}
           {current === 'logs' && <LogsPanel />}
+          {current === 'guestbook' && <GuestbookPanel />}
           {current === 'forum-boards' && <ForumBoardsPanel user={user} />}
           {current === 'forum-posts' && <AdminBoardPostsPanel user={user} />}
           {current === 'review' && <ReviewPanel />}

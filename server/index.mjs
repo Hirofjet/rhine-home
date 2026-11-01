@@ -33,6 +33,7 @@ import {
   verifyPassword,
 } from './auth.mjs'
 import { mailConfigured, sendCodeMail } from './mail.mjs'
+import { importLegacyIfEmpty } from './legacy-import.mjs'
 
 const exifr = exifrNamespace.default ?? exifrNamespace
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -283,6 +284,18 @@ async function ensureSuperAdmin() {
   console.log(`[bootstrap] 已创建超级管理员 ${config.adminUser}`)
 }
 await ensureSuperAdmin()
+
+// 重新部署后内容表为空时，自动恢复旧版 markdown / JSON 数据
+if ((process.env.AUTO_IMPORT_LEGACY ?? '1') === '1') {
+  try {
+    const restored = await importLegacyIfEmpty({ query, execute })
+    if (restored.length) {
+      console.log(`[legacy] 已恢复旧数据：${restored.join(', ')}`)
+    }
+  } catch (error) {
+    console.error('[legacy] 自动恢复失败：', error.message)
+  }
+}
 
 // ---------- Express ----------
 const app = express()
@@ -744,27 +757,89 @@ app.get('/api/content/videos', async (_req, res) => {
 })
 
 // ---------- 留言板 ----------
-app.get('/api/messages', async (_req, res) => {
+const guestTokenOf = (req) => asString(req.headers['x-guest-token'], 64)
+
+app.get('/api/messages', async (req, res) => {
+  const token = guestTokenOf(req)
   const rows = await query(
-    'SELECT id, name, content, created_at AS createdAt FROM guest_messages ORDER BY id DESC LIMIT 60',
+    `SELECT id, name, content, user_id, owner_token, created_at AS createdAt
+     FROM guest_messages ORDER BY id DESC LIMIT 60`,
   )
-  res.json({ messages: rows })
+  res.json({
+    messages: rows.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      content: row.content,
+      createdAt: row.createdAt,
+      mine:
+        (Boolean(token) && row.owner_token === token) ||
+        Boolean(req.user && Number(row.user_id) === req.user.id),
+    })),
+  })
 })
+
 app.post('/api/messages', async (req, res) => {
   const name = asString(req.body?.name, 24)
   const content = asString(req.body?.content, 120)
   if (!name || !content) return res.status(400).json({ error: 'invalid_input' })
+  if (!rateLimit(`guestbook:${req.ip}`, 60 * 1000, 3)) {
+    return res.status(429).json({ error: 'too_many_requests' })
+  }
+  const token =
+    guestTokenOf(req) ||
+    asString(req.body?.token, 64) ||
+    crypto.randomBytes(16).toString('hex')
   const result = await execute(
-    'INSERT INTO guest_messages (name, content) VALUES (?, ?)',
-    [name, content],
+    'INSERT INTO guest_messages (name, content, user_id, owner_token) VALUES (?, ?, ?, ?)',
+    [name, content, req.user?.id ?? null, token],
   )
   res.status(201).json({
     id: Number(result.insertId),
     name,
     content,
     createdAt: new Date().toISOString(),
+    token,
   })
 })
+
+app.delete('/api/messages/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  const rows = await query(
+    'SELECT user_id, owner_token FROM guest_messages WHERE id = ?',
+    [id],
+  )
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  const token = guestTokenOf(req)
+  const allowed =
+    (Boolean(token) && rows[0].owner_token === token) ||
+    Boolean(
+      req.user &&
+        (Number(rows[0].user_id) === req.user.id ||
+          hasPermission(req.user, 'guestbook')),
+    )
+  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  await execute('DELETE FROM guest_messages WHERE id = ?', [id])
+  res.json({ ok: true })
+})
+
+// ---------- 后台留言管理 ----------
+app.get('/api/admin/messages', requireAuth, requirePermission('guestbook'), async (_req, res) => {
+  const rows = await query(
+    `SELECT id, name, content, user_id, created_at AS createdAt
+     FROM guest_messages ORDER BY id DESC LIMIT 300`,
+  )
+  res.json({ messages: rows })
+})
+
+app.delete(
+  '/api/admin/messages/:id',
+  requireAuth,
+  requirePermission('guestbook'),
+  async (req, res) => {
+    await execute('DELETE FROM guest_messages WHERE id = ?', [Number(req.params.id)])
+    res.json({ ok: true })
+  },
+)
 
 // ============================================================
 // 文件上传

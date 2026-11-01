@@ -3,7 +3,7 @@ import { Send } from 'lucide-react'
 import { DanmakuWall } from '../components/guestbook/DanmakuWall'
 import { SectionTitle } from '../components/ui'
 import type { GuestMessage } from '../lib/api'
-import { createMessage, listMessages } from '../lib/api'
+import { createMessage, deleteMessage, listMessages } from '../lib/api'
 
 /**
  * 留言板：留言以弹幕形式滚动在整个页面上。
@@ -15,6 +15,7 @@ export function GuestbookPage() {
   const [content, setContent] = useState('')
   const [sending, setSending] = useState(false)
   const [notice, setNotice] = useState('')
+  const [deleting, setDeleting] = useState<number | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -39,13 +40,29 @@ export function GuestbookPage() {
     setSending(true)
     try {
       const msg = await createMessage({ name: n, content: c })
-      setMessages((prev) => [msg, ...prev].slice(0, 60))
+      setMessages((prev) => [{ ...msg, mine: true }, ...prev].slice(0, 60))
       setContent('')
       setNotice('讯号已投递 · SIGNAL SENT')
     } finally {
       setSending(false)
     }
   }
+
+  const remove = async (message: GuestMessage) => {
+    if (deleting) return
+    setDeleting(message.id)
+    try {
+      await deleteMessage(message.id)
+      setMessages((prev) => prev.filter((item) => item.id !== message.id))
+      setNotice('留言已删除')
+    } catch {
+      setNotice('删除失败，请刷新后重试')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const mine = messages.filter((message) => message.mine)
 
   return (
     <main className="relative min-h-screen overflow-hidden pt-28">
@@ -96,9 +113,27 @@ export function GuestbookPage() {
               {sending ? 'SENDING' : 'SEND'}
             </button>
           </div>
+          {mine.length > 0 && (
+            <ul className="border-b border-rhine-line/60 px-4 py-2">
+              {mine.map((message) => (
+                <li key={message.id} className="flex items-center gap-2 py-1">
+                  <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-rhine-dim">
+                    {message.name}：{message.content}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void remove(message)}
+                    disabled={deleting === message.id}
+                    className="shrink-0 font-mono text-[9px] tracking-wider text-rhine-faint hover:text-rhine-red disabled:opacity-50"
+                  >
+                    {deleting === message.id ? '删除中…' : '删除'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="px-4 pb-3 font-mono text-[9px] tracking-wider text-rhine-faint">
-            {notice ||
-              '未配置后端时留言保存在本地浏览器；接口与 MySQL 示例见 README / server/'}
+            {notice || ''}
           </div>
         </div>
       </div>

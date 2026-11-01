@@ -406,7 +406,32 @@ rsync -a --delete /srv/rhine-home/server/uploads/ /srv/backup/uploads/
 
 ---
 
-## 11. 升级流程
+## 11. 重新部署与旧数据恢复
+
+**数据不会因为更新代码而消失**：内容都在 MySQL 的 `rhine_home` 数据库里，`dist/` 只是前端静态文件，重新构建 / 重新上传代码不会清空数据库。
+
+需要一起保留的还有：
+
+- MySQL 数据目录（容器部署务必挂载 volume，例如 `mysql-data:/var/lib/mysql`）；
+- `server/uploads/`（上传的图片、视频、附件）；
+- `server/.env`（数据库密码、SMTP、管理员初始密码）。
+
+如果数据库被重建为空，后端首次启动会自动恢复旧内容：
+
+1. 从 `src/assets/articles/*.md` 恢复文章；
+2. 从 `src/assets/logs/*.md` 恢复日志；
+3. 如果存在旧版 `server/data/*.json`，优先导入其中的文章 / 日志 / 照片 / 视频。
+
+自动恢复只会在对应内容表为空时执行，不会覆盖已有数据；也可以手动执行：
+
+```bash
+cd server
+npm run import-legacy
+```
+
+新服务器部署时，把旧站的 `src/assets`、`server/data`、`server/uploads` 一起带过去即可恢复内容与附件。
+
+## 12. 升级流程
 
 ```bash
 cd /srv/rhine-home
@@ -423,7 +448,7 @@ curl -fsS https://example.com/api/health
 
 ---
 
-## 12. 性能优化建议
+## 13. 性能优化建议
 
 - **MySQL**：`innodb_buffer_pool_size` 设为内存的 50%–60%；已建索引（帖子按板块+状态、回复按帖子+状态、会话按过期时间）；
 - **Nginx**：开启 gzip（见下）、静态资源 `immutable` 长缓存、HTTP/2；
@@ -443,7 +468,7 @@ gzip_types text/plain text/css application/javascript application/json image/svg
 
 ---
 
-## 13. 故障排查：后台连不上
+## 14. 故障排查：后台连不上
 
 ### 第 1 步：确认后端活着
 
@@ -491,7 +516,7 @@ curl -s -X POST http://127.0.0.1:3001/api/auth/login \
 
 ---
 
-## 14. 安全清单
+## 15. 安全清单
 
 - [ ] 修改默认 `ADMIN_PASSWORD`，并在后台「设置」再次修改；
 - [ ] `ALLOW_DEV_CODES=0`（生产环境绝不能返回验证码）；
