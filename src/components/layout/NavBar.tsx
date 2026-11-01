@@ -8,7 +8,10 @@ import { useClock } from '../../hooks/useClock'
 import { cx } from '../../lib/cx'
 import { resolveMediaUrl } from '../../lib/api'
 import { useSession } from '../auth/useSession'
+import { NotificationMenu } from './NotificationMenu'
 import { StatusDot } from '../ui'
+
+const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin'
 
 const SECTION_IDS: string[] = navItems
   .map((i) => i.section)
@@ -21,7 +24,7 @@ export function NavBar() {
   const onHome = pathname === '/'
   const active = useActiveSection(SECTION_IDS)
   const clock = useClock(site.timezone)
-  const { user } = useSession()
+  const { user, staff } = useSession()
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
   const [homeOpenFor, setHomeOpenFor] = useState<string | null>(null)
   const menuOpen = menuOpenFor === pathname
@@ -112,6 +115,14 @@ export function NavBar() {
                 {item.label}
               </Link>
             ))}
+            {staff && (
+              <Link
+                to={ADMIN_PATH}
+                className="px-3 py-2 font-mono text-[11px] tracking-[0.16em] text-rhine-gold transition-colors hover:text-rhine-gold/80"
+              >
+                后台
+              </Link>
+            )}
           </nav>
 
           <div className="flex items-center gap-3">
@@ -121,6 +132,8 @@ export function NavBar() {
               <span className="text-rhine-faint">|</span>
               <span>{clock}</span>
             </div>
+
+            <NotificationMenu />
 
             <Link
               to="/profile"
@@ -220,6 +233,15 @@ export function NavBar() {
               >
                 {user ? `我的主页 · ${user.username}` : '登录 / 注册'}
               </Link>
+              {staff && (
+                <Link
+                  to={ADMIN_PATH}
+                  onClick={() => setMenuOpenFor(null)}
+                  className="mt-2 border border-rhine-cyan/40 px-3 py-3 text-center text-sm text-rhine-cyan"
+                >
+                  进入后台
+                </Link>
+              )}
             </nav>
 
             <div className="flex items-center gap-3 px-8 pb-10 font-mono text-[11px] tracking-widest text-rhine-dim sm:px-12">

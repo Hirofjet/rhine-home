@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
 import { errorMessage, forumApi, type Board } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
@@ -8,6 +8,7 @@ import { ContentComposer, type ComposerValue } from '../components/forum/Content
 
 export function ForumComposePage() {
   const [search] = useSearchParams()
+  const navigate = useNavigate()
   const { user } = useSession()
   const [boards, setBoards] = useState<Board[]>([])
   const [boardSlug, setBoardSlug] = useState(search.get('board') ?? '')
@@ -27,7 +28,10 @@ export function ForumComposePage() {
       .then((data) => {
         if (!alive) return
         setBoards(data.boards)
-        if (!boardSlug && data.boards.length) setBoardSlug(data.boards[0].slug)
+        if (!boardSlug) {
+          const accessible = data.boards.find((item) => item.canAccess !== false)
+          setBoardSlug(accessible?.slug ?? data.boards[0]?.slug ?? '')
+        }
       })
       .catch((err: unknown) => {
         if (alive) setError(errorMessage(err))
@@ -48,6 +52,10 @@ export function ForumComposePage() {
     }
     if (!board) {
       setError('请选择板块')
+      return
+    }
+    if (board.canAccess === false) {
+      setError('你没有该板块的访问权限')
       return
     }
     if (!title.trim()) {
@@ -74,6 +82,7 @@ export function ForumComposePage() {
       })
       setDone(true)
       setNotice(result.message || '帖子已发布')
+      window.setTimeout(() => navigate(`/forum/${board.slug}`), 1200)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -150,8 +159,15 @@ export function ForumComposePage() {
               className="w-full border border-rhine-line bg-rhine-abyss/70 px-3 py-2 font-mono text-xs text-rhine-ink outline-none focus:border-rhine-gold/60"
             >
               {boards.map((item) => (
-                <option key={item.id} value={item.slug}>
+                <option
+                  key={item.id}
+                  value={item.slug}
+                  disabled={item.canAccess === false}
+                >
                   {item.name}
+                  {item.canAccess === false
+                    ? `（${item.access === 'core' ? '核心' : '需申请'}）`
+                    : ''}
                 </option>
               ))}
             </select>

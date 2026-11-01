@@ -1,45 +1,44 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { ArrowRight, MessageSquare, Plus, Radio, Search } from 'lucide-react'
+import { ArrowRight, Lock, MessageSquare, Plus, Radio, Search, Shield } from 'lucide-react'
 import {
   errorMessage,
   forumApi,
-  ROLE_LABELS,
   type Announcement,
   type Board,
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { fadeUp, stagger } from '../lib/motion'
-import { formatDateTime, STATUS_LABELS, STATUS_STYLES } from '../lib/format'
+import { formatDateTime } from '../lib/format'
 
-interface MineData {
-  posts: Array<{
-    id: number
-    title: string
-    status: string
-    createdAt: string
-    board: { slug: string; name: string }
-  }>
-  replies: Array<{
-    id: number
-    content: string
-    status: string
-    createdAt: string
-    post: { id: number; title: string }
-  }>
+const ACCESS_LABEL: Record<string, string> = {
+  public: '公开',
+  special: '特殊',
+  core: '核心',
+}
+
+const ACCESS_TONE: Record<string, string> = {
+  public: 'border-rhine-line text-rhine-faint',
+  special: 'border-rhine-cyan/50 text-rhine-cyan',
+  core: 'border-rhine-gold/50 text-rhine-gold',
 }
 
 export function ForumPage() {
-  const { user, logout } = useSession()
+  const { user } = useSession()
   const [boards, setBoards] = useState<Board[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
-  const [mine, setMine] = useState<MineData | null>(null)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [search, setSearch] = useState('')
+  const [applying, setApplying] = useState<number | null>(null)
+
+  const load = async () => {
+    const data = await forumApi.boards()
+    setBoards(data.boards)
+  }
 
   useEffect(() => {
     let alive = true
@@ -54,27 +53,6 @@ export function ForumPage() {
       .finally(() => {
         if (alive) setLoading(false)
       })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!user) return undefined
-    let alive = true
-    forumApi
-      .my()
-      .then((data) => {
-        if (alive) setMine(data)
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [user])
-
-  useEffect(() => {
-    let alive = true
     forumApi
       .announcements()
       .then((data) => {
@@ -85,6 +63,27 @@ export function ForumPage() {
       alive = false
     }
   }, [])
+
+  const applyAccess = async (board: Board) => {
+    if (!user) {
+      setAuthOpen(true)
+      return
+    }
+    setApplying(board.id)
+    setError('')
+    try {
+      await forumApi.requestAccess(board.id)
+      setBoards((current) =>
+        current.map((item) =>
+          item.id === board.id ? { ...item, requestStatus: 'pending' } : item,
+        ),
+      )
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setApplying(null)
+    }
+  }
 
   const totalPosts = boards.reduce((sum, board) => sum + board.postCount, 0)
   const filteredBoards = boards.filter((board) => {
@@ -104,20 +103,17 @@ export function ForumPage() {
           variants={fadeUp}
           className="font-mono text-xs tracking-[0.3em] text-rhine-faint"
         >
-          RHINE//FORUM // 公共讨论区
+          RHINE//FORUM
         </motion.p>
         <motion.h1
           variants={fadeUp}
           className="text-glow-gold mt-3 text-4xl font-bold text-rhine-ink sm:text-5xl"
         >
-          论坛<span className="ml-3 font-mono text-sm tracking-[0.3em] text-rhine-faint">/ FORUM</span>
+          论坛
+          <span className="ml-3 font-mono text-sm tracking-[0.3em] text-rhine-faint">
+            / FORUM
+          </span>
         </motion.h1>
-        <motion.p
-          variants={fadeUp}
-          className="mt-4 max-w-2xl text-sm leading-relaxed text-rhine-dim"
-        >
-          讨论区 · 支持图片、视频与长文
-        </motion.p>
 
         {announcements.length > 0 && (
           <motion.div variants={fadeUp} className="mt-5 space-y-2">
@@ -139,10 +135,10 @@ export function ForumPage() {
 
         <motion.div
           variants={fadeUp}
-          className="mt-6 flex flex-wrap items-center gap-4 border-y border-rhine-line/60 py-3 font-mono text-[10px] tracking-[0.2em] text-rhine-faint"
+          className="mt-5 flex flex-wrap items-center gap-4 border-y border-rhine-line/60 py-3 font-mono text-[10px] tracking-[0.2em] text-rhine-faint"
         >
           <span className="flex items-center gap-1.5">
-            <Radio className="h-3 w-3 text-rhine-green" /> SYSTEM ONLINE
+            <Radio className="h-3 w-3 text-rhine-green" /> ONLINE
           </span>
           <span>BOARDS: {String(boards.length).padStart(2, '0')}</span>
           <span>THREADS: {String(totalPosts).padStart(3, '0')}</span>
@@ -150,24 +146,42 @@ export function ForumPage() {
         </motion.div>
       </motion.div>
 
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div className="flex min-w-56 flex-1 items-center gap-2 border border-rhine-line/60 bg-rhine-abyss/40 px-3 py-2">
+          <Search className="h-3.5 w-3.5 text-rhine-faint" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="搜索板块"
+            className="w-full bg-transparent font-mono text-xs text-rhine-ink outline-none placeholder:text-rhine-faint"
+          />
+        </div>
+        {user ? (
+          <Link
+            to="/forum/new"
+            className="inline-flex items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-rhine-gold transition-colors hover:bg-rhine-gold/20"
+          >
+            <Plus className="h-3 w-3" /> 发布新帖
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAuthOpen(true)}
+            className="inline-flex items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-rhine-gold"
+          >
+            登录 / 注册
+          </button>
+        )}
+      </div>
+
       {error && (
-        <p className="mt-6 border border-rhine-red/40 bg-rhine-red/5 px-4 py-3 font-mono text-[11px] tracking-wider text-rhine-red">
+        <p className="mt-4 border border-rhine-red/40 bg-rhine-red/5 px-3 py-2 font-mono text-[10px] text-rhine-red">
           {error}
         </p>
       )}
 
-      <div className="mt-6 flex items-center gap-2 border border-rhine-line/60 bg-rhine-abyss/40 px-3 py-2">
-        <Search className="h-3.5 w-3.5 text-rhine-faint" />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="搜索板块"
-          className="w-full bg-transparent font-mono text-xs text-rhine-ink outline-none placeholder:text-rhine-faint"
-        />
-      </div>
-
       {loading ? (
-        <p className="mt-10 animate-pulse-soft font-mono text-xs tracking-[0.3em] text-rhine-faint">
+        <p className="mt-8 animate-pulse-soft font-mono text-xs tracking-[0.3em] text-rhine-faint">
           LOADING BOARDS …
         </p>
       ) : (
@@ -175,36 +189,85 @@ export function ForumPage() {
           variants={stagger}
           initial="hidden"
           animate="show"
-          className="mt-8 grid gap-4 sm:grid-cols-2"
+          className="mt-5 grid gap-3 sm:grid-cols-2"
         >
-          {filteredBoards.map((board) => (
-            <motion.div key={board.id} variants={fadeUp}>
-              <Link
-                to={`/forum/${board.slug}`}
-                className="group relative flex h-full flex-col border border-rhine-line/80 bg-rhine-panel/50 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-rhine-gold/50 hover:shadow-[0_0_34px_rgb(211_178_122/0.14)]"
-              >
-                <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-rhine-gold/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                <div className="flex items-center justify-between">
-                  <p className="font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
-                    BOARD // {board.slug.toUpperCase()}
+          {filteredBoards.map((board) => {
+            const accessible = board.canAccess !== false
+            const isSpecial = board.access === 'special'
+            const isCore = board.access === 'core'
+            const pending = board.requestStatus === 'pending'
+            return (
+              <motion.div key={board.id} variants={fadeUp}>
+                <div className="relative flex h-full flex-col border border-rhine-line/80 bg-rhine-panel/50 p-4 transition-colors hover:border-rhine-gold/40">
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`border px-1.5 py-0.5 font-mono text-[9px] tracking-[0.16em] ${ACCESS_TONE[board.access] ?? ACCESS_TONE.public}`}
+                    >
+                      {ACCESS_LABEL[board.access] ?? '公开'}
+                    </span>
+                    {accessible ? (
+                      <Link
+                        to={`/forum/${board.slug}`}
+                        className="font-mono text-[10px] tracking-[0.16em] text-rhine-cyan hover:text-rhine-gold"
+                      >
+                        进入 →
+                      </Link>
+                    ) : (
+                      <Lock className="h-3 w-3 text-rhine-faint" />
+                    )}
+                  </div>
+                  <h2 className="mt-2 text-lg font-semibold text-rhine-ink">{board.name}</h2>
+                  <p className="mt-1 min-h-9 text-xs leading-relaxed text-rhine-dim">
+                    {board.description || '暂无描述'}
                   </p>
-                  <ArrowRight className="h-4 w-4 text-rhine-faint transition-all group-hover:translate-x-1 group-hover:text-rhine-gold" />
+                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3 font-mono text-[10px] tracking-wider text-rhine-faint">
+                    <span className="flex items-center gap-1.5">
+                      <MessageSquare className="h-3 w-3" /> {board.postCount} 主题
+                    </span>
+                    <span>{board.lastPostAt ? formatDateTime(board.lastPostAt) : '暂无帖子'}</span>
+                  </div>
+
+                  {!accessible && (
+                    <div className="mt-3 border-t border-rhine-line/50 pt-2">
+                      {isCore ? (
+                        <p className="flex items-center gap-1.5 font-mono text-[10px] text-rhine-gold">
+                          <Shield className="h-3 w-3" /> 核心板块 · 仅授权成员可访问
+                        </p>
+                      ) : isSpecial ? (
+                        pending ? (
+                          <p className="font-mono text-[10px] text-rhine-cyan">访问申请审核中</p>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void applyAccess(board)}
+                            disabled={applying === board.id}
+                            className="border border-rhine-cyan/50 px-2 py-1 font-mono text-[10px] tracking-[0.14em] text-rhine-cyan hover:bg-rhine-cyan/10 disabled:opacity-50"
+                          >
+                            {applying === board.id ? '提交中…' : '申请访问'}
+                          </button>
+                        )
+                      ) : (
+                        <Link
+                          to={`/forum/${board.slug}`}
+                          className="font-mono text-[10px] text-rhine-gold"
+                        >
+                          进入 →
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                  {accessible && (
+                    <Link
+                      to={`/forum/${board.slug}`}
+                      className="mt-3 inline-flex items-center gap-1 border-t border-rhine-line/50 pt-2 font-mono text-[10px] text-rhine-dim hover:text-rhine-gold"
+                    >
+                      查看帖子 <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  )}
                 </div>
-                <h2 className="mt-3 text-lg font-semibold text-rhine-ink group-hover:text-rhine-gold">
-                  {board.name}
-                </h2>
-                <p className="mt-2 min-h-10 text-xs leading-relaxed text-rhine-dim">
-                  {board.description || '暂无描述'}
-                </p>
-                <div className="mt-auto flex items-center justify-between pt-4 font-mono text-[10px] tracking-wider text-rhine-faint">
-                  <span className="flex items-center gap-1.5">
-                    <MessageSquare className="h-3 w-3" /> {board.postCount} 主题
-                  </span>
-                  <span>{board.lastPostAt ? formatDateTime(board.lastPostAt) : '暂无帖子'}</span>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
+              </motion.div>
+            )
+          })}
           {filteredBoards.length === 0 && (
             <p className="border border-rhine-line/60 bg-rhine-panel/30 px-4 py-6 text-center font-mono text-[11px] text-rhine-faint">
               没有匹配的板块
@@ -213,95 +276,7 @@ export function ForumPage() {
         </motion.div>
       )}
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border border-rhine-line/70 bg-rhine-panel/40 px-4 py-3">
-        <p className="font-mono text-[10px] tracking-[0.16em] text-rhine-dim">
-          {user
-            ? `已登录：${user.username}（${ROLE_LABELS[user.role]}）`
-            : '登录后即可发帖、回复与上传图片 / 视频'}
-        </p>
-        {user ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/forum/new"
-              className="inline-flex items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-rhine-gold transition-colors hover:bg-rhine-gold/20"
-            >
-              <Plus className="h-3 w-3" /> 发布新帖
-            </Link>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="inline-flex items-center gap-2 border border-rhine-line px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-rhine-dim transition-colors hover:border-rhine-red/50 hover:text-rhine-red"
-            >
-              退出
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAuthOpen(true)}
-            className="inline-flex items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-rhine-gold transition-colors hover:bg-rhine-gold/20"
-          >
-            登录 / 注册
-          </button>
-        )}
-      </div>
-
-      {user && mine && (mine.posts.length > 0 || mine.replies.length > 0) && (
-        <div className="mt-10 border border-rhine-line/70 bg-rhine-panel/30">
-          <div className="flex items-center justify-between border-b border-rhine-line/60 px-4 py-3">
-            <p className="font-mono text-[10px] tracking-[0.25em] text-rhine-faint">
-              我的发布 / MY SUBMISSIONS
-            </p>
-            <span className="font-mono text-[9px] tracking-[0.2em] text-rhine-faint">
-              审核通过后才会公开
-            </span>
-          </div>
-          <ul className="divide-y divide-rhine-line/50">
-            {mine.posts.map((post) => (
-              <li key={`post-${post.id}`} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-                <Link
-                  to={`/forum/post/${post.id}`}
-                  className="min-w-0 flex-1 truncate text-xs text-rhine-ink hover:text-rhine-gold"
-                >
-                  {post.title}
-                </Link>
-                <span className="font-mono text-[9px] tracking-wider text-rhine-faint">
-                  {post.board.name}
-                </span>
-                <span
-                  className={`border px-1.5 py-0.5 font-mono text-[9px] tracking-wider ${
-                    STATUS_STYLES[post.status] ?? 'border-rhine-line text-rhine-faint'
-                  }`}
-                >
-                  {STATUS_LABELS[post.status] ?? post.status}
-                </span>
-              </li>
-            ))}
-            {mine.replies.map((reply) => (
-              <li key={`reply-${reply.id}`} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-                <Link
-                  to={`/forum/post/${reply.post.id}`}
-                  className="min-w-0 flex-1 truncate text-xs text-rhine-dim hover:text-rhine-gold"
-                >
-                  回复：{reply.content.slice(0, 40) || '（无文字）'}
-                </Link>
-                <span className="font-mono text-[9px] tracking-wider text-rhine-faint">
-                  {reply.post.title}
-                </span>
-                <span
-                  className={`border px-1.5 py-0.5 font-mono text-[9px] tracking-wider ${
-                    STATUS_STYLES[reply.status] ?? 'border-rhine-line text-rhine-faint'
-                  }`}
-                >
-                  {STATUS_LABELS[reply.status] ?? reply.status}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <ForumAuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <ForumAuthModal open={authOpen} onClose={() => setAuthOpen(false)} onSuccess={() => void load()} />
     </section>
   )
 }

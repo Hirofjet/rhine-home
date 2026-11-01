@@ -167,6 +167,7 @@ const TABLES = [
     slug VARCHAR(64) NOT NULL,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(500) NULL,
+    access ENUM('public','special','core') NOT NULL DEFAULT 'public',
     sort INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -255,6 +256,20 @@ const TABLES = [
     KEY idx_ann_board (board_id, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS forum_access_requests (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    board_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    note VARCHAR(255) NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    reviewed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_request_board_user (board_id, user_id),
+    KEY idx_request_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS email_blacklist (
     email VARCHAR(190) NOT NULL,
     reason VARCHAR(200) NULL,
@@ -292,6 +307,11 @@ async function ensureSchemaUpgrades() {
     'pinned TINYINT(1) NOT NULL DEFAULT 0',
   )
   await ensureColumn('forum_replies', 'parent_id', 'parent_id BIGINT UNSIGNED NULL')
+  await ensureColumn(
+    'forum_boards',
+    'access',
+    "access ENUM('public','special','core') NOT NULL DEFAULT 'public'",
+  )
   await pool.query(
     `ALTER TABLE forum_posts MODIFY status
      ENUM('pending','approved','rejected','hidden','deleted') NOT NULL DEFAULT 'pending'`,
@@ -299,6 +319,10 @@ async function ensureSchemaUpgrades() {
   await pool.query(
     `ALTER TABLE forum_replies MODIFY status
      ENUM('pending','approved','rejected','deleted') NOT NULL DEFAULT 'approved'`,
+  )
+  await pool.query(
+    `ALTER TABLE email_codes MODIFY purpose
+     ENUM('register','reset','bind') NOT NULL`,
   )
 }
 
