@@ -436,6 +436,36 @@ npm run import-legacy
 
 ## 12. 升级流程
 
+### 一键重新部署（推荐）
+
+服务器拉取代码后，用项目自带脚本完成安装、构建、重启与健康检查：
+
+```bash
+cd /srv/rhine-home
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+```
+
+脚本行为：
+
+- `git fetch` + `git pull --ff-only`；
+- 安装前端依赖、执行 `npm run build`；
+- 安装后端生产依赖；
+- 自动识别 systemd 或 PM2 并重启（PM2 使用 `server/ecosystem.config.cjs`）；
+- 轮询 `/api/health`，失败时自动回滚到部署前 commit；
+- 数据库与 `server/uploads` 不会被改动。
+
+常用可选变量：
+
+```bash
+APP_DIR=/www/wwwroot/rhine-home BRANCH=main ./scripts/deploy.sh
+FORCE_BUILD=1 ./scripts/deploy.sh   # 没有新提交也强制重建
+```
+
+如果服务器不是 `/srv/rhine-home`，设置 `APP_DIR`；如果服务名不同，设置 `SERVICE`。
+
+### 手动方式（了解流程即可）
+
 ```bash
 cd /srv/rhine-home
 git pull                # 或重新上传代码

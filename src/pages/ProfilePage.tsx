@@ -25,6 +25,7 @@ import {
   type NotificationItem,
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
+import { BirthdayPicker } from '../components/profile/BirthdayPicker'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { formatDateTime, STATUS_LABELS, STATUS_STYLES } from '../lib/format'
 
@@ -465,15 +466,10 @@ export function ProfilePage() {
                 <option value="other">其他</option>
               </select>
             </label>
-            <label className="block space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">生日</span>
-              <input
-                type="date"
-                value={birthday}
-                onChange={(event) => setBirthday(event.target.value)}
-                className="w-full border border-rhine-line bg-rhine-abyss/60 px-2 py-1.5 font-mono text-xs text-rhine-ink outline-none"
-              />
-            </label>
+              <BirthdayPicker value={birthday} onChange={setBirthday} />
+            </div>
           </div>
           <label className="block space-y-1">
             <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">简介</span>
