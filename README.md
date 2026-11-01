@@ -204,6 +204,12 @@ cd server && npm start
 cd server && npm run import-legacy   # 从旧版 markdown / JSON 恢复内容
 ```
 
+服务器拉取后一键重新部署：
+
+```bash
+./scripts/deploy.sh
+```
+
 Git 常用操作（提交、分支、撤销、冲突、部署拉取）见 **[GIT_GUIDE.md](GIT_GUIDE.md)**。
 
 ## 数据持久化

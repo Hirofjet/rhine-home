@@ -835,17 +835,37 @@ free -h
 
 ### B.13 后续更新项目
 
-**Git 方式（推荐）：**
+**Git 方式（推荐，一键脚本）：**
+
+服务器上首次执行一次：
+
+```bash
+cd /www/wwwroot/rhine-home
+chmod +x scripts/deploy.sh
+```
+
+以后每次本地 push 后，在服务器执行：
+
+```bash
+cd /www/wwwroot/rhine-home
+./scripts/deploy.sh
+```
+
+脚本会自动 `git pull --ff-only` → 安装依赖 → 构建 → 重启（自动识别 systemd / PM2）→ 健康检查；失败会回滚到上次 commit，并保留数据库与 uploads。
+
+也可从本地直接触发：
+
+```bash
+ssh root@你的服务器IP "cd /www/wwwroot/rhine-home && ./scripts/deploy.sh"
+```
+
+**手动方式（了解流程即可）：**
 
 ```bash
 cd /www/wwwroot/rhine-home
 git pull --ff-only
-
-npm ci
-npm run build
-
-cd server
-npm ci --omit=dev
+npm ci && npm run build
+cd server && npm ci --omit=dev
 pm2 restart rhine-home
 ```
 
