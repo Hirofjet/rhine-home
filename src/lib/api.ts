@@ -155,7 +155,7 @@ export interface NotificationItem {
 }
 
 export interface Conversation {
-  user: { id: number; username: string; avatarUrl?: string }
+  user: { id: number; username: string; avatarUrl?: string; isFollowing?: boolean }
   last: { content: string; createdAt: string; fromMe: boolean } | null
   unread: number
 }
@@ -829,7 +829,7 @@ export const userApi = {
   },
   messagesWith(id: number) {
     return api<{
-      user: { id: number; username: string; avatarUrl?: string }
+      user: { id: number; username: string; avatarUrl?: string; isFollowing?: boolean }
       messages: ChatMessage[]
     }>(`/api/messages/with/${id}`)
   },
