@@ -54,7 +54,7 @@ Vite 已配置 `/api`、`/uploads` 代理到 `http://127.0.0.1:3001`。
 - 论坛：<http://localhost:5173/forum>
 - 后台：<http://localhost:5173/admin>（默认 `admin / <ADMIN_PASSWORD>`，**不在前台导航中**）
 
-> 生产部署请看 **[DEPLOY.md](DEPLOY.md)**（通用）与 **[TENCENT_DEPLOY.md](TENCENT_DEPLOY.md)**（腾讯云轻量应用服务器）。
+> 生产部署请看 **[DEPLOY.md](DEPLOY.md)**（通用）与 **[TENCENT_DEPLOY.md](TENCENT_DEPLOY.md)**（腾讯云轻量应用服务器）；Git 操作见 **[GIT_GUIDE.md](GIT_GUIDE.md)**。
 
 ---
 
@@ -198,6 +198,8 @@ npm run lint       # oxlint
 cd server && npm start
 cd server && npm run import-legacy   # 从旧版 markdown / JSON 恢复内容
 ```
+
+Git 常用操作（提交、分支、撤销、冲突、部署拉取）见 **[GIT_GUIDE.md](GIT_GUIDE.md)**。
 
 ## 数据持久化
 
