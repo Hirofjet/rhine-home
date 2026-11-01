@@ -851,6 +851,16 @@ cd /www/wwwroot/rhine-home
 ./scripts/deploy.sh
 ```
 
+国内网络访问 GitHub 慢时，改用 cnfast 加速拉取：
+
+```bash
+cd /www/wwwroot/rhine-home
+chmod +x scripts/deploy-cn.sh   # 首次
+./scripts/deploy-cn.sh
+```
+
+`deploy-cn.sh` 会执行 `cnfast git pull --ff-only`，其余构建、重启、健康检查和失败回滚与 `deploy.sh` 相同。
+
 脚本会自动 `git pull --ff-only` → 安装依赖 → 构建 → 重启（自动识别 systemd / PM2）→ 健康检查；失败会回滚到上次 commit，并保留数据库与 uploads。
 
 也可从本地直接触发：

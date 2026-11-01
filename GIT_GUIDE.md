@@ -317,10 +317,17 @@ cd /www/wwwroot/rhine-home
 ./scripts/deploy.sh
 ```
 
-`scripts/deploy.sh` 会自动 pull、构建、重启并做健康检查，失败会回滚；不需要手动执行 `npm ci` / `pm2 restart`。也可以在本地一步完成：
+国内网络访问 GitHub 慢时，用 cnfast 入口：
 
 ```bash
-ssh root@你的服务器IP "cd /www/wwwroot/rhine-home && ./scripts/deploy.sh"
+cd /www/wwwroot/rhine-home
+./scripts/deploy-cn.sh
+```
+
+`scripts/deploy.sh` 会自动 pull、构建、重启并做健康检查，失败会回滚；`scripts/deploy-cn.sh` 仅把拉取换成 `cnfast git pull --ff-only`，其余流程相同。也可以在本地一步完成：
+
+```bash
+ssh root@你的服务器IP "cd /www/wwwroot/rhine-home && ./scripts/deploy-cn.sh"
 ```
 
 服务器更新（手动对照）：

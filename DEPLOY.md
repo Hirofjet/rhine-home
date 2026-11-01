@@ -446,6 +446,21 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
 ```
 
+国内网络访问 GitHub 慢时，用 cnfast 加速拉取的入口：
+
+```bash
+cd /www/wwwroot/rhine-home
+chmod +x scripts/deploy-cn.sh
+./scripts/deploy-cn.sh
+```
+
+两个脚本共用同一套构建、重启、健康检查和回滚逻辑，只是拉取方式不同：
+`deploy-cn.sh` 内部执行 `cnfast git pull --ff-only`；如果 cnfast 不在 PATH 中，可以：
+
+```bash
+PULL_WRAPPER=/usr/local/bin/cnfast ./scripts/deploy-cn.sh
+```
+
 脚本行为：
 
 - `git fetch` + `git pull --ff-only`；

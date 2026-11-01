@@ -11,6 +11,7 @@
 #   BRANCH=main                    要部署的分支
 #   SERVICE=rhine-home             systemd 服务名
 #   HEALTH_URL=http://127.0.0.1:3001/api/health
+#   PULL_WRAPPER=cnfast            用包装命令拉取（国内环境，如 cnfast）
 #   FORCE_BUILD=1                  没有新提交也强制重新构建
 #   ALLOW_DIRTY=1                  允许有未提交的已跟踪改动（默认拒绝）
 #
@@ -116,9 +117,16 @@ rollback() {
 }
 trap rollback ERR
 
-log "拉取 origin/$BRANCH"
-git fetch --prune origin "$BRANCH"
-git pull --ff-only origin "$BRANCH"
+if [ -n "${PULL_WRAPPER:-}" ]; then
+  command -v "$PULL_WRAPPER" >/dev/null 2>&1 \
+    || fail "找不到拉取命令：$PULL_WRAPPER（请先安装 cnfast）"
+  log "使用 $PULL_WRAPPER 拉取（国内加速模式）"
+  "$PULL_WRAPPER" git pull --ff-only
+else
+  log "拉取 origin/$BRANCH"
+  git fetch --prune origin "$BRANCH"
+  git pull --ff-only origin "$BRANCH"
+fi
 
 NEW="$(git rev-parse HEAD)"
 if [ "$PREV" = "$NEW" ] && [ "$FORCE_BUILD" != "1" ]; then
