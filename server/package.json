@@ -6,7 +6,8 @@
   "description": "RHINE//HOME 后端：账号 / 权限 / 内容 / 论坛 / 审核 / 上传（MySQL）",
   "scripts": {
     "start": "node index.mjs",
-    "dev": "node --watch index.mjs"
+    "dev": "node --watch index.mjs",
+    "import-legacy": "node legacy-import.mjs"
   },
   "dependencies": {
     "compression": "^1.8.1",

@@ -216,6 +216,8 @@ const TABLES = [
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(64) NOT NULL,
     content VARCHAR(200) NOT NULL,
+    user_id BIGINT UNSIGNED NULL,
+    owner_token CHAR(64) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_messages_created (created_at)
@@ -317,6 +319,8 @@ async function ensureSchemaUpgrades() {
     'pinned TINYINT(1) NOT NULL DEFAULT 0',
   )
   await ensureColumn('forum_replies', 'parent_id', 'parent_id BIGINT UNSIGNED NULL')
+  await ensureColumn('guest_messages', 'user_id', 'user_id BIGINT UNSIGNED NULL')
+  await ensureColumn('guest_messages', 'owner_token', 'owner_token CHAR(64) NULL')
   await ensureColumn(
     'forum_boards',
     'access',

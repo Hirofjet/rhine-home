@@ -269,6 +269,7 @@ export function MembersPanel({ user }: MembersPanelProps) {
       if (target.permissions.includes('archive.videos')) labels.push('视频')
     }
     if (target.permissions.includes('logs')) labels.push('日志')
+    if (target.permissions.includes('guestbook')) labels.push('留言板')
     if (target.permissions.includes('forum')) labels.push('论坛（全部板块）')
     else {
       target.permissions

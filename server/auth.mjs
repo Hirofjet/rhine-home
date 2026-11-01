@@ -24,6 +24,7 @@ export const PERMISSION_KEYS = [
   'archive.photos',
   'archive.videos',
   'logs',
+  'guestbook',
   'forum',
   'members.manage',
   'members.grant',
@@ -157,7 +158,11 @@ export function isStaff(user) {
     user.permissions.includes('members.manage') ||
     user.permissions.includes('members.grant') ||
     user.permissions.some(
-      (p) => p === 'archive' || p === 'logs' || isForumPermission(p),
+      (p) =>
+        p === 'archive' ||
+        p === 'logs' ||
+        p === 'guestbook' ||
+        isForumPermission(p),
     )
   )
 }
