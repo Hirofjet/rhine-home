@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Diamond, LogOut, ShieldCheck } from 'lucide-react'
+import { Diamond, Home, LogOut, ShieldCheck } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { cx } from '../../lib/cx'
 import { hasPerm, ROLE_LABELS, type ApiUser } from '../../lib/api'
 import { AdminBadge, AdminButton } from './AdminUi'
@@ -116,6 +117,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 font-mono text-[10px] tracking-wider text-rhine-dim">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 border border-rhine-line px-2.5 py-1.5 text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
+            >
+              <Home className="h-3 w-3" /> 返回主页
+            </Link>
             <ShieldCheck className="h-3.5 w-3.5 text-rhine-cyan" />
             <span>{user.username}</span>
             <AdminBadge tone={user.isSuper ? 'gold' : 'cyan'}>
@@ -130,35 +137,43 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row">
         <aside className="lg:w-56 lg:shrink-0">
-          <nav className="flex gap-4 overflow-x-auto pb-1 lg:flex-col lg:gap-5">
-            {groups.map((group) => (
-              <div key={group.title} className="shrink-0">
-                <p className="mb-1.5 font-mono text-[8px] tracking-[0.3em] text-rhine-faint">
-                  {group.title}
-                </p>
-                <div className="flex gap-1 lg:flex-col">
-                  {group.items.map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setPanel(item.key)}
-                      className={cx(
-                        'flex shrink-0 items-center justify-between gap-3 border px-3 py-2 text-left transition-colors',
-                        current === item.key
-                          ? 'border-rhine-gold/60 bg-rhine-gold/10 text-rhine-gold'
-                          : 'border-transparent text-rhine-dim hover:border-rhine-line hover:text-rhine-ink',
-                      )}
-                    >
-                      <span className="text-xs">{item.label}</span>
-                      <span className="font-mono text-[8px] tracking-[0.2em] opacity-60">
-                        {item.labelEn}
-                      </span>
-                    </button>
-                  ))}
+          <div className="border border-rhine-line/60 bg-rhine-panel/30 p-2 lg:sticky lg:top-20">
+            <nav className="flex gap-4 overflow-x-auto pb-1 lg:flex-col lg:gap-5">
+              {groups.map((group) => (
+                <div key={group.title} className="shrink-0">
+                  <p className="mb-1.5 font-mono text-[8px] tracking-[0.3em] text-rhine-faint">
+                    {group.title}
+                  </p>
+                  <div className="flex gap-1 lg:flex-col">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setPanel(item.key)}
+                        className={cx(
+                          'flex shrink-0 items-center justify-between gap-3 border-l-2 px-3 py-2 text-left transition-colors',
+                          current === item.key
+                            ? 'border-l-rhine-gold bg-rhine-gold/10 text-rhine-gold'
+                            : 'border-l-transparent text-rhine-dim hover:border-l-rhine-line hover:bg-rhine-abyss/40 hover:text-rhine-ink',
+                        )}
+                      >
+                        <span className="text-xs">{item.label}</span>
+                        <span className="font-mono text-[8px] tracking-[0.2em] opacity-60">
+                          {item.labelEn}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </nav>
+              ))}
+            </nav>
+            <Link
+              to="/"
+              className="mt-4 hidden items-center gap-2 border-t border-rhine-line/50 pt-3 font-mono text-[10px] tracking-[0.16em] text-rhine-faint transition-colors hover:text-rhine-gold lg:flex"
+            >
+              <Home className="h-3 w-3" /> 返回主页
+            </Link>
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1">

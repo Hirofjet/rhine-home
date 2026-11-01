@@ -64,6 +64,7 @@ export function normalizeUser(row) {
   return {
     id: Number(row.id),
     username: row.username,
+    nickname: row.nickname || row.username,
     email: row.email,
     emailVerified: Boolean(row.email_verified),
     isSuper: Boolean(row.is_super),
@@ -102,6 +103,7 @@ export function publicUser(user) {
   return {
     id: user.id,
     username: user.username,
+    nickname: user.nickname || user.username,
     email: user.email,
     emailVerified: user.emailVerified,
     isSuper: user.isSuper,

@@ -44,6 +44,9 @@ const ForumComposePage = lazy(() =>
 const ProfilePage = lazy(() =>
   import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 )
+const PublicUserPage = lazy(() =>
+  import('./pages/PublicUserPage').then((m) => ({ default: m.PublicUserPage })),
+)
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
 )
@@ -138,6 +141,7 @@ function AnimatedRoutes() {
             <Route path="/forum/post/:id" element={<ForumPostPage />} />
             <Route path="/forum/:slug" element={<ForumBoardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/u/:id" element={<PublicUserPage />} />
             <Route path="/guestbook" element={<GuestbookPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

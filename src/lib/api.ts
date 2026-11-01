@@ -15,6 +15,7 @@ export type Role = 'super' | 'admin' | 'moderator' | 'user'
 export interface ApiUser {
   id: number
   username: string
+  nickname?: string
   email: string
   emailVerified: boolean
   isSuper: boolean
@@ -169,6 +170,7 @@ export interface ChatMessage {
 export interface PublicProfile {
   id: number
   username: string
+  nickname?: string
   avatarUrl?: string
   bio?: string
   tags?: string[]
@@ -177,6 +179,9 @@ export interface PublicProfile {
   birthday?: string
   createdAt: string
   banned?: boolean
+  followers?: number
+  following?: number
+  isFollowing?: boolean
 }
 
 export interface ForumPost {
@@ -285,6 +290,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   cannot_ban_super: '不能封禁超级管理员',
   invalid_avatar: '头像地址不合法',
   invalid_gender: '性别选项不合法',
+  invalid_nickname: '昵称至少 2 个字符',
+  cannot_follow_self: '不能关注自己',
   cannot_change_own_permissions: '不能修改自己的权限',
   cannot_delete_self: '不能删除自己',
   cannot_delete_super: '不能删除超级管理员',
@@ -461,7 +468,7 @@ export async function createMessage(input: {
 // ---------- 论坛 ----------
 export const forumApi = {
   boards() {
-    return api<{ boards: Board[] }>('/api/forum/boards', { auth: false })
+    return api<{ boards: Board[] }>('/api/forum/boards')
   },
   announcements(boardId?: number) {
     return api<{ announcements: Announcement[] }>(
@@ -474,14 +481,11 @@ export const forumApi = {
       board: Board
       posts: PostSummary[]
       pagination: { page: number; limit: number; total: number }
-    }>(`/api/forum/boards/${encodeURIComponent(slug)}?page=${page}`, {
-      auth: false,
-    })
+    }>(`/api/forum/boards/${encodeURIComponent(slug)}?page=${page}`)
   },
   post(id: number) {
     return api<{ post: ForumPost; replies: ForumReply[] }>(
       `/api/forum/posts/${id}`,
-      { auth: false },
     )
   },
   createPost(input: {
@@ -718,9 +722,34 @@ export const adminApi = {
 // ---------- 个人资料 / 通知 / 私信 ----------
 export const userApi = {
   profile(id: number) {
-    return api<{ user: PublicProfile }>(`/api/users/${id}`, { auth: false })
+    return api<{
+      user: PublicProfile
+      posts: Array<{
+        id: number
+        title: string
+        createdAt: string
+        board: { slug: string; name: string }
+      }>
+    }>(`/api/users/${id}`)
+  },
+  follow(id: number) {
+    return api<{ ok: boolean }>(`/api/users/${id}/follow`, { method: 'POST' })
+  },
+  unfollow(id: number) {
+    return api<{ ok: boolean }>(`/api/users/${id}/follow`, { method: 'DELETE' })
+  },
+  followers(id: number) {
+    return api<{
+      users: Array<{ id: number; username: string; nickname: string; avatarUrl?: string }>
+    }>(`/api/users/${id}/followers`)
+  },
+  following(id: number) {
+    return api<{
+      users: Array<{ id: number; username: string; nickname: string; avatarUrl?: string }>
+    }>(`/api/users/${id}/following`)
   },
   updateProfile(input: {
+    nickname?: string
     avatarUrl?: string
     gender?: string
     birthday?: string
