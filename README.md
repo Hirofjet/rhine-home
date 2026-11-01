@@ -4,6 +4,8 @@
 > 视觉致敬《明日方舟》莱茵生命：黑曜石底色、白金与数据青、四角刻度面板、扫描线与开机终端动画。
 >
 > **当前版本：v0.8.x**（发布记录见 Git tags；更新后执行 `npm run release -- "说明"` 自动推送 GitHub）
+>
+> 版本规划与 v0.1–v0.8 各里程碑说明见 **[VERSION_HISTORY.md](VERSION_HISTORY.md)**。
 
 ---
 
