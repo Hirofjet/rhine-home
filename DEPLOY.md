@@ -100,13 +100,13 @@ max_connections = 100
 
 ## 3. 上传代码与构建前端
 
-把项目放到 `/srv/rhine-home`（示例）：
+把项目放到 `/www/wwwroot/rhine-home`（示例）：
 
 ```bash
-sudo mkdir -p /srv/rhine-home
-sudo chown -R $USER:$USER /srv/rhine-home
+sudo mkdir -p /www/wwwroot/rhine-home
+sudo chown -R $USER:$USER /www/wwwroot/rhine-home
 # 用 git clone 或 scp/git 上传项目文件
-cd /srv/rhine-home
+cd /www/wwwroot/rhine-home
 
 # 前端依赖与构建
 npm ci
@@ -128,7 +128,7 @@ VITE_ADMIN_PATH=/console-x7k2 npm run build
 ## 4. 配置后端
 
 ```bash
-cd /srv/rhine-home/server
+cd /www/wwwroot/rhine-home/server
 npm ci --omit=dev
 cp .env.example .env
 nano .env
@@ -150,7 +150,7 @@ ADMIN_USER=admin
 ADMIN_PASSWORD=请替换为强密码
 SESSION_HOURS=12
 
-UPLOAD_DIR=/srv/rhine-home/server/uploads
+UPLOAD_DIR=/www/wwwroot/rhine-home/server/uploads
 ALLOW_DEV_CODES=0
 ```
 
@@ -180,7 +180,7 @@ SMTP_FROM=RHINE//HOME <你的QQ邮箱@qq.com>
 先手动验证：
 
 ```bash
-cd /srv/rhine-home/server
+cd /www/wwwroot/rhine-home/server
 node index.mjs
 # 另开终端：
 curl http://127.0.0.1:3001/api/health
@@ -200,8 +200,8 @@ Wants=mysql.service
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/srv/rhine-home/server
-EnvironmentFile=/srv/rhine-home/server/.env
+WorkingDirectory=/www/wwwroot/rhine-home/server
+EnvironmentFile=/www/wwwroot/rhine-home/server/.env
 ExecStart=/usr/bin/node index.mjs
 Restart=always
 RestartSec=3
@@ -212,7 +212,7 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo chown -R www-data:www-data /srv/rhine-home/server/uploads
+sudo chown -R www-data:www-data /www/wwwroot/rhine-home/server/uploads
 sudo systemctl daemon-reload
 sudo systemctl enable --now rhine-home
 sudo systemctl status rhine-home
@@ -223,7 +223,7 @@ journalctl -u rhine-home -n 100 -f
 
 ```bash
 npm i -g pm2
-cd /srv/rhine-home/server
+cd /www/wwwroot/rhine-home/server
 pm2 start ecosystem.config.cjs
 pm2 save
 pm2 startup
@@ -247,7 +247,7 @@ server {
     listen 80;
     server_name example.com;
 
-    root /srv/rhine-home/dist;
+    root /www/wwwroot/rhine-home/dist;
     index index.html;
 
     client_max_body_size 500m;
@@ -404,7 +404,7 @@ gunzip -c /srv/backup/rhine-2026-11-01.sql.gz | mysql -u rhine -p rhine_home
 ### 上传文件
 
 ```bash
-rsync -a --delete /srv/rhine-home/server/uploads/ /srv/backup/uploads/
+rsync -a --delete /www/wwwroot/rhine-home/server/uploads/ /srv/backup/uploads/
 ```
 
 ---
@@ -441,7 +441,7 @@ npm run import-legacy
 服务器拉取代码后，用项目自带脚本完成安装、构建、重启与健康检查：
 
 ```bash
-cd /srv/rhine-home
+cd /www/wwwroot/rhine-home
 chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
 ```
@@ -462,12 +462,12 @@ APP_DIR=/www/wwwroot/rhine-home BRANCH=main ./scripts/deploy.sh
 FORCE_BUILD=1 ./scripts/deploy.sh   # 没有新提交也强制重建
 ```
 
-如果服务器不是 `/srv/rhine-home`，设置 `APP_DIR`；如果服务名不同，设置 `SERVICE`。
+如果服务器不是 `/www/wwwroot/rhine-home`，设置 `APP_DIR`；如果服务名不同，设置 `SERVICE`。
 
 ### 手动方式（了解流程即可）
 
 ```bash
-cd /srv/rhine-home
+cd /www/wwwroot/rhine-home
 git pull                # 或重新上传代码
 npm ci
 npm run build
