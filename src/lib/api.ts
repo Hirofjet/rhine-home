@@ -841,6 +841,7 @@ export const adminApi = {
     description?: string
     access?: BoardAccess
     sort?: number
+    tags?: string[]
   }) {
     return api<{ id: number }>('/api/admin/forum/boards', {
       method: 'POST',
@@ -855,6 +856,7 @@ export const adminApi = {
       description?: string
       access?: BoardAccess
       sort?: number
+      tags?: string[]
     },
   ) {
     return api<{ ok: boolean }>(`/api/admin/forum/boards/${id}`, {

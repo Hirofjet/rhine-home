@@ -8,8 +8,10 @@ import { useSiteBrand } from '../../hooks/useSiteBrand'
 import { ThemeMenu } from '../theme/ThemeMenu'
 import { AdminBadge, AdminButton } from './AdminUi'
 import { ArticlesPanel } from './panels/ArticlesPanel'
-import { AdminBoardPostsPanel } from './panels/AdminBoardPostsPanel'
-import { ForumBoardsPanel } from './panels/ForumBoardsPanel'
+import { ForumAnnouncementsPanel } from './panels/ForumAnnouncementsPanel'
+import { ForumClassPanel } from './panels/ForumClassPanel'
+import { CreateForumPanel } from './panels/CreateForumPanel'
+import { IdentityPanel } from './panels/IdentityPanel'
 import { GuestbookPanel } from './panels/GuestbookPanel'
 import { LogsPanel } from './panels/LogsPanel'
 import { MembersPanel } from './panels/MembersPanel'
@@ -30,16 +32,21 @@ type PanelKey =
   | 'videos'
   | 'logs'
   | 'guestbook'
-  | 'forum-boards'
-  | 'forum-posts'
+  | 'forum-announcements'
+  | 'forum-create'
+  | 'forum-public'
+  | 'forum-special'
+  | 'forum-core'
   | 'review'
   | 'members'
+  | 'identities'
   | 'settings'
 
 interface MenuItem {
   key: PanelKey
   label: string
   labelEn: string
+  subgroup?: string
 }
 
 interface AdminDashboardProps {
@@ -100,9 +107,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
     const forum: MenuItem[] = []
     if (forumAccess) {
-      forum.push({ key: 'forum-boards', label: '论坛管理', labelEn: 'BOARDS' })
-      forum.push({ key: 'forum-posts', label: '帖子管理', labelEn: 'THREADS' })
-      forum.push({ key: 'review', label: '审核平台', labelEn: 'REVIEW' })
+      forum.push(
+        { key: 'forum-announcements', label: '主页公告', labelEn: 'ANNOUNCEMENTS', subgroup: '论坛管理' },
+        { key: 'forum-create', label: '创建论坛', labelEn: 'CREATE', subgroup: '论坛管理' },
+        { key: 'forum-public', label: '普通论坛', labelEn: 'PUBLIC', subgroup: '论坛管理' },
+        { key: 'forum-special', label: '特殊论坛', labelEn: 'SPECIAL', subgroup: '论坛管理' },
+        { key: 'forum-core', label: '核心论坛', labelEn: 'CORE', subgroup: '论坛管理' },
+        { key: 'review', label: '审核平台', labelEn: 'REVIEW', subgroup: '审核平台' },
+      )
     }
     if (forum.length) list.push({ title: '论坛', items: forum })
 
@@ -116,7 +128,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     if (memberAccess) {
       list.push({
         title: '成员',
-        items: [{ key: 'members', label: '成员与权限', labelEn: 'MEMBERS' }],
+        items: [
+          { key: 'members', label: '成员与权限', labelEn: 'MEMBERS' },
+          { key: 'identities', label: '身份管理', labelEn: 'IDENTITIES' },
+        ],
       })
     }
 
@@ -171,13 +186,19 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     {group.title}
                   </p>
                   <div className="flex gap-1 lg:flex-col">
-                    {group.items.map((item) => (
-                      <button
-                        key={item.key}
+                    {group.items.map((item, index) => (
+                      <div key={item.key} className="contents lg:block">
+                        {item.subgroup &&
+                          (index === 0 || group.items[index - 1]?.subgroup !== item.subgroup) && (
+                            <p className="mt-2 mb-1 px-3 font-mono text-[8px] tracking-[0.25em] text-rhine-gold/70">
+                              {item.subgroup}
+                            </p>
+                          )}
+                        <button
                         type="button"
                         onClick={() => setPanel(item.key)}
                         className={cx(
-                          'flex shrink-0 items-center justify-between gap-3 border-l-2 px-3 py-2 text-left transition-colors',
+                          'flex w-full shrink-0 items-center justify-between gap-3 border-l-2 px-3 py-2 text-left transition-colors',
                           current === item.key
                             ? 'border-l-rhine-gold bg-rhine-gold/10 text-rhine-gold'
                             : 'border-l-transparent text-rhine-dim hover:border-l-rhine-line hover:bg-rhine-abyss/40 hover:text-rhine-ink',
@@ -187,7 +208,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         <span className="font-mono text-[8px] tracking-[0.2em] opacity-60">
                           {item.labelEn}
                         </span>
-                      </button>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -215,10 +237,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               {current === 'videos' && <VideosPanel />}
               {current === 'logs' && <LogsPanel />}
               {current === 'guestbook' && <GuestbookPanel />}
-              {current === 'forum-boards' && <ForumBoardsPanel user={user} />}
-              {current === 'forum-posts' && <AdminBoardPostsPanel user={user} />}
+              {current === 'forum-announcements' && <ForumAnnouncementsPanel />}
+              {current === 'forum-create' && <CreateForumPanel />}
+              {current === 'forum-public' && <ForumClassPanel access="public" />}
+              {current === 'forum-special' && <ForumClassPanel access="special" />}
+              {current === 'forum-core' && <ForumClassPanel access="core" />}
               {current === 'review' && <ReviewPanel />}
               {current === 'members' && <MembersPanel user={user} />}
+              {current === 'identities' && <IdentityPanel actor={user} />}
               {current === 'settings' && <SettingsPanel user={user} />}
             </motion.div>
           </AnimatePresence>
