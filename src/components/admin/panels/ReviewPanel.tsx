@@ -20,7 +20,7 @@ import {
 } from '../AdminUi'
 
 /** 论坛内容审核：帖子与回复逐条通过 / 拒绝 */
-export function ReviewPanel() {
+export function ReviewPanel({ postsOnly = false }: { postsOnly?: boolean }) {
   const [posts, setPosts] = useState<PendingPost[]>([])
   const [replies, setReplies] = useState<PendingReply[]>([])
   const [requests, setRequests] = useState<
@@ -115,7 +115,7 @@ export function ReviewPanel() {
       <AdminError message={error} />
       <AdminNotice message={notice} />
 
-      {requests.length > 0 && (
+      {!postsOnly && requests.length > 0 && (
         <AdminPanel title="特殊论坛申请" subtitle="ACCESS REQUESTS">
           <ul className="divide-y divide-rhine-line/60">
             {requests.map((request) => (

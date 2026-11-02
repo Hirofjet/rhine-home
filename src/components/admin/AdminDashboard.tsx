@@ -20,6 +20,7 @@ import { PhotosPanel } from './panels/PhotosPanel'
 import { ProfilePanel } from './panels/ProfilePanel'
 import { ProjectsPanel } from './panels/ProjectsPanel'
 import { ReviewPanel } from './panels/ReviewPanel'
+import { ReviewAccessPanel } from './panels/ReviewAccessPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
 import { VideosPanel } from './panels/VideosPanel'
 
@@ -37,7 +38,8 @@ type PanelKey =
   | 'forum-public'
   | 'forum-special'
   | 'forum-core'
-  | 'review'
+  | 'review-access'
+  | 'review-posts'
   | 'members'
   | 'identities'
   | 'settings'
@@ -113,7 +115,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         { key: 'forum-public', label: '普通论坛', labelEn: 'PUBLIC', subgroup: '论坛管理' },
         { key: 'forum-special', label: '特殊论坛', labelEn: 'SPECIAL', subgroup: '论坛管理' },
         { key: 'forum-core', label: '核心论坛', labelEn: 'CORE', subgroup: '论坛管理' },
-        { key: 'review', label: '审核平台', labelEn: 'REVIEW', subgroup: '审核平台' },
+        { key: 'review-access', label: '特殊申请', labelEn: 'APPLICATIONS', subgroup: '审核平台' },
+        { key: 'review-posts', label: '待审帖子', labelEn: 'PENDING', subgroup: '审核平台' },
       )
     }
     if (forum.length) list.push({ title: '论坛', items: forum })
@@ -242,7 +245,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               {current === 'forum-public' && <ForumClassPanel access="public" />}
               {current === 'forum-special' && <ForumClassPanel access="special" />}
               {current === 'forum-core' && <ForumClassPanel access="core" />}
-              {current === 'review' && <ReviewPanel />}
+              {current === 'review-access' && <ReviewAccessPanel />}
+              {current === 'review-posts' && <ReviewPanel postsOnly />}
               {current === 'members' && <MembersPanel user={user} />}
               {current === 'identities' && <IdentityPanel actor={user} />}
               {current === 'settings' && <SettingsPanel user={user} />}
