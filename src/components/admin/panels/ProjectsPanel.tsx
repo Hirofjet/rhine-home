@@ -70,6 +70,14 @@ export function ProjectsPanel() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
+  const nextCode = () => {
+    const max = items.reduce((value, item) => {
+      const match = /(\d+)\s*$/.exec(item.code)
+      return Math.max(value, match ? Number(match[1]) : 0)
+    }, 0)
+    return `RL-PJ-${String(max + 1).padStart(2, '0')}`
+  }
+
   const load = useCallback(async () => {
     try {
       const data = await adminApi.projects()
@@ -142,7 +150,7 @@ export function ProjectsPanel() {
           <AdminButton
             variant="ghost"
             onClick={() => {
-              setDraft(empty())
+              setDraft({ ...empty(), code: nextCode() })
               setPreview(false)
               setFormOpen(true)
             }}

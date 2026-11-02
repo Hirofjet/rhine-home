@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import * as exifr from 'exifr'
-import { ImageOff } from 'lucide-react'
 import { cx } from '../../../lib/cx'
 import { contentApi, resolveMediaUrl } from '../../../lib/api'
 
@@ -141,19 +140,7 @@ export function PhotoTimeline({ className }: { className?: string }) {
   }
 
   if (photos.length === 0) {
-    return (
-      <div
-        className={cx(
-          'flex flex-col items-center gap-2 border border-dashed border-rhine-line/80 p-6 text-center',
-          className,
-        )}
-      >
-        <ImageOff className="h-5 w-5 text-rhine-faint" />
-        <p className="font-mono text-xs leading-relaxed tracking-wider text-rhine-faint">
-          把照片放进 src/assets/photos/，会自动读取拍摄时间并按时间排序
-        </p>
-      </div>
-    )
+    return null
   }
 
   // 按年份分组（未识别时间的放最后）

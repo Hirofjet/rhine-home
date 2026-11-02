@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Lock, MessageSquare, Plus, Radio, Search, Shield } from 'lucide-react'
+import { ArrowRight, Lock, MessageSquare, Pin, Plus, Radio, Search, Shield } from 'lucide-react'
 import {
   errorMessage,
   forumApi,
@@ -35,6 +35,14 @@ export function ForumPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [search, setSearch] = useState('')
   const [applying, setApplying] = useState<number | null>(null)
+  const [pins, setPins] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('rhine:forum-pins')
+      return raw ? (JSON.parse(raw) as string[]) : []
+    } catch {
+      return []
+    }
+  })
 
   const load = async () => {
     const data = await forumApi.boards()
@@ -96,6 +104,21 @@ export function ForumPage() {
       board.description.toLowerCase().includes(keyword)
     )
   })
+  const orderedBoards = [...filteredBoards].sort(
+    (a, b) =>
+      Number(pins.includes(b.slug)) - Number(pins.includes(a.slug)) ||
+      new Date(b.lastPostAt ?? 0).getTime() - new Date(a.lastPostAt ?? 0).getTime(),
+  )
+
+  const togglePin = (slug: string) => {
+    const next = pins.includes(slug) ? pins.filter((item) => item !== slug) : [...pins, slug]
+    setPins(next)
+    try {
+      localStorage.setItem('rhine:forum-pins', JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+  }
 
   return (
     <section className="mx-auto w-full max-w-5xl px-4 pb-24 pt-28 sm:px-6">
@@ -192,7 +215,7 @@ export function ForumPage() {
           animate="show"
           className="mt-5 grid gap-3 sm:grid-cols-2"
         >
-          {filteredBoards.map((board) => {
+          {orderedBoards.map((board) => {
             const accessible = board.canAccess !== false
             const isSpecial = board.access === 'special'
             const isCore = board.access === 'core'
@@ -213,11 +236,28 @@ export function ForumPage() {
                     >
                       {ACCESS_LABEL[board.access] ?? '公开'}
                     </span>
-                    {accessible ? (
-                      <ArrowRight className="h-3 w-3 text-rhine-faint" />
-                    ) : (
-                      <Lock className="h-3 w-3 text-rhine-faint" />
-                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          togglePin(board.slug)
+                        }}
+                        aria-label={pins.includes(board.slug) ? '取消置顶' : '置顶板块'}
+                        className={`transition-colors ${
+                          pins.includes(board.slug)
+                            ? 'text-rhine-gold'
+                            : 'text-rhine-faint hover:text-rhine-gold'
+                        }`}
+                      >
+                        <Pin className="h-3 w-3" fill={pins.includes(board.slug) ? 'currentColor' : 'none'} />
+                      </button>
+                      {accessible ? (
+                        <ArrowRight className="h-3 w-3 text-rhine-faint" />
+                      ) : (
+                        <Lock className="h-3 w-3 text-rhine-faint" />
+                      )}
+                    </div>
                   </div>
                   <h2 className="mt-2 text-lg font-semibold text-rhine-ink">{board.name}</h2>
                   <p className="mt-1 min-h-9 text-xs leading-relaxed text-rhine-dim">

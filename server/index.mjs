@@ -1179,7 +1179,7 @@ app.get('/api/forum/boards', async (req, res) => {
     `SELECT b.*,
       (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'approved') AS post_count,
       (SELECT MAX(p.created_at) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'approved') AS last_post_at
-     FROM forum_boards b ORDER BY b.sort ASC, b.id ASC`,
+     FROM forum_boards b ORDER BY last_post_at DESC, b.id DESC`,
   )
   const boards = []
   for (const row of rows) {
@@ -1532,8 +1532,9 @@ app.get('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req, 
   const rows = await query(
     `SELECT b.*,
       (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id) AS post_count,
-      (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'pending') AS pending_count
-     FROM forum_boards b ORDER BY b.sort ASC, b.id ASC`,
+      (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'pending') AS pending_count,
+      (SELECT MAX(p.created_at) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'approved') AS last_post_at
+     FROM forum_boards b ORDER BY last_post_at DESC, b.id DESC`,
   )
   res.json({
     boards: rows.map((row) => ({

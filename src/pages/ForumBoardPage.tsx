@@ -190,25 +190,6 @@ export function ForumBoardPage() {
         </motion.div>
       </motion.div>
 
-      <div className="mt-5 flex justify-end">
-        {user ? (
-          <Link
-            to={`/forum/new?board=${encodeURIComponent(slug)}`}
-            className="inline-flex items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-rhine-gold transition-colors hover:bg-rhine-gold/20"
-          >
-            <Plus className="h-3 w-3" /> 发布新帖
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAuthOpen(true)}
-            className="inline-flex items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-rhine-gold transition-colors hover:bg-rhine-gold/20"
-          >
-            登录后发帖
-          </button>
-        )}
-      </div>
-
       {announcements.length > 0 && (
         <div className="mt-5 space-y-2">
           {announcements.map((item) => (
@@ -227,14 +208,32 @@ export function ForumBoardPage() {
         </div>
       )}
 
-      <div className="mt-5 flex items-center gap-2 border border-rhine-line/60 bg-rhine-abyss/40 px-3 py-2">
-        <Search className="h-3.5 w-3.5 text-rhine-faint" />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="搜索标题、作者或标签"
-          className="w-full bg-transparent font-mono text-xs text-rhine-ink outline-none placeholder:text-rhine-faint"
-        />
+      <div className="mt-5 flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-2 border border-rhine-line/60 bg-rhine-abyss/40 px-3 py-2">
+          <Search className="h-3.5 w-3.5 text-rhine-faint" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="搜索标题、作者或标签"
+            className="w-full bg-transparent font-mono text-xs text-rhine-ink outline-none placeholder:text-rhine-faint"
+          />
+        </div>
+        {user ? (
+          <Link
+            to={`/forum/new?board=${encodeURIComponent(slug)}`}
+            className="inline-flex shrink-0 items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-rhine-gold transition-colors hover:bg-rhine-gold/20"
+          >
+            <Plus className="h-3 w-3" /> 发布新帖
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAuthOpen(true)}
+            className="inline-flex shrink-0 items-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-rhine-gold"
+          >
+            登录后发帖
+          </button>
+        )}
       </div>
 
       {error && (

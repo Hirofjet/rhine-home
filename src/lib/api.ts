@@ -504,31 +504,31 @@ export const authApi = {
 // ---------- 前台内容 ----------
 export const contentApi = {
   async articles(): Promise<ContentArticle[]> {
-    const data = await api<{ items?: ContentArticle[] }>('/api/content/articles', {
+    const data = await api<{ items?: ContentArticle[] }>(`/api/content/articles?t=${Date.now()}`, {
       auth: false,
     })
     return data.items ?? []
   },
   async logs(): Promise<ContentLog[]> {
-    const data = await api<{ items?: ContentLog[] }>('/api/content/logs', {
+    const data = await api<{ items?: ContentLog[] }>(`/api/content/logs?t=${Date.now()}`, {
       auth: false,
     })
     return data.items ?? []
   },
   async photos(): Promise<ContentPhoto[]> {
-    const data = await api<{ items?: ContentPhoto[] }>('/api/content/photos', {
+    const data = await api<{ items?: ContentPhoto[] }>(`/api/content/photos?t=${Date.now()}`, {
       auth: false,
     })
     return data.items ?? []
   },
   async videos(): Promise<ContentVideo[]> {
-    const data = await api<{ items?: ContentVideo[] }>('/api/content/videos', {
+    const data = await api<{ items?: ContentVideo[] }>(`/api/content/videos?t=${Date.now()}`, {
       auth: false,
     })
     return data.items ?? []
   },
   async projects(): Promise<SiteProject[]> {
-    const data = await api<{ items?: SiteProject[] }>('/api/content/projects', {
+    const data = await api<{ items?: SiteProject[] }>(`/api/content/projects?t=${Date.now()}`, {
       auth: false,
     })
     return data.items ?? []
@@ -542,7 +542,7 @@ export const siteApi = {
     }>('/api/site/profile', { auth: false })
   },
   home() {
-    return api<SiteHomeContent>('/api/site/home', { auth: false })
+    return api<SiteHomeContent>(`/api/site/home?t=${Date.now()}`, { auth: false })
   },
   saveHome(content: {
     profile: HomeProfile

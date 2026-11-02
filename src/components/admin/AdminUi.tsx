@@ -94,12 +94,12 @@ export function AdminField({
   children: ReactNode
 }) {
   return (
-    <label className="block space-y-1.5">
+    <div className="block space-y-1.5">
       <span className="flex items-center gap-2 font-mono text-[9px] tracking-[0.25em] text-rhine-faint">
         {label}
       </span>
       {children}
-    </label>
+    </div>
   )
 }
 

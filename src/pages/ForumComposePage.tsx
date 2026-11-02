@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
 import { errorMessage, forumApi, type Board } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
@@ -8,7 +8,6 @@ import { ContentComposer, type ComposerValue } from '../components/forum/Content
 
 export function ForumComposePage() {
   const [search] = useSearchParams()
-  const navigate = useNavigate()
   const { user } = useSession()
   const [boards, setBoards] = useState<Board[]>([])
   const [boardSlug, setBoardSlug] = useState(search.get('board') ?? '')
@@ -82,7 +81,6 @@ export function ForumComposePage() {
       })
       setDone(true)
       setNotice(result.message || '帖子已发布')
-      window.setTimeout(() => navigate(`/forum/${board.slug}`), 1200)
     } catch (err) {
       setError(errorMessage(err))
     } finally {

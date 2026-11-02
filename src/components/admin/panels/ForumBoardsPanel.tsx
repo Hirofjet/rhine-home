@@ -57,6 +57,7 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [annTitle, setAnnTitle] = useState('')
   const [annContent, setAnnContent] = useState('')
+  const [annBoardId, setAnnBoardId] = useState('')
   const [requests, setRequests] = useState<
     Array<{
       id: number
@@ -115,11 +116,13 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
     setBusy(true)
     try {
       await adminApi.createAnnouncement({
+        boardId: annBoardId ? Number(annBoardId) : null,
         title: annTitle.trim(),
         content: annContent.trim(),
       })
       setAnnTitle('')
       setAnnContent('')
+      setAnnBoardId('')
       setNotice('公告已发布')
       await load()
     } catch (err) {
@@ -237,6 +240,18 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
         {canManageAll && (
           <div className="mb-4 space-y-2 border border-rhine-line/60 bg-rhine-abyss/30 p-3">
             <p className="font-mono text-[9px] tracking-[0.25em] text-rhine-faint">发布公告</p>
+            <select
+              value={annBoardId}
+              onChange={(event) => setAnnBoardId(event.target.value)}
+              className="w-full border border-rhine-line bg-rhine-abyss/70 px-3 py-2 font-mono text-xs text-rhine-ink outline-none focus:border-rhine-gold/60"
+            >
+              <option value="">全站公告</option>
+              {boards.map((board) => (
+                <option key={board.id} value={board.id}>
+                  {board.name} · 板块公告
+                </option>
+              ))}
+            </select>
             <AdminInput
               value={annTitle}
               onChange={(event) => setAnnTitle(event.target.value)}
@@ -416,13 +431,6 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
               <option value="special">特殊（需申请 / 授权）</option>
               <option value="core">核心（仅超级管理员与授权成员）</option>
             </select>
-          </AdminField>
-          <AdminField label="排序 / SORT">
-            <AdminInput
-              type="number"
-              value={form.sort}
-              onChange={(event) => setForm({ ...form, sort: event.target.value })}
-            />
           </AdminField>
           <div className="flex justify-end gap-2">
             <AdminButton variant="ghost" onClick={() => setOpen(false)}>

@@ -289,6 +289,9 @@ export function ProfilePanel() {
         <AdminButton variant="ghost" className="mt-2" onClick={() => setLinks((prev) => [...prev, { id: `link-${Date.now()}`, label: '', href: '', note: '' }])}>
           <Plus className="h-3 w-3" /> 添加链接
         </AdminButton>
+        <AdminButton className="mt-4" onClick={() => void save()} disabled={busy}>
+          <Save className="h-3 w-3" /> {busy ? '保存中…' : '保存主页资料'}
+        </AdminButton>
       </AdminPanel>
     </div>
   )
