@@ -354,6 +354,22 @@ async function ensureSchemaUpgrades() {
     'pinned TINYINT(1) NOT NULL DEFAULT 0',
   )
   await ensureColumn('forum_replies', 'parent_id', 'parent_id BIGINT UNSIGNED NULL')
+  await ensureColumn(
+    'forum_access_requests',
+    'escalated_at',
+    'escalated_at DATETIME NULL',
+  )
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS forum_invites (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      board_id BIGINT UNSIGNED NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      invited_by BIGINT UNSIGNED NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uniq_forum_invite (board_id, user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  )
   await ensureColumn('guest_messages', 'user_id', 'user_id BIGINT UNSIGNED NULL')
   await ensureColumn('guest_messages', 'owner_token', 'owner_token CHAR(64) NULL')
   await ensureColumn(

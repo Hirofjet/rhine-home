@@ -1226,6 +1226,15 @@ async function canAccessBoard(user, board) {
     )
     return rows.length > 0
   }
+  if (access === 'core') {
+    if (user.isSuper) return true
+    if (hasPermission(user, 'forum')) return true
+    const rows = await query(
+      'SELECT id FROM forum_invites WHERE board_id = ? AND user_id = ? LIMIT 1',
+      [board.id, user.id],
+    )
+    return rows.length > 0
+  }
   return false
 }
 
@@ -1940,6 +1949,12 @@ app.post('/api/forum/boards/:id/request', requireAuth, async (req, res) => {
 })
 
 app.get('/api/admin/forum/requests', requireAuth, requireForumAccess, async (req, res) => {
+  await execute(
+    `UPDATE forum_access_requests
+     SET escalated_at = NOW()
+     WHERE status = 'pending' AND escalated_at IS NULL
+       AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
+  ).catch(() => undefined)
   const rows = await query(
     `SELECT r.*, b.name AS board_name, b.access,
             COALESCE(NULLIF(u.nickname,''), u.username) AS username
@@ -1959,6 +1974,7 @@ app.get('/api/admin/forum/requests', requireAuth, requireForumAccess, async (req
         userId: Number(row.user_id),
         username: row.username,
         status: row.status,
+        escalated: Boolean(row.escalated_at),
         createdAt: row.created_at,
       })),
   })
@@ -1978,7 +1994,9 @@ app.post(
       [id],
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
-    if (!canModerateBoard(req.user, Number(rows[0].board_id))) {
+    const globalForumAdmin =
+      req.user.isSuper || ['senior', 'forum_master'].includes(req.user.identity)
+    if (!globalForumAdmin && !canModerateBoard(req.user, Number(rows[0].board_id))) {
       return res.status(403).json({ error: 'forbidden' })
     }
     await execute(
@@ -1995,6 +2013,45 @@ app.post(
       `/forum`,
     )
     res.json({ ok: true })
+  },
+)
+
+// ============================================================
+// 核心论坛邀请
+// ============================================================
+app.post(
+  '/api/admin/forum/boards/:id/invite',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const boardId = Number(req.params.id)
+    const userId = Number(req.body?.userId)
+    const boards = await query('SELECT * FROM forum_boards WHERE id = ?', [boardId])
+    if (!boards.length) return res.status(404).json({ error: 'not_found' })
+    if (boards[0].access !== 'core') {
+      return res.status(400).json({ error: 'not_core_board' })
+    }
+    const allowed =
+      req.user.isSuper ||
+      ['senior', 'forum_master'].includes(req.user.identity) ||
+      canModerateBoard(req.user, boardId)
+    if (!allowed) return res.status(403).json({ error: 'forbidden' })
+    const users = await query('SELECT id FROM users WHERE id = ?', [userId])
+    if (!users.length) return res.status(404).json({ error: 'user_not_found' })
+    await execute(
+      `INSERT INTO forum_invites (board_id, user_id, invited_by)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE invited_by = VALUES(invited_by), created_at = NOW()`,
+      [boardId, userId, req.user.id],
+    )
+    await notify(
+      userId,
+      'access',
+      '核心论坛邀请',
+      `你已被邀请进入「${boards[0].name}」`,
+      `/forum/${boards[0].slug}`,
+    )
+    res.status(201).json({ ok: true })
   },
 )
 
