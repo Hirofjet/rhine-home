@@ -1,9 +1,11 @@
 /* ============================================================
-   槽位模块（SLOT）类型与空数据源
-   档案内容全部由后台发布后读取；不再内置示例文章/照片/视频。
+   档案库槽位：卡片常驻，内容实时从后台读取
    ============================================================ */
 
 import type { ReactNode } from 'react'
+import { ArticlesFeed } from '../components/slots/content/ArticlesFeed'
+import { PhotoTimeline } from '../components/slots/content/PhotoTimeline'
+import { VideosFeed } from '../components/slots/content/VideosFeed'
 
 export interface SlotDetailItem {
   label: string
@@ -25,5 +27,26 @@ export interface SlotModule {
   content?: SlotContent
 }
 
-/** 档案库默认没有任何已发布内容。 */
-export const archiveSlots: SlotModule[] = []
+export const archiveSlots: SlotModule[] = [
+  {
+    id: 'articles',
+    label: '文章',
+    labelEn: 'ARTICLES',
+    summary: '已发布文章',
+    content: { custom: <ArticlesFeed /> },
+  },
+  {
+    id: 'videos',
+    label: '视频',
+    labelEn: 'VIDEOS',
+    summary: '已发布视频',
+    content: { custom: <VideosFeed /> },
+  },
+  {
+    id: 'photos',
+    label: '照片',
+    labelEn: 'PHOTOS',
+    summary: '照片时间线',
+    content: { custom: <PhotoTimeline /> },
+  },
+]
