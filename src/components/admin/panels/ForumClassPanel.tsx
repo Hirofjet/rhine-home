@@ -1,7 +1,8 @@
 /* oxlint-disable react/set-state-in-effect */
 import { useCallback, useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, MessageSquare, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import {
   adminApi,
   errorMessage,
@@ -125,22 +126,52 @@ export function ForumClassPanel({ access }: { access: BoardAccess }) {
           ))}
           {boards.length === 0 && <span className="text-xs text-rhine-faint">暂无数据</span>}
         </div>
-        <ul className="divide-y divide-rhine-line/60">
-          {boards.map((board) => (
-            <li key={board.id} className="flex flex-wrap items-center gap-3 py-3">
-              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelected(board)}>
-                <p className="text-sm text-rhine-ink">{board.name}</p>
-                <p className="mt-0.5 font-mono text-[10px] text-rhine-faint">
-                  {board.postCount} 帖 · {board.tags?.join(' · ') || '无标签'}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {boards.map((board, index) => (
+            <motion.article
+              key={board.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, delay: index * 0.04 }}
+              whileHover={{ y: -4 }}
+              className="group border border-rhine-line/70 bg-rhine-panel/40 p-4 transition-colors hover:border-rhine-gold/50"
+            >
+              <button type="button" className="w-full text-left" onClick={() => setSelected(board)}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[9px] tracking-wider text-rhine-gold">
+                    {LABELS[access]}
+                  </span>
+                  <span className="font-mono text-[9px] text-rhine-faint">{board.postCount} 帖</span>
+                </div>
+                <h3 className="mt-3 text-lg font-semibold text-rhine-ink">{board.name}</h3>
+                <p className="mt-1 min-h-8 text-xs leading-relaxed text-rhine-dim">
+                  {board.description || '暂无描述'}
                 </p>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {(board.tags ?? []).map((tag) => (
+                    <span key={tag} className="border border-rhine-line px-1.5 py-0.5 font-mono text-[8px] text-rhine-faint">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-rhine-line/50 pt-3 font-mono text-[10px] text-rhine-cyan">
+                  <span>进入板块后台</span>
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </div>
               </button>
-              <AdminButton variant="ghost" onClick={() => startEdit(board)}>
-                <Pencil className="h-3 w-3" /> 编辑
-              </AdminButton>
-            </li>
+              <div className="mt-3 flex justify-end">
+                <AdminButton variant="ghost" onClick={() => startEdit(board)}>
+                  <Pencil className="h-3 w-3" /> 编辑
+                </AdminButton>
+              </div>
+            </motion.article>
           ))}
-          {boards.length === 0 && <li className="py-3 text-xs text-rhine-faint">暂无板块</li>}
-        </ul>
+          {boards.length === 0 && (
+            <div className="border border-dashed border-rhine-line/70 p-8 text-center font-mono text-[10px] text-rhine-faint md:col-span-2 xl:col-span-3">
+              暂无论坛，请先在「创建论坛」新增
+            </div>
+          )}
+        </div>
       </AdminPanel>
 
       {editing && (
