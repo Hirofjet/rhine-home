@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, MessageSquare, Pencil, Trash2 } from 'lucide-react'
+import { useSession } from '../../auth/useSession'
 import {
   adminApi,
   errorMessage,
@@ -198,6 +199,7 @@ export function ForumClassPanel({ access }: { access: BoardAccess }) {
 }
 
 function BoardAdminView({ board, onBack }: { board: Board; onBack: () => void }) {
+  const { user } = useSession()
   const [posts, setPosts] = useState<
     Array<{ id: number; title: string; status: string; pinned: boolean; author: string; replyCount: number; createdAt: string }>
   >([])
@@ -253,6 +255,13 @@ function BoardAdminView({ board, onBack }: { board: Board; onBack: () => void })
 
   const removeBoard = async () => {
     try {
+      if (user?.isSuper) {
+        if (!window.confirm(`确定直接删除论坛「${board.name}」及其全部内容吗？`)) return
+        await adminApi.deleteBoardDirect(board.id)
+        setNotice('论坛已直接删除')
+        onBack()
+        return
+      }
       await adminApi.requestBoardDeletion(board.id)
       setNotice('删除申请已提交，等待高级管理员审批')
     } catch (err) {
@@ -340,7 +349,7 @@ function BoardAdminView({ board, onBack }: { board: Board; onBack: () => void })
         </div>
         <div className="mt-4 flex justify-end">
           <AdminButton variant="danger" onClick={() => void removeBoard()}>
-            <Trash2 className="h-3 w-3" /> 删除论坛
+            <Trash2 className="h-3 w-3" /> {user?.isSuper ? '直接删除论坛' : '申请删除论坛'}
           </AdminButton>
         </div>
       </AdminPanel>

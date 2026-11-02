@@ -889,6 +889,11 @@ export const adminApi = {
       method: 'POST',
     })
   },
+  deleteBoardDirect(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/forum/boards/${id}`, {
+      method: 'DELETE',
+    })
+  },
   deletionRequests() {
     return api<{
       requests: Array<{
