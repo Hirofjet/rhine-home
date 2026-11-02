@@ -121,9 +121,9 @@ export function PhotoTimeline({ className }: { className?: string }) {
   const photos =
     localPhotos && remotePhotos
       ? [...localPhotos, ...remotePhotos].sort((a, b) => {
-          const ta = a.date?.getTime() ?? Number.POSITIVE_INFINITY
-          const tb = b.date?.getTime() ?? Number.POSITIVE_INFINITY
-          return ta === tb ? a.name.localeCompare(b.name) : ta - tb
+          const ta = a.date?.getTime() ?? Number.NEGATIVE_INFINITY
+          const tb = b.date?.getTime() ?? Number.NEGATIVE_INFINITY
+          return ta === tb ? a.name.localeCompare(b.name) : tb - ta
         })
       : null
 

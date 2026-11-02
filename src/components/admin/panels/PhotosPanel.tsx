@@ -1,35 +1,58 @@
+/* oxlint-disable react/set-state-in-effect */
 import { useCallback, useEffect, useState } from 'react'
-import { ImagePlus, Link2, Upload } from 'lucide-react'
+import { ImagePlus, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { adminApi, type ContentPhoto } from '../../../lib/api'
 import {
   AdminButton,
-  AdminCheckbox,
   AdminError,
+  AdminField,
   AdminInput,
   AdminNotice,
   AdminPanel,
+  AdminTextarea,
 } from '../AdminUi'
 
-/** 照片管理：批量上传（自动读 EXIF 日期）或用链接添加 */
+interface PhotoDraft {
+  id: number | null
+  url: string
+  name: string
+  date: string
+  description: string
+  file: File | null
+  preview: string
+}
+
+const emptyDraft = (): PhotoDraft => ({
+  id: null,
+  url: '',
+  name: '',
+  date: new Date().toISOString().slice(0, 10),
+  description: '',
+  file: null,
+  preview: '',
+})
+
+const toDraft = (item: ContentPhoto): PhotoDraft => ({
+  id: item.id,
+  url: item.url,
+  name: item.name,
+  date: item.date ?? '',
+  description: item.description ?? '',
+  file: null,
+  preview: item.url,
+})
+
 export function PhotosPanel() {
   const [items, setItems] = useState<ContentPhoto[]>([])
-  const [useLink, setUseLink] = useState(false)
-  const [link, setLink] = useState('')
+  const [draft, setDraft] = useState<PhotoDraft | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [descriptions, setDescriptions] = useState<Record<number, string>>({})
-  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null)
-  const [pendingUrl, setPendingUrl] = useState('')
-  const [pendingDescription, setPendingDescription] = useState('')
 
   const load = useCallback(async () => {
     try {
       const data = (await adminApi.list('photos')) as { items: ContentPhoto[] }
       setItems(data.items)
-      setDescriptions(
-        Object.fromEntries(data.items.map((item) => [item.id, item.description ?? ''])),
-      )
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
@@ -37,69 +60,64 @@ export function PhotosPanel() {
   }, [])
 
   useEffect(() => {
-    let alive = true
-    adminApi
-      .list('photos')
-      .then((data) => {
-        if (!alive) return
-        const list = (data as { items: ContentPhoto[] }).items
-        setItems(list)
-        setDescriptions(
-          Object.fromEntries(list.map((item) => [item.id, item.description ?? ''])),
-        )
-      })
-      .catch((err: unknown) => {
-        if (alive) setError(err instanceof Error ? err.message : '加载失败')
-      })
-    return () => {
-      alive = false
-    }
-  }, [])
+    void load()
+  }, [load])
 
-  const uploadFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    setBusy(true)
-    setError('')
+  const updateDraft = (patch: Partial<PhotoDraft>) =>
+    setDraft((current) => (current ? { ...current, ...patch } : current))
+
+  const startNew = () => {
+    setDraft(emptyDraft())
     setNotice('')
-    try {
-      for (const file of Array.from(files)) {
-        const uploaded = await adminApi.upload(file, 'photo')
-        await adminApi.create('photos', {
-          url: uploaded.url,
-          name: uploaded.name,
-          date: uploaded.date ?? '',
-          description: pendingDescription,
-        })
-      }
-      setNotice(`已上传 ${files.length} 张照片`)
-      setPendingFiles(null)
-      setPendingUrl('')
-      setPendingDescription('')
-      await load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败')
-    } finally {
-      setBusy(false)
-    }
+    setError('')
   }
 
-  const addByLink = async () => {
-    const url = link.trim()
-    if (!url) return
+  const startEdit = (item: ContentPhoto) => {
+    setDraft(toDraft(item))
+    setNotice('')
+    setError('')
+  }
+
+  const chooseFile = (file: File | undefined) => {
+    if (!file) return
+    updateDraft({
+      file,
+      name: file.name,
+      preview: URL.createObjectURL(file),
+    })
+  }
+
+  const save = async () => {
+    if (!draft) return
+    if (!draft.file && !draft.url.trim()) {
+      setError('请选择照片文件或填写图片地址')
+      return
+    }
     setBusy(true)
     setError('')
-    setNotice('')
     try {
-      await adminApi.create('photos', {
+      let url = draft.url.trim()
+      let name = draft.name.trim() || url.split('/').pop() || 'photo'
+      let date = draft.date
+      if (draft.file) {
+        const uploaded = await adminApi.upload(draft.file, 'photo')
+        url = uploaded.url
+        name = name || uploaded.name
+        if (!date) date = uploaded.date ?? ''
+      }
+      const payload = {
         url,
-        name: url.split('/').pop() ?? 'photo',
-        date: '',
-      })
-      setLink('')
-      setNotice('照片已添加')
+        name,
+        date,
+        description: draft.description,
+      }
+      if (draft.id) await adminApi.update('photos', draft.id, payload)
+      else await adminApi.create('photos', payload)
+      setNotice(draft.id ? '照片已更新' : '照片已发布')
+      setDraft(null)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '添加失败')
+      setError(err instanceof Error ? err.message : '保存失败')
     } finally {
       setBusy(false)
     }
@@ -109,24 +127,11 @@ export function PhotosPanel() {
     if (!window.confirm(`删除照片「${item.name}」？`)) return
     try {
       await adminApi.remove('photos', item.id)
+      setItems((current) => current.filter((row) => row.id !== item.id))
       setNotice('照片已删除')
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败')
-    }
-  }
-
-  const saveDescription = async (item: ContentPhoto) => {
-    try {
-      await adminApi.update('photos', item.id, {
-        url: item.url,
-        name: item.name,
-        date: item.date ?? '',
-        description: descriptions[item.id] ?? '',
-      })
-      setNotice('描述已保存')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败')
     }
   }
 
@@ -135,142 +140,125 @@ export function PhotosPanel() {
       <AdminError message={error} />
       <AdminNotice message={notice} />
 
-      <AdminPanel
-        title="添加照片"
-        subtitle="PHOTOS"
-        actions={
-          <>
-            <AdminCheckbox
-              checked={useLink}
-              onChange={setUseLink}
-              label="使用文件链接"
-            />
-            {useLink ? (
-              <div className="flex items-center gap-2">
-                <AdminInput
-                  value={link}
-                  onChange={(event) => setLink(event.target.value)}
-                  placeholder="https://…/photo.jpg"
-                  className="w-56"
-                />
-                <AdminButton onClick={() => void addByLink()} disabled={busy}>
-                  <Link2 className="h-3 w-3" /> 添加
-                </AdminButton>
-              </div>
-            ) : (
-              <>
-                <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 border border-rhine-gold/70 bg-rhine-gold/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-rhine-gold transition-colors hover:border-rhine-gold hover:bg-rhine-gold/15">
-                  <Upload className="h-3 w-3" /> 选择照片上传
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(event) => {
-                      const files = event.target.files
-                      if (files && files[0]) {
-                        setPendingFiles(files)
-                        setPendingUrl(URL.createObjectURL(files[0]))
-                      }
-                      event.target.value = ''
-                    }}
-                  />
-                </label>
-                {pendingUrl && (
-                  <div className="mt-3 border border-rhine-line/70 bg-rhine-abyss/40 p-2">
-                    <p className="mb-2 font-mono text-[9px] tracking-[0.2em] text-rhine-faint">
-                      PREVIEW // 预览
-                    </p>
-                    <img src={pendingUrl} alt="待上传照片预览" className="max-h-56 w-full object-contain" />
-                    <AdminInput
-                      value={pendingDescription}
-                      onChange={(event) => setPendingDescription(event.target.value)}
-                      placeholder="照片描述"
-                      className="mt-2"
-                    />
-                    <div className="mt-2 flex gap-2">
-                      <AdminButton onClick={() => void uploadFiles(pendingFiles)} disabled={busy}>
-                        <Upload className="h-3 w-3" /> 确认上传
-                      </AdminButton>
-                      <AdminButton
-                        variant="ghost"
-                        onClick={() => {
-                          setPendingFiles(null)
-                          setPendingUrl('')
-                          setPendingDescription('')
-                        }}
-                      >
-                        取消
-                      </AdminButton>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        }
-      >
-        {items.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 border border-dashed border-rhine-line/80 p-8 text-center">
-            <ImagePlus className="h-5 w-5 text-rhine-faint" />
-            <p className="font-mono text-[11px] tracking-wider text-rhine-faint">
-              暂无照片
-            </p>
+      {draft ? (
+        <AdminPanel
+          title={draft.id ? '编辑照片' : '发布新照片'}
+          subtitle="PHOTO EDITOR"
+          actions={
+            <>
+              <AdminButton variant="ghost" onClick={() => setDraft(null)} disabled={busy}>
+                取消
+              </AdminButton>
+              <AdminButton onClick={() => void save()} disabled={busy}>
+                <ImagePlus className="h-3 w-3" /> {busy ? '保存中…' : draft.id ? '保存修改' : '发布照片'}
+              </AdminButton>
+            </>
+          }
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <AdminField label="日期 / DATE">
+              <AdminInput
+                type="date"
+                value={draft.date}
+                onChange={(event) => updateDraft({ date: event.target.value })}
+              />
+            </AdminField>
+            <AdminField label="名称 / NAME">
+              <AdminInput
+                value={draft.name}
+                onChange={(event) => updateDraft({ name: event.target.value })}
+                placeholder="照片名称"
+              />
+            </AdminField>
           </div>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="overflow-hidden border border-rhine-line/70 bg-rhine-abyss/40"
-              >
-                <a href={item.url} target="_blank" rel="noreferrer" className="block">
-                  <img
-                    src={item.url}
-                    alt={item.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-32 w-full object-cover"
-                  />
-                </a>
-                <div className="space-y-1.5 px-2 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-mono text-[10px] text-rhine-ink">
-                        {item.name}
-                      </p>
-                      <p className="font-mono text-[9px] text-rhine-faint">
-                        {item.date || '日期未知'}
-                      </p>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <AdminField label="上传文件 / FILE">
+              <label className="flex cursor-pointer items-center justify-center gap-2 border border-dashed border-rhine-line bg-rhine-abyss/40 px-3 py-6 font-mono text-[10px] tracking-wider text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold">
+                <Upload className="h-4 w-4" />
+                {draft.file ? draft.file.name : '选择照片文件'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    chooseFile(event.target.files?.[0])
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </AdminField>
+            <AdminField label="图片地址 / URL">
+              <AdminInput
+                value={draft.url}
+                onChange={(event) => updateDraft({ url: event.target.value, preview: event.target.value })}
+                placeholder="https://…/photo.jpg"
+              />
+            </AdminField>
+          </div>
+
+          <AdminField label="描述 / DESCRIPTION">
+            <AdminTextarea
+              value={draft.description}
+              onChange={(event) => updateDraft({ description: event.target.value })}
+              rows={3}
+              className="min-h-20"
+            />
+          </AdminField>
+
+          {(draft.preview || draft.url) && (
+            <div className="mt-4 border border-rhine-gold/30 bg-rhine-panel/50 p-3">
+              <img
+                src={draft.preview || draft.url}
+                alt={draft.name || '照片预览'}
+                className="max-h-72 w-full object-contain"
+              />
+              <p className="mt-2 font-mono text-[10px] tracking-wider text-rhine-cyan">
+                {draft.date || 'DATE'} · {draft.name || 'PHOTO'}
+              </p>
+              {draft.description && (
+                <p className="mt-1 text-xs text-rhine-dim">{draft.description}</p>
+              )}
+            </div>
+          )}
+        </AdminPanel>
+      ) : (
+        <AdminPanel
+          title="照片"
+          subtitle="PHOTOS"
+          actions={
+            <AdminButton onClick={startNew}>
+              <Plus className="h-3 w-3" /> 发布新照片
+            </AdminButton>
+          }
+        >
+          {items.length === 0 ? (
+            <p className="font-mono text-[10px] tracking-wider text-rhine-faint">暂无照片</p>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map((item) => (
+                <li key={item.id} className="border border-rhine-line/70 bg-rhine-abyss/40">
+                  <img src={item.url} alt={item.name} className="h-40 w-full object-cover" loading="lazy" />
+                  <div className="p-3">
+                    <p className="truncate text-sm text-rhine-ink">{item.name}</p>
+                    <p className="mt-1 font-mono text-[9px] tracking-wider text-rhine-faint">
+                      {item.date || '日期未填'}
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <AdminButton variant="ghost" onClick={() => startEdit(item)}>
+                        <Pencil className="h-3 w-3" /> 编辑
+                      </AdminButton>
+                      <AdminButton variant="danger" onClick={() => void remove(item)}>
+                        <Trash2 className="h-3 w-3" /> 删除
+                      </AdminButton>
                     </div>
-                    <AdminButton variant="danger" onClick={() => void remove(item)}>
-                      删除
-                    </AdminButton>
                   </div>
-                  <div className="flex gap-1.5">
-                    <AdminInput
-                      value={descriptions[item.id] ?? ''}
-                      onChange={(event) =>
-                        setDescriptions((current) => ({
-                          ...current,
-                          [item.id]: event.target.value,
-                        }))
-                      }
-                      placeholder="照片描述（可选）"
-                    />
-                    <AdminButton
-                      variant="ghost"
-                      onClick={() => void saveDescription(item)}
-                    >
-                      保存
-                    </AdminButton>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </AdminPanel>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminPanel>
+      )}
     </div>
   )
 }

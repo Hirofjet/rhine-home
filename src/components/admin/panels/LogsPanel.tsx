@@ -218,14 +218,9 @@ export function LogsPanel() {
           title="日志列表"
           subtitle="LOGS"
           actions={
-            <>
-              <AdminButton variant="ghost" onClick={() => fileRef.current?.click()}>
-                <FileUp className="h-3 w-3" /> 导入 md 文件
-              </AdminButton>
-              <AdminButton onClick={startNew}>
-                <Plus className="h-3 w-3" /> 新建日志
-              </AdminButton>
-            </>
+            <AdminButton onClick={startNew}>
+              <Plus className="h-3 w-3" /> 新建日志
+            </AdminButton>
           }
         >
           {items.length === 0 ? (

@@ -7,7 +7,6 @@ import {
   AdminError,
   AdminField,
   AdminInput,
-  AdminModal,
   AdminNotice,
   AdminPanel,
   AdminSelect,
@@ -135,6 +134,7 @@ export function ProjectsPanel() {
     <div className="space-y-4">
       <AdminError message={error} />
       <AdminNotice message={notice} />
+      {!formOpen && (
       <AdminPanel
         title="项目库"
         subtitle="PROJECT DATABASE"
@@ -190,13 +190,25 @@ export function ProjectsPanel() {
           )}
         </div>
       </AdminPanel>
+      )}
 
-      <AdminModal
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
+      {formOpen && (
+      <AdminPanel
         title={draft.id ? '编辑项目' : '新建项目'}
         subtitle="PROJECT FORM"
-        wide
+        actions={
+          <>
+            <AdminButton variant="ghost" onClick={() => setPreview((value) => !value)}>
+              {preview ? '关闭预览' : '预览'}
+            </AdminButton>
+            <AdminButton variant="ghost" onClick={() => setFormOpen(false)}>
+              取消
+            </AdminButton>
+            <AdminButton onClick={() => void save()} disabled={busy}>
+              <FolderKanban className="h-3 w-3" /> {busy ? '保存中…' : '保存项目'}
+            </AdminButton>
+          </>
+        }
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <AdminField label="项目编号 / CODE">
@@ -249,15 +261,6 @@ export function ProjectsPanel() {
             />
             公开展示
           </label>
-          <AdminButton variant="ghost" onClick={() => setPreview((value) => !value)}>
-            {preview ? '关闭预览' : '预览'}
-          </AdminButton>
-          <AdminButton variant="ghost" onClick={() => setFormOpen(false)}>
-            取消
-          </AdminButton>
-          <AdminButton onClick={() => void save()} disabled={busy}>
-            <FolderKanban className="h-3 w-3" /> {busy ? '保存中…' : '保存项目'}
-          </AdminButton>
         </div>
         {preview && (
           <div className="mt-4 border border-rhine-gold/40 bg-rhine-panel/60 p-4">
@@ -272,7 +275,8 @@ export function ProjectsPanel() {
             </div>
           </div>
         )}
-      </AdminModal>
+      </AdminPanel>
+      )}
     </div>
   )
 }

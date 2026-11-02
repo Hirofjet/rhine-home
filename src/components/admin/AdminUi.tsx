@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -208,7 +207,7 @@ export function AdminModal({
   children: ReactNode
   wide?: boolean
 }) {
-  return createPortal(
+  return (
     <AnimatePresence>
       {open && (
         <motion.div
@@ -251,8 +250,7 @@ export function AdminModal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>,
-    document.body,
+    </AnimatePresence>
   )
 }
 
