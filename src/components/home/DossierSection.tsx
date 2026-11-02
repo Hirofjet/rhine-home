@@ -1,18 +1,20 @@
 import { motion } from 'framer-motion'
 import { profile } from '../../content'
+import { useSiteHomeContent } from '../../hooks/useSiteHomeContent'
 import { fadeUp, viewportOnce } from '../../lib/motion'
 import { Barcode, Panel, ProgressBar, SectionTitle, Tag } from '../ui'
 
-const BASIC_ROWS: Array<{ label: string; value: string }> = [
-  { label: '代号', value: profile.codeName },
-  { label: '真名', value: profile.realName },
-  { label: '职业', value: profile.occupation },
-  { label: '所属', value: profile.affiliation },
-  { label: '状态', value: profile.status },
-  { label: '所在地', value: profile.location },
-]
-
 export function DossierSection() {
+  const content = useSiteHomeContent()
+  const data = content.profile ?? profile
+  const rows = [
+    { label: '代号', value: data.codeName },
+    { label: '真名', value: data.realName },
+    { label: '职业', value: data.occupation },
+    { label: '所属', value: data.affiliation },
+    { label: '状态', value: data.status },
+    { label: '所在地', value: data.location },
+  ]
   const trustPct = Math.min(100, (profile.trust.value / 200) * 100)
 
   return (
@@ -35,7 +37,7 @@ export function DossierSection() {
               right={<Barcode className="hidden h-3 opacity-40 sm:flex" />}
             >
               <dl className="space-y-4">
-                {BASIC_ROWS.map((row) => (
+                {rows.map((row) => (
                   <div key={row.label} className="flex items-baseline gap-3">
                     <dt className="w-16 shrink-0 text-sm text-rhine-dim">
                       {row.label}
@@ -53,7 +55,7 @@ export function DossierSection() {
             </Panel>
             <Panel className="mt-6" code="RL-03" title="TAGS" titleZh="特性标签">
               <div className="flex flex-wrap gap-2">
-                {profile.traits.map((t) => (
+                {data.traits.map((t) => (
                   <Tag key={t} tone="cyan">
                     # {t}
                   </Tag>
@@ -77,7 +79,7 @@ export function DossierSection() {
               className="h-full"
             >
               <div className="space-y-4 text-sm leading-relaxed text-rhine-dim">
-                {profile.dossier.map((paragraph, i) => (
+                {data.dossier.map((paragraph, i) => (
                   <p key={i} className="flex gap-3">
                     <span className="shrink-0 font-mono text-[11px] leading-6 text-rhine-gold">
                       ▍{String(i + 1).padStart(2, '0')}
