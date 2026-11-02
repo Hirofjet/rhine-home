@@ -370,6 +370,18 @@ async function ensureSchemaUpgrades() {
       UNIQUE KEY uniq_forum_invite (board_id, user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   )
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS forum_moderators (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      board_id BIGINT UNSIGNED NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      role ENUM('master','admin') NOT NULL DEFAULT 'admin',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uniq_forum_moderator (board_id, user_id),
+      KEY idx_forum_moderator_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  )
   await ensureColumn('guest_messages', 'user_id', 'user_id BIGINT UNSIGNED NULL')
   await ensureColumn('guest_messages', 'owner_token', 'owner_token CHAR(64) NULL')
   await ensureColumn(

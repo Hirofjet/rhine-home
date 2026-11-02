@@ -2017,6 +2017,138 @@ app.post(
 )
 
 // ============================================================
+// 板块管理员绑定（总管理员 1 位 / 管理员 4 位 / 每人最多 4 个板块）
+// ============================================================
+app.get('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (req, res) => {
+  const rows = await query(
+    `SELECT m.*, b.name AS board_name, b.access,
+            COALESCE(NULLIF(u.nickname,''), u.username) AS username
+     FROM forum_moderators m
+     JOIN forum_boards b ON b.id = m.board_id
+     JOIN users u ON u.id = m.user_id
+     ORDER BY m.board_id ASC, m.role DESC, m.id ASC`,
+  )
+  const visible = rows.filter(
+    (row) =>
+      req.user.isSuper ||
+      ['senior', 'forum_master'].includes(req.user.identity) ||
+      canModerateBoard(req.user, Number(row.board_id)),
+  )
+  res.json({
+    moderators: visible.map((row) => ({
+      id: Number(row.id),
+      boardId: Number(row.board_id),
+      boardName: row.board_name,
+      access: row.access,
+      userId: Number(row.user_id),
+      username: row.username,
+      role: row.role,
+      createdAt: row.created_at,
+    })),
+  })
+})
+
+app.post('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (req, res) => {
+  const boardId = Number(req.body?.boardId)
+  const userId = Number(req.body?.userId)
+  const role = req.body?.role === 'master' ? 'master' : 'admin'
+  const boards = await query('SELECT * FROM forum_boards WHERE id = ?', [boardId])
+  if (!boards.length) return res.status(404).json({ error: 'board_not_found' })
+  const allowed =
+    req.user.isSuper ||
+    ['senior', 'forum_master'].includes(req.user.identity) ||
+    canModerateBoard(req.user, boardId)
+  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  const users = await query('SELECT id FROM users WHERE id = ?', [userId])
+  if (!users.length) return res.status(404).json({ error: 'user_not_found' })
+
+  const existing = await query(
+    'SELECT * FROM forum_moderators WHERE board_id = ? AND user_id = ?',
+    [boardId, userId],
+  )
+  if (existing.length) return res.status(409).json({ error: 'already_moderator' })
+  if (role === 'master') {
+    const masters = await query(
+      "SELECT id FROM forum_moderators WHERE board_id = ? AND role = 'master' LIMIT 1",
+      [boardId],
+    )
+    if (masters.length) return res.status(409).json({ error: 'master_limit' })
+  } else {
+    const admins = await query(
+      "SELECT COUNT(*) AS n FROM forum_moderators WHERE board_id = ? AND role = 'admin'",
+      [boardId],
+    )
+    if (Number(admins[0]?.n ?? 0) >= 4) return res.status(409).json({ error: 'admin_limit' })
+  }
+  const count = await query(
+    'SELECT COUNT(*) AS n FROM forum_moderators WHERE user_id = ?',
+    [userId],
+  )
+  if (Number(count[0]?.n ?? 0) >= 4) return res.status(409).json({ error: 'board_limit' })
+
+  await execute(
+    'INSERT INTO forum_moderators (board_id, user_id, role) VALUES (?, ?, ?)',
+    [boardId, userId, role],
+  )
+  const userRows = await query('SELECT permissions FROM users WHERE id = ?', [userId])
+  let permissions = []
+  try {
+    permissions = JSON.parse(userRows[0]?.permissions ?? '[]')
+  } catch {
+    permissions = []
+  }
+  if (!permissions.includes(`forum.${boardId}`)) {
+    permissions.push(`forum.${boardId}`)
+    await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+      JSON.stringify(permissions),
+      userId,
+    ])
+  }
+  await notify(
+    userId,
+    'permission',
+    '论坛管理授权',
+    `你已被授权管理「${boards[0].name}」`,
+    '/admin',
+  )
+  res.status(201).json({ ok: true })
+})
+
+app.delete('/api/admin/forum/moderators/:id', requireAuth, requireForumAccess, async (req, res) => {
+  const rows = await query('SELECT * FROM forum_moderators WHERE id = ?', [
+    Number(req.params.id),
+  ])
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  const boardId = Number(rows[0].board_id)
+  const allowed =
+    req.user.isSuper ||
+    ['senior', 'forum_master'].includes(req.user.identity) ||
+    canModerateBoard(req.user, boardId)
+  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  await execute('DELETE FROM forum_moderators WHERE id = ?', [Number(req.params.id)])
+  const remaining = await query(
+    'SELECT id FROM forum_moderators WHERE user_id = ? AND board_id = ? LIMIT 1',
+    [Number(rows[0].user_id), boardId],
+  )
+  if (!remaining.length) {
+    const userRows = await query('SELECT permissions FROM users WHERE id = ?', [
+      Number(rows[0].user_id),
+    ])
+    let permissions = []
+    try {
+      permissions = JSON.parse(userRows[0]?.permissions ?? '[]')
+    } catch {
+      permissions = []
+    }
+    await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+      JSON.stringify(permissions.filter((p) => p !== `forum.${boardId}`)),
+      Number(rows[0].user_id),
+    ])
+  }
+  res.json({ ok: true })
+})
+
+// ============================================================
 // 核心论坛邀请
 // ============================================================
 app.post(

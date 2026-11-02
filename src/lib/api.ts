@@ -803,6 +803,31 @@ export const adminApi = {
   forumBoards() {
     return api<{ boards: Board[] }>('/api/admin/forum/boards')
   },
+  forumModerators() {
+    return api<{
+      moderators: Array<{
+        id: number
+        boardId: number
+        boardName: string
+        access: string
+        userId: number
+        username: string
+        role: 'master' | 'admin'
+        createdAt: string
+      }>
+    }>('/api/admin/forum/moderators')
+  },
+  assignModerator(data: { boardId: number; userId: number; role: 'master' | 'admin' }) {
+    return api<{ ok: boolean }>('/api/admin/forum/moderators', {
+      method: 'POST',
+      body: data,
+    })
+  },
+  removeModerator(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/forum/moderators/${id}`, {
+      method: 'DELETE',
+    })
+  },
   createBoard(data: {
     name: string
     slug: string

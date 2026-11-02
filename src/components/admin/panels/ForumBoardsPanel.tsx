@@ -58,6 +58,19 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
   const [annTitle, setAnnTitle] = useState('')
   const [annContent, setAnnContent] = useState('')
   const [annBoardId, setAnnBoardId] = useState('')
+  const [moderators, setModerators] = useState<
+    Array<{
+      id: number
+      boardId: number
+      boardName: string
+      username: string
+      role: 'master' | 'admin'
+    }>
+  >([])
+  const [allUsers, setAllUsers] = useState<ApiUser[]>([])
+  const [modBoard, setModBoard] = useState('')
+  const [modUser, setModUser] = useState('')
+  const [modRole, setModRole] = useState<'master' | 'admin'>('admin')
   const [requests, setRequests] = useState<
     Array<{
       id: number
@@ -72,24 +85,61 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
 
   const load = useCallback(async () => {
     try {
-      const [data, annData, requestData] = await Promise.all([
+      const [data, annData, requestData, modData, userData] = await Promise.all([
         adminApi.forumBoards(),
         forumApi.announcements(),
         adminApi.requests(),
+        adminApi.forumModerators(),
+        canManageAll ? adminApi.users().catch(() => ({ users: [] })) : Promise.resolve({ users: [] }),
       ])
       setBoards(data.boards)
       setAnnouncements(annData.announcements)
       setRequests(requestData.requests)
+      setModerators(modData.moderators)
+      setAllUsers(userData.users)
       setError('')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canManageAll])
 
-  const reviewRequest = async (id: number, approve: boolean) => {
+  const assignModerator = async () => {
+    if (!modBoard || !modUser) {
+      setError('请选择板块和成员')
+      return
+    }
+    setBusy(true)
+    setError('')
     try {
+      await adminApi.assignModerator({
+        boardId: Number(modBoard),
+        userId: Number(modUser),
+        role: modRole,
+      })
+      setNotice('板块管理员已授权')
+      setModBoard('')
+      setModUser('')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeModerator = async (id: number) => {
+    try {
+      await adminApi.removeModerator(id)
+      setNotice('板块管理员已移除')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const reviewRequest = async (id: number, approve: boolean) => {    try {
       await adminApi.reviewRequest(id, approve)
       setNotice(approve ? '已通过访问申请' : '已拒绝访问申请')
       await load()
@@ -381,6 +431,46 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
                       拒绝
                     </AdminButton>
                   </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </AdminPanel>
+
+      <AdminPanel title="板块管理员" subtitle="BOARD MODERATORS">
+        {canManageAll && (
+          <div className="mb-4 grid gap-2 border border-rhine-line/60 bg-rhine-abyss/30 p-3 sm:grid-cols-4">
+            <select value={modBoard} onChange={(e) => setModBoard(e.target.value)} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
+              <option value="">选择板块</option>
+              {boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
+            </select>
+            <select value={modUser} onChange={(e) => setModUser(e.target.value)} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
+              <option value="">选择成员</option>
+              {allUsers.map((member) => <option key={member.id} value={member.id}>{member.username}</option>)}
+            </select>
+            <select value={modRole} onChange={(e) => setModRole(e.target.value as 'master' | 'admin')} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
+              <option value="admin">子管理员</option>
+              <option value="master">总管理员</option>
+            </select>
+            <AdminButton onClick={() => void assignModerator()} disabled={busy}>授权</AdminButton>
+          </div>
+        )}
+        {moderators.length === 0 ? (
+          <p className="font-mono text-[10px] text-rhine-faint">暂无板块管理员</p>
+        ) : (
+          <ul className="divide-y divide-rhine-line/60">
+            {moderators.map((item) => (
+              <li key={item.id} className="flex items-center gap-2 py-2">
+                <span className="text-xs text-rhine-ink">{item.username}</span>
+                <span className="font-mono text-[10px] text-rhine-dim">{item.boardName}</span>
+                <AdminBadge tone={item.role === 'master' ? 'gold' : 'cyan'}>
+                  {item.role === 'master' ? '总管理员' : '管理员'}
+                </AdminBadge>
+                {canManageAll && (
+                  <AdminButton variant="danger" className="ml-auto" onClick={() => void removeModerator(item.id)}>
+                    移除
+                  </AdminButton>
                 )}
               </li>
             ))}
