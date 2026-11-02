@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Save, Upload } from 'lucide-react'
+import { Download, Plus, Save, Trash2, Upload } from 'lucide-react'
 import {
   errorMessage,
   siteApi,
@@ -16,6 +16,7 @@ import {
   AdminInput,
   AdminNotice,
   AdminPanel,
+  AdminSelect,
   AdminTextarea,
 } from '../AdminUi'
 
@@ -205,47 +206,86 @@ export function ProfilePanel() {
         <AdminField label="特性 / TRAITS（逗号分隔）">
           <AdminInput value={list(draft.traits)} onChange={(e) => setDraft({ ...draft, traits: parseList(e.target.value) })} />
         </AdminField>
-        <AdminField label="能力模块 / JSON">
-          <AdminTextarea
-            value={JSON.stringify(abilities, null, 2)}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value)
-                if (Array.isArray(parsed)) setAbilities(parsed)
-              } catch {
-                /* 输入中允许暂时不合法 */
-              }
-            }}
-            rows={6}
-          />
+        <AdminField label="能力模块 / ABILITY CARDS">
+          <div className="grid gap-3 md:grid-cols-2">
+            {abilities.map((item, index) => (
+              <div key={`${item.id}-${index}`} className="space-y-2 border border-rhine-line/70 bg-rhine-abyss/40 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-rhine-gold">ABILITY {index + 1}</span>
+                  <button type="button" onClick={() => setAbilities((prev) => prev.filter((_, i) => i !== index))} className="text-rhine-faint hover:text-rhine-red" aria-label="删除能力">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <AdminInput value={item.code} onChange={(e) => setAbilities((prev) => prev.map((row, i) => (i === index ? { ...row, code: e.target.value } : row)))} placeholder="编号" />
+                  <AdminInput value={item.name} onChange={(e) => setAbilities((prev) => prev.map((row, i) => (i === index ? { ...row, name: e.target.value } : row)))} placeholder="名称" />
+                  <AdminInput value={item.nameEn} onChange={(e) => setAbilities((prev) => prev.map((row, i) => (i === index ? { ...row, nameEn: e.target.value } : row)))} placeholder="English" />
+                  <AdminInput value={item.level} type="number" min={0} max={100} onChange={(e) => setAbilities((prev) => prev.map((row, i) => (i === index ? { ...row, level: Number(e.target.value) } : row)))} placeholder="熟练度" />
+                  <AdminSelect value={item.grade} onChange={(e) => setAbilities((prev) => prev.map((row, i) => (i === index ? { ...row, grade: e.target.value as 'S' | 'A' | 'B' } : row)))}>
+                    <option value="S">S</option><option value="A">A</option><option value="B">B</option>
+                  </AdminSelect>
+                  <AdminSelect value={item.icon} onChange={(e) => setAbilities((prev) => prev.map((row, i) => (i === index ? { ...row, icon: e.target.value as typeof item.icon } : row)))}>
+                    {['code', 'design', 'research', 'game', 'data', 'music'].map((icon) => <option key={icon} value={icon}>{icon}</option>)}
+                  </AdminSelect>
+                </div>
+                <AdminTextarea value={item.desc} rows={2} onChange={(e) => setAbilities((prev) => prev.map((row, i) => (i === index ? { ...row, desc: e.target.value } : row)))} placeholder="描述" />
+              </div>
+            ))}
+          </div>
+          <AdminButton variant="ghost" className="mt-2" onClick={() => setAbilities((prev) => [...prev, { id: `ability-${Date.now()}`, code: '', name: '', nameEn: '', desc: '', level: 50, grade: 'B', icon: 'code' }])}>
+            <Plus className="h-3 w-3" /> 添加能力
+          </AdminButton>
         </AdminField>
-        <AdminField label="联系方式 / JSON">
-          <AdminTextarea
-            value={JSON.stringify(contacts, null, 2)}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value)
-                if (Array.isArray(parsed)) setContacts(parsed)
-              } catch {
-                /* ignore */
-              }
-            }}
-            rows={6}
-          />
+
+        <AdminField label="联系方式 / CONTACT CARDS">
+          <div className="grid gap-3 md:grid-cols-2">
+            {contacts.map((item, index) => (
+              <div key={`${item.id}-${index}`} className="space-y-2 border border-rhine-line/70 bg-rhine-abyss/40 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-rhine-cyan">CONTACT {index + 1}</span>
+                  <button type="button" onClick={() => setContacts((prev) => prev.filter((_, i) => i !== index))} className="text-rhine-faint hover:text-rhine-red" aria-label="删除联系方式">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <AdminInput value={item.label} onChange={(e) => setContacts((prev) => prev.map((row, i) => (i === index ? { ...row, label: e.target.value } : row)))} placeholder="名称" />
+                  <AdminInput value={item.labelEn} onChange={(e) => setContacts((prev) => prev.map((row, i) => (i === index ? { ...row, labelEn: e.target.value } : row)))} placeholder="English" />
+                  <AdminInput value={item.value} onChange={(e) => setContacts((prev) => prev.map((row, i) => (i === index ? { ...row, value: e.target.value } : row)))} placeholder="显示账号" />
+                  <AdminInput value={item.href} onChange={(e) => setContacts((prev) => prev.map((row, i) => (i === index ? { ...row, href: e.target.value } : row)))} placeholder="跳转链接" />
+                  <AdminSelect value={item.icon} onChange={(e) => setContacts((prev) => prev.map((row, i) => (i === index ? { ...row, icon: e.target.value as typeof item.icon } : row)))}>
+                    {['github', 'bilibili', 'mail', 'music', 'chat'].map((icon) => <option key={icon} value={icon}>{icon}</option>)}
+                  </AdminSelect>
+                  <AdminInput value={item.note ?? ''} onChange={(e) => setContacts((prev) => prev.map((row, i) => (i === index ? { ...row, note: e.target.value } : row)))} placeholder="备注" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <AdminButton variant="ghost" className="mt-2" onClick={() => setContacts((prev) => [...prev, { id: `contact-${Date.now()}`, label: '', labelEn: '', value: '', href: '', icon: 'chat', note: '' }])}>
+            <Plus className="h-3 w-3" /> 添加联系方式
+          </AdminButton>
         </AdminField>
-        <AdminField label="外部链接 / JSON">
-          <AdminTextarea
-            value={JSON.stringify(links, null, 2)}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value)
-                if (Array.isArray(parsed)) setLinks(parsed)
-              } catch {
-                /* ignore */
-              }
-            }}
-            rows={4}
-          />
+
+        <AdminField label="外部链接 / LINK CARDS">
+          <div className="grid gap-3 md:grid-cols-2">
+            {links.map((item, index) => (
+              <div key={`${item.id}-${index}`} className="space-y-2 border border-rhine-line/70 bg-rhine-abyss/40 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-rhine-gold">LINK {index + 1}</span>
+                  <button type="button" onClick={() => setLinks((prev) => prev.filter((_, i) => i !== index))} className="text-rhine-faint hover:text-rhine-red" aria-label="删除链接">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <AdminInput value={item.label} onChange={(e) => setLinks((prev) => prev.map((row, i) => (i === index ? { ...row, label: e.target.value } : row)))} placeholder="名称" />
+                  <AdminInput value={item.note ?? ''} onChange={(e) => setLinks((prev) => prev.map((row, i) => (i === index ? { ...row, note: e.target.value } : row)))} placeholder="备注" />
+                  <AdminInput value={item.href} onChange={(e) => setLinks((prev) => prev.map((row, i) => (i === index ? { ...row, href: e.target.value } : row)))} placeholder="链接" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <AdminButton variant="ghost" className="mt-2" onClick={() => setLinks((prev) => [...prev, { id: `link-${Date.now()}`, label: '', href: '', note: '' }])}>
+            <Plus className="h-3 w-3" /> 添加链接
+          </AdminButton>
         </AdminField>
         <p className="mt-3 font-mono text-[9px] leading-relaxed text-rhine-faint">
           数据保存到 MySQL，同时在本浏览器的 localStorage 留一份备份；换电脑可用“导出 / 导入本地”迁移。
