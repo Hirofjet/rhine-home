@@ -24,9 +24,13 @@ import {
   isForumPermission,
   isStaff,
   normalizeUser,
+  permissionsForRole,
   publicUser,
   pruneSessions,
+  roleClass,
   roleLabel,
+  ROLE_KEYS,
+  ROLE_LABELS,
   sanitizePermissions,
   tokenFromRequest,
   userBySession,
@@ -593,8 +597,59 @@ app.put(
   },
 )
 
-app.delete('/api/admin/users/:id', requireAuth, requireMembersManage, async (req, res) => {
+app.put('/api/admin/users/:id/identity', requireAuth, async (req, res) => {
+  if (!req.user.isSuper) return res.status(403).json({ error: 'super_only' })
   const id = Number(req.params.id)
+  if (id === req.user.id) return res.status(400).json({ error: 'cannot_change_own_identity' })
+  const role = String(req.body?.identity ?? '')
+  if (!ROLE_KEYS.includes(role) || role === 'super') {
+    return res.status(400).json({ error: 'invalid_identity' })
+  }
+  const targetRows = await query('SELECT * FROM users WHERE id = ?', [id])
+  const target = normalizeUser(targetRows[0])
+  if (!target) return res.status(404).json({ error: 'not_found' })
+  if (target.isSuper) return res.status(403).json({ error: 'cannot_modify_super' })
+
+  const masterRoles = new Set(['core_master', 'special_master', 'normal_master'])
+  const adminRoles = new Set(['core_admin', 'special_admin', 'normal_admin'])
+  if (masterRoles.has(role)) {
+    const existing = await query(
+      'SELECT id FROM users WHERE role_code = ? AND id <> ? LIMIT 1',
+      [role, id],
+    )
+    if (existing.length) return res.status(409).json({ error: 'identity_limit' })
+  }
+  if (adminRoles.has(role)) {
+    const rows = await query('SELECT COUNT(*) AS n FROM users WHERE role_code = ? AND id <> ?', [
+      role,
+      id,
+    ])
+    if (Number(rows[0]?.n ?? 0) >= 4) return res.status(409).json({ error: 'identity_limit' })
+  }
+
+  const permissions = permissionsForRole(role)
+  const cls = roleClass(role)
+  if (cls) {
+    const boards = await query('SELECT id FROM forum_boards WHERE access = ?', [cls])
+    for (const board of boards) permissions.push(`forum.${board.id}`)
+  }
+  await execute('UPDATE users SET role_code = ?, permissions = ? WHERE id = ?', [
+    role,
+    JSON.stringify([...new Set(permissions)]),
+    id,
+  ])
+  await notify(
+    id,
+    'permission',
+    '你的身份已更新',
+    `当前身份：${ROLE_LABELS[role]}`,
+    '/profile',
+  )
+  const updated = await query('SELECT * FROM users WHERE id = ?', [id])
+  res.json({ user: publicUser(normalizeUser(updated[0])) })
+})
+
+app.delete('/api/admin/users/:id', requireAuth, requireMembersManage, async (req, res) => {  const id = Number(req.params.id)
   if (id === req.user.id) return res.status(400).json({ error: 'cannot_delete_self' })
   const targetRows = await query('SELECT * FROM users WHERE id = ?', [id])
   const target = normalizeUser(targetRows[0])

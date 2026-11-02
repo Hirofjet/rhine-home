@@ -27,6 +27,64 @@ export const PERMISSION_KEYS = [
   'members.grant',
 ]
 
+export const ROLE_KEYS = [
+  'super',
+  'senior',
+  'forum_master',
+  'core_master',
+  'core_admin',
+  'special_master',
+  'special_admin',
+  'normal_master',
+  'normal_admin',
+  'member',
+]
+
+export const ROLE_LABELS = {
+  super: '超级管理员',
+  senior: '高级管理员',
+  forum_master: '论坛总管理员',
+  core_master: '核心论坛总管理员',
+  core_admin: '核心论坛管理员',
+  special_master: '特殊论坛总管理员',
+  special_admin: '特殊论坛管理员',
+  normal_master: '普通论坛总管理员',
+  normal_admin: '普通论坛管理员',
+  member: '普通成员',
+}
+
+const ROLE_CLASS = {
+  core_master: 'core',
+  core_admin: 'core',
+  special_master: 'special',
+  special_admin: 'special',
+  normal_master: 'public',
+  normal_admin: 'public',
+}
+
+const ROLE_BASE_PERMISSIONS = {
+  senior: ['projects', 'logs', 'guestbook', 'forum', 'members.manage', 'members.grant'],
+  forum_master: ['forum', 'guestbook'],
+  core_master: ['guestbook'],
+  core_admin: ['guestbook'],
+  special_master: ['guestbook'],
+  special_admin: ['guestbook'],
+  normal_master: ['guestbook'],
+  normal_admin: ['guestbook'],
+  member: [],
+}
+
+export const roleForUser = (user) =>
+  ROLE_KEYS.includes(user?.identity) ? user.identity : user?.isSuper ? 'super' : 'member'
+
+export const roleClass = (role) => ROLE_CLASS[role] ?? null
+
+/** 根据身份生成模块权限；论坛类别身份会在授权时按板块追加 forum.<id> */
+export function permissionsForRole(role) {
+  if (role === 'super') return [...PERMISSION_KEYS]
+  return [...(ROLE_BASE_PERMISSIONS[role] ?? [])]
+}
+
 export const isForumPermission = (permission) =>
   permission === 'forum' || /^forum\.\d+$/.test(permission)
 
@@ -66,6 +124,7 @@ export function normalizeUser(row) {
     email: row.email,
     emailVerified: Boolean(row.email_verified),
     isSuper: Boolean(row.is_super),
+    identity: row.role_code || (row.is_super ? 'super' : 'member'),
     status: row.status,
     permissions: permissions.filter((p) => typeof p === 'string'),
     avatarUrl: row.avatar_url ?? '',
@@ -105,6 +164,8 @@ export function publicUser(user) {
     email: user.email,
     emailVerified: user.emailVerified,
     isSuper: user.isSuper,
+    identity: user.identity,
+    identityLabel: ROLE_LABELS[user.identity] ?? ROLE_LABELS.member,
     status: user.status,
     permissions: user.permissions,
     role: roleLabel(user),
@@ -122,13 +183,8 @@ export function publicUser(user) {
 
 /** 派生角色标签 */
 export function roleLabel(user) {
-  if (user.isSuper) return 'super'
-  if (
-    user.permissions.includes('members.manage') ||
-    user.permissions.includes('members.grant')
-  ) {
-    return 'admin'
-  }
+  if (user.isSuper || user.identity === 'super') return 'super'
+  if (user.identity && user.identity !== 'member') return 'admin'
   if (user.permissions.some(isForumPermission)) return 'moderator'
   return 'user'
 }

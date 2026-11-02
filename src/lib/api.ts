@@ -29,6 +29,8 @@ export interface ApiUser {
   status: 'active' | 'disabled'
   permissions: string[]
   role: Role
+  identity?: string
+  identityLabel?: string
   avatarUrl?: string
   gender?: string
   birthday?: string
@@ -787,6 +789,12 @@ export const adminApi = {
     return api<{ user: ApiUser }>(`/api/admin/users/${id}/permissions`, {
       method: 'PUT',
       body: { permissions },
+    })
+  },
+  updateIdentity(id: number, identity: string) {
+    return api<{ user: ApiUser }>(`/api/admin/users/${id}/identity`, {
+      method: 'PUT',
+      body: { identity },
     })
   },
   removeUser(id: number) {

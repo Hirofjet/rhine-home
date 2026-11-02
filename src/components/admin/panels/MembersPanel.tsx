@@ -47,6 +47,7 @@ export function MembersPanel({ user }: MembersPanelProps) {
   const [newPermissions, setNewPermissions] = useState<string[]>([])
 
   const [draftPermissions, setDraftPermissions] = useState<string[]>([])
+  const [draftIdentity, setDraftIdentity] = useState('member')
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -122,8 +123,25 @@ export function MembersPanel({ user }: MembersPanelProps) {
 
   const openPermissions = (target: ApiUser) => {
     setDraftPermissions([...target.permissions])
+    setDraftIdentity(target.identity ?? 'member')
     setError('')
     setModal({ type: 'permissions', target })
+  }
+
+  const applyIdentity = async () => {
+    if (!modal || modal.type !== 'permissions') return
+    setBusy(true)
+    setError('')
+    try {
+      await adminApi.updateIdentity(modal.target.id, draftIdentity)
+      setNotice('身份已更新，权限已按身份重算')
+      setModal(null)
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const openPassword = (target: ApiUser) => {
@@ -518,6 +536,33 @@ export function MembersPanel({ user }: MembersPanelProps) {
         wide
       >
         <div className="space-y-3">
+          {user.isSuper && (
+            <div className="space-y-2 border border-rhine-gold/30 bg-rhine-gold/[0.03] p-3">
+              <p className="font-mono text-[9px] tracking-[0.2em] text-rhine-gold">身份组 / IDENTITY</p>
+              <select
+                value={draftIdentity}
+                onChange={(event) => setDraftIdentity(event.target.value)}
+                className="w-full border border-rhine-line bg-rhine-abyss/70 px-3 py-2 font-mono text-xs text-rhine-ink outline-none focus:border-rhine-gold/60"
+              >
+                {[
+                  ['member', '普通成员'],
+                  ['normal_admin', '普通论坛管理员'],
+                  ['normal_master', '普通论坛总管理员'],
+                  ['special_admin', '特殊论坛管理员'],
+                  ['special_master', '特殊论坛总管理员'],
+                  ['core_admin', '核心论坛管理员'],
+                  ['core_master', '核心论坛总管理员'],
+                  ['forum_master', '论坛总管理员'],
+                  ['senior', '高级管理员'],
+                ].map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <AdminButton variant="ghost" onClick={() => void applyIdentity()} disabled={busy}>
+                应用身份并重算权限
+              </AdminButton>
+            </div>
+          )}
           <PermissionTree
             value={draftPermissions}
             onChange={setDraftPermissions}

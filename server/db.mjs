@@ -332,6 +332,12 @@ async function ensureColumn(table, column, definition) {
 /** 兼容已部署的旧表：缺少的列与状态枚举自动补齐 */
 async function ensureSchemaUpgrades() {
   await ensureColumn('users', 'avatar_url', 'avatar_url VARCHAR(500) NULL')
+  await ensureColumn(
+    'users',
+    'role_code',
+    "role_code VARCHAR(32) NOT NULL DEFAULT 'member'",
+  )
+  await pool.query("UPDATE users SET role_code = 'super' WHERE is_super = 1").catch(() => undefined)
   await ensureColumn('users', 'nickname', 'nickname VARCHAR(64) NULL')
   await ensureColumn('users', 'gender', 'gender VARCHAR(16) NULL')
   await ensureColumn('users', 'birthday', 'birthday VARCHAR(16) NULL')
