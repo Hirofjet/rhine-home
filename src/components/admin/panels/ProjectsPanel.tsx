@@ -7,6 +7,7 @@ import {
   AdminError,
   AdminField,
   AdminInput,
+  AdminModal,
   AdminNotice,
   AdminPanel,
   AdminSelect,
@@ -190,8 +191,13 @@ export function ProjectsPanel() {
         </div>
       </AdminPanel>
 
-      {formOpen && (
-      <AdminPanel title={draft.id ? '编辑项目' : '新建项目'} subtitle="PROJECT FORM">
+      <AdminModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={draft.id ? '编辑项目' : '新建项目'}
+        subtitle="PROJECT FORM"
+        wide
+      >
         <div className="grid gap-3 sm:grid-cols-2">
           <AdminField label="项目编号 / CODE">
             <div className="border border-rhine-line bg-rhine-abyss/40 px-2 py-1.5 font-mono text-[10px] text-rhine-faint">
@@ -266,8 +272,7 @@ export function ProjectsPanel() {
             </div>
           </div>
         )}
-      </AdminPanel>
-      )}
+      </AdminModal>
     </div>
   )
 }
