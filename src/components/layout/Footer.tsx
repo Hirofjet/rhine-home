@@ -23,7 +23,7 @@ export function Footer() {
                   {brand}
                 </span>
                 <span className="mt-1 font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
-                  {site.titleSub}
+                  PERSONAL TERMINAL
                 </span>
               </span>
             </div>
@@ -88,7 +88,7 @@ export function Footer() {
         {/* 小字声明 */}
         <div className="mt-10 space-y-2 border-t border-rhine-line/60 pt-6 font-mono text-[10px] leading-relaxed tracking-wider text-rhine-faint">
           <p>
-            © {YEAR} {site.footer.line1}
+            © {YEAR} {brand}
           </p>
           <p>{site.footer.line2}</p>
           <p className="text-rhine-gold-deep">
