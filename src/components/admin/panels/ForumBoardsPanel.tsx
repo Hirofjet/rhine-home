@@ -87,6 +87,11 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
   >([])
 
   const canManageAll = user.isSuper || hasPerm(user, 'forum')
+  const canCreateBoard =
+    canManageAll ||
+    ['senior', 'forum_master', 'core_master', 'special_master', 'normal_master'].includes(
+      user.identity ?? '',
+    )
 
   const load = useCallback(async () => {
     try {
@@ -297,7 +302,7 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
             <AdminButton variant="ghost" onClick={() => void load()}>
               <RefreshCw className="h-3 w-3" /> 刷新
             </AdminButton>
-            {canManageAll && (
+            {canCreateBoard && (
               <AdminButton onClick={openCreate}>
                 <Plus className="h-3 w-3" /> 新建板块
               </AdminButton>

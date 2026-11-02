@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useSession } from '../components/auth/useSession'
-import { AdminLogin } from '../components/admin/AdminLogin'
 import { AdminDashboard } from '../components/admin/AdminDashboard'
+import { NotFoundPage } from './NotFoundPage'
 import { ROLE_LABELS } from '../lib/api'
 
 /**
@@ -22,7 +22,7 @@ export function AdminPage() {
     )
   }
 
-  if (!user) return <AdminLogin />
+  if (!user) return <NotFoundPage />
 
   if (!staff) {
     return (

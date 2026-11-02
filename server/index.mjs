@@ -1620,16 +1620,22 @@ app.get('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req, 
 })
 
 app.post('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req, res) => {
-  if (!(req.user.isSuper || hasPermission(req.user, 'forum'))) {
-    return res.status(403).json({ error: 'forbidden' })
-  }
+  const requestedAccess = ['public', 'special', 'core'].includes(req.body?.access)
+    ? req.body.access
+    : 'public'
+  const roleClassValue = roleClass(req.user.identity)
+  const canCreate =
+    req.user.isSuper ||
+    hasPermission(req.user, 'forum') ||
+    ['senior', 'forum_master'].includes(req.user.identity) ||
+    (['core_master', 'special_master', 'normal_master'].includes(req.user.identity) &&
+      roleClassValue === requestedAccess)
+  if (!canCreate) return res.status(403).json({ error: 'forbidden' })
   const name = asString(req.body?.name, 100)
   const slug = asString(req.body?.slug, 64).toLowerCase()
   const description = asString(req.body?.description, 500)
   const sort = Number(req.body?.sort) || 0
-  const access = ['public', 'special', 'core'].includes(req.body?.access)
-    ? req.body.access
-    : 'public'
+  const access = requestedAccess
   if (!name || !SLUG_RE.test(slug)) {
     return res.status(400).json({ error: 'invalid_input' })
   }

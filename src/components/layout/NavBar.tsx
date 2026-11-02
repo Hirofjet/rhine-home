@@ -105,7 +105,9 @@ export function NavBar() {
               </AnimatePresence>
             </div>
 
-            {moduleLinks.map((item) => (
+            {moduleLinks
+              .filter((item) => item.href !== '/forum' || Boolean(user))
+              .map((item) => (
               <Link
                 key={item.id}
                 to={item.href}
@@ -222,7 +224,9 @@ export function NavBar() {
                 ))}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                {moduleLinks.map((item) => (
+                {moduleLinks
+                  .filter((item) => item.href !== '/forum' || Boolean(user))
+                  .map((item) => (
                   <Link
                     key={item.id}
                     to={item.href}

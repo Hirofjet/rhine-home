@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { BootScreen } from './components/boot/BootScreen'
 import { SessionProvider } from './components/auth/SessionProvider'
+import { useSession } from './components/auth/useSession'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { BackgroundFX } from './components/layout/BackgroundFX'
 import { MouseTrail } from './components/layout/MouseTrail'
@@ -194,6 +195,12 @@ function routeMotion(pathname: string, reduce: boolean) {
   }
 }
 
+function RequireUser({ children }: { children: ReactNode }) {
+  const { user, loading } = useSession()
+  if (loading) return <PageLoading />
+  return user ? <>{children}</> : <NotFoundPage />
+}
+
 /** 前台页面切换动画 */
 function AnimatedRoutes() {
   const location = useLocation()
@@ -219,10 +226,10 @@ function AnimatedRoutes() {
               <Route path="/archive" element={<ArchivePage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/logs" element={<LogsPage />} />
-              <Route path="/forum" element={<ForumPage />} />
-              <Route path="/forum/new" element={<ForumComposePage />} />
-              <Route path="/forum/post/:id" element={<ForumPostPage />} />
-              <Route path="/forum/:slug" element={<ForumBoardPage />} />
+              <Route path="/forum" element={<RequireUser><ForumPage /></RequireUser>} />
+              <Route path="/forum/new" element={<RequireUser><ForumComposePage /></RequireUser>} />
+              <Route path="/forum/post/:id" element={<RequireUser><ForumPostPage /></RequireUser>} />
+              <Route path="/forum/:slug" element={<RequireUser><ForumBoardPage /></RequireUser>} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/u/:id" element={<PublicUserPage />} />
