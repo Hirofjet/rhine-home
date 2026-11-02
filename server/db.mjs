@@ -364,6 +364,11 @@ async function ensureSchemaUpgrades() {
     'escalation_notified',
     'escalation_notified TINYINT(1) NOT NULL DEFAULT 0',
   )
+  await ensureColumn(
+    'forum_access_requests',
+    'escalation_level',
+    'escalation_level TINYINT NOT NULL DEFAULT 0',
+  )
   await pool.query(
     `CREATE TABLE IF NOT EXISTS forum_invites (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -406,6 +411,16 @@ async function ensureSchemaUpgrades() {
     `ALTER TABLE email_codes MODIFY purpose
      ENUM('register','reset','bind') NOT NULL`,
   )
+  const indexes = [
+    'CREATE INDEX idx_posts_board_status_created ON forum_posts (board_id, status, created_at)',
+    'CREATE INDEX idx_requests_board_user_status ON forum_access_requests (board_id, user_id, status)',
+    'CREATE INDEX idx_articles_date ON articles (date)',
+    'CREATE INDEX idx_logs_date ON logs (date)',
+    'CREATE INDEX idx_photos_date ON photos (date)',
+  ]
+  for (const sql of indexes) {
+    await pool.query(sql).catch(() => undefined)
+  }
 }
 
 export async function initSchema() {

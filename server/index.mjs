@@ -1249,6 +1249,16 @@ app.get('/api/forum/boards', async (req, res) => {
   for (const row of rows) {
     const board = boardPublic(row)
     const canAccess = await canAccessBoard(req.user, board)
+    const canSeeCore =
+      board.access !== 'core' ||
+      canAccess ||
+      Boolean(
+        req.user &&
+          (req.user.isSuper ||
+            hasPermission(req.user, 'forum') ||
+            hasPermission(req.user, `forum.${board.id}`)),
+      )
+    if (!canSeeCore) continue
     let requestStatus = ''
     if (req.user && board.access === 'special') {
       const requests = await query(
@@ -1951,9 +1961,15 @@ app.post('/api/forum/boards/:id/request', requireAuth, async (req, res) => {
 app.get('/api/admin/forum/requests', requireAuth, requireForumAccess, async (req, res) => {
   await execute(
     `UPDATE forum_access_requests
-     SET escalated_at = NOW()
-     WHERE status = 'pending' AND escalated_at IS NULL
+     SET escalated_at = NOW(), escalation_level = 1
+     WHERE status = 'pending' AND escalation_level = 0
        AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
+  ).catch(() => undefined)
+  await execute(
+    `UPDATE forum_access_requests
+     SET escalation_level = 2, escalation_notified = 0
+     WHERE status = 'pending' AND escalation_level = 1
+       AND created_at < DATE_SUB(NOW(), INTERVAL 2 HOUR)`,
   ).catch(() => undefined)
   const escalated = await query(
     `SELECT r.id, r.user_id, b.name AS board_name
@@ -2028,6 +2044,14 @@ app.post(
        WHERE id = ?`,
       [approve ? 'approved' : 'rejected', req.user.id, id],
     )
+    if (approve) {
+      await execute(
+        `UPDATE forum_access_requests
+         SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW()
+         WHERE board_id = ? AND user_id = ? AND id <> ? AND status = 'pending'`,
+        [req.user.id, Number(rows[0].board_id), Number(rows[0].user_id), id],
+      ).catch(() => undefined)
+    }
     await notify(
       Number(rows[0].user_id),
       'access',
