@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { Mail, X } from 'lucide-react'
 import {
@@ -140,7 +141,7 @@ function ForumAuthModalBody({
     }
   }
 
-  return (
+  return createPortal(
     <motion.div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
       initial={{ opacity: 0 }}
@@ -352,6 +353,7 @@ function ForumAuthModalBody({
               </div>
             </div>
           </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   )
 }
