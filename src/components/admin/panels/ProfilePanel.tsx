@@ -289,10 +289,6 @@ export function ProfilePanel() {
         <AdminButton variant="ghost" className="mt-2" onClick={() => setLinks((prev) => [...prev, { id: `link-${Date.now()}`, label: '', href: '', note: '' }])}>
           <Plus className="h-3 w-3" /> 添加链接
         </AdminButton>
-        <p className="mt-3 font-mono text-[9px] leading-relaxed text-rhine-faint">
-          数据保存到 MySQL，同时在本浏览器的 localStorage 留一份备份；换电脑可用“导出 / 导入本地”迁移。
-          主页与后台共享的字段会自动同步。
-        </p>
       </AdminPanel>
     </div>
   )

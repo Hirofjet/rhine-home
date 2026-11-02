@@ -230,7 +230,7 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
               控制台概览
             </h1>
             <p className="mt-1 font-mono text-[9px] tracking-[0.2em] text-rhine-dim">
-              数据实时读取自 MySQL · {user.username} · {ROLE_LABELS[user.role]}
+              {user.username} · {ROLE_LABELS[user.role]}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -518,7 +518,6 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
       <div className="flex flex-wrap items-center justify-between gap-2 border border-rhine-line/50 bg-rhine-panel/20 px-4 py-3 font-mono text-[9px] tracking-wider text-rhine-faint">
         <span className="flex items-center gap-2">
           <Activity className="h-3 w-3" />
-          数据源：MySQL · 自动刷新于每次进入概览
         </span>
         <span className="flex items-center gap-3">
           <span>ROLE: {ROLE_LABELS[user.role]}</span>

@@ -87,7 +87,6 @@ export function AdminPanel({
 
 export function AdminField({
   label,
-  hint,
   children,
 }: {
   label: string
@@ -98,7 +97,6 @@ export function AdminField({
     <label className="block space-y-1.5">
       <span className="flex items-center gap-2 font-mono text-[9px] tracking-[0.25em] text-rhine-faint">
         {label}
-        {hint && <span className="text-rhine-faint/70">— {hint}</span>}
       </span>
       {children}
     </label>
@@ -260,7 +258,6 @@ export function AdminModal({
 export function SourceField({
   kind,
   label,
-  hint,
   accept,
   value,
   onChange,
@@ -305,7 +302,6 @@ export function SourceField({
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[9px] tracking-[0.25em] text-rhine-faint">
           {label}
-          {hint && <span className="ml-2 text-rhine-faint/70">{hint}</span>}
         </span>
         <AdminCheckbox
           checked={useLink}

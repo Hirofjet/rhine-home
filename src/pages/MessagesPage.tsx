@@ -191,7 +191,7 @@ export function MessagesPage() {
             消息面板
           </h1>
           <p className="mt-1 font-mono text-[10px] tracking-wider text-rhine-dim">
-            互相关注即成为好友 · 每位好友拥有独立聊天窗口
+            消息权重排序
           </p>
         </div>
         <Link

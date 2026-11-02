@@ -206,7 +206,7 @@ export function PhotosPanel() {
           <div className="flex flex-col items-center gap-2 border border-dashed border-rhine-line/80 p-8 text-center">
             <ImagePlus className="h-5 w-5 text-rhine-faint" />
             <p className="font-mono text-[11px] tracking-wider text-rhine-faint">
-              还没有照片。上传时会自动读取 EXIF 拍摄日期用于时间线排序。
+              暂无照片
             </p>
           </div>
         ) : (

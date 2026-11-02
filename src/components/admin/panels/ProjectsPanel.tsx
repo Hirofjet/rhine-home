@@ -201,7 +201,7 @@ export function ProjectsPanel() {
         <div className="grid gap-3 sm:grid-cols-2">
           <AdminField label="项目编号 / CODE">
             <div className="border border-rhine-line bg-rhine-abyss/40 px-2 py-1.5 font-mono text-[10px] text-rhine-faint">
-              {draft.code || '保存时自动生成（RL-PJ-XX）'}
+              {draft.code}
             </div>
           </AdminField>
           <AdminField label="项目简称 / SHORT NAME">
