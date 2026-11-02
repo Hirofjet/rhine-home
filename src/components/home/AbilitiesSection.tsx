@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { AbilityIcon } from '../../content'
 import { abilityModules } from '../../content'
+import { useSiteHomeContent } from '../../hooks/useSiteHomeContent'
 import { fadeUp, stagger, viewportOnce } from '../../lib/motion'
 import { ProgressBar, SectionTitle } from '../ui'
 
@@ -23,13 +24,15 @@ const ICONS: Record<AbilityIcon, LucideIcon> = {
 }
 
 export function AbilitiesSection() {
+  const content = useSiteHomeContent()
+  const modules = content.abilities.length ? content.abilities : abilityModules
   return (
     <section id="abilities" className="relative py-20 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <SectionTitle index="02" en="ABILITY MODULES" zh="能力模块" className="flex-1" />
           <span className="hidden font-mono text-[10px] tracking-[0.25em] text-rhine-faint sm:block">
-            MODULES: {String(abilityModules.length).padStart(2, '0')}
+            MODULES: {String(modules.length).padStart(2, '0')}
           </span>
         </div>
 
@@ -40,7 +43,7 @@ export function AbilitiesSection() {
           viewport={viewportOnce}
           className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {abilityModules.map((mod) => {
+          {modules.map((mod) => {
             const Icon = ICONS[mod.icon]
             return (
               <motion.article

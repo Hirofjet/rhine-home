@@ -895,30 +895,89 @@ const sanitizeHomeProfile = (body) => {
   return profile
 }
 
+const sanitizeAbility = (item) => ({
+  id: asString(item?.id, 64),
+  code: asString(item?.code, 64),
+  name: asString(item?.name, 120),
+  nameEn: asString(item?.nameEn, 120),
+  desc: asString(item?.desc, 500),
+  level: Math.max(0, Math.min(100, Number(item?.level) || 0)),
+  grade: ['S', 'A', 'B'].includes(item?.grade) ? item.grade : 'B',
+  icon: ['code', 'design', 'research', 'game', 'data', 'music'].includes(item?.icon)
+    ? item.icon
+    : 'code',
+})
+
+const sanitizeContact = (item) => ({
+  id: asString(item?.id, 64),
+  label: asString(item?.label, 120),
+  labelEn: asString(item?.labelEn, 120),
+  value: asString(item?.value, 200),
+  href: asString(item?.href, 500),
+  icon: ['github', 'bilibili', 'mail', 'music', 'chat'].includes(item?.icon)
+    ? item.icon
+    : 'chat',
+  note: asString(item?.note, 100),
+})
+
+const sanitizeLink = (item) => ({
+  id: asString(item?.id, 64),
+  label: asString(item?.label, 120),
+  href: asString(item?.href, 500),
+  note: asString(item?.note, 120),
+})
+
+const sanitizeHomeContent = (body) => {
+  const profileSource = body?.profile ?? body
+  const profile = sanitizeHomeProfile(profileSource)
+  if (!profile) return null
+  return {
+    profile,
+    abilities: Array.isArray(body?.abilities)
+      ? body.abilities.filter((item) => item && item.name).slice(0, 30).map(sanitizeAbility)
+      : [],
+    contacts: Array.isArray(body?.contacts)
+      ? body.contacts.filter((item) => item && item.label).slice(0, 30).map(sanitizeContact)
+      : [],
+    links: Array.isArray(body?.links)
+      ? body.links.filter((item) => item && item.label).slice(0, 30).map(sanitizeLink)
+      : [],
+  }
+}
+
 app.get('/api/site/home', async (_req, res) => {
   const rows = await query('SELECT data, updated_at FROM site_profile WHERE id = 1')
-  let profile = null
+  let content = null
   if (rows.length) {
     try {
-      profile = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data
+      const raw = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data
+      content = raw?.profile
+        ? raw
+        : { profile: raw, abilities: [], contacts: [], links: [] }
     } catch {
-      profile = null
+      content = null
     }
   }
   res.set('Cache-Control', 'public, max-age=15')
-  res.json({ profile, updatedAt: rows[0]?.updated_at ?? null })
+  res.json({
+    profile: content?.profile ?? null,
+    abilities: content?.abilities ?? [],
+    contacts: content?.contacts ?? [],
+    links: content?.links ?? [],
+    updatedAt: rows[0]?.updated_at ?? null,
+  })
 })
 
 app.put('/api/site/home', requireAuth, async (req, res) => {
   if (!req.user.isSuper) return res.status(403).json({ error: 'forbidden' })
-  const profile = sanitizeHomeProfile(req.body?.profile ?? req.body)
-  if (!profile) return res.status(400).json({ error: 'invalid_input' })
+  const content = sanitizeHomeContent(req.body)
+  if (!content) return res.status(400).json({ error: 'invalid_input' })
   await execute(
     `INSERT INTO site_profile (id, data, updated_by) VALUES (1, ?, ?)
      ON DUPLICATE KEY UPDATE data = VALUES(data), updated_by = VALUES(updated_by)`,
-    [JSON.stringify(profile), req.user.id],
+    [JSON.stringify(content), req.user.id],
   )
-  res.json({ profile })
+  res.json(content)
 })
 
 // 站点所有者资料：主页头像与后台超级管理员保持同步

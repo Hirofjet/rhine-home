@@ -191,10 +191,10 @@
 :root {
   --theme-scanline: rgb(0 0 0 / 0.16);
   --theme-selection: rgb(211 178 122 / 0.3);
-  --cursor-default: url("/cursors/rhine/default.cur") 6 10, auto;
-  --cursor-pointer: url("/cursors/rhine/pointer.cur") 6 10, pointer;
-  --cursor-text: url("/cursors/rhine/text.cur") 15 16, text;
-  --cursor-move: url("/cursors/rhine/move.cur") 15 16, move;
+  --cursor-default: url("/cursors/bluearchive/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/bluearchive/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/bluearchive/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/bluearchive/move.cur") 15 16, move;
 }
 
 html[data-theme="archive"] {
@@ -214,10 +214,10 @@ html[data-theme="archive"] {
   --color-rhine-red: #e0526f;
   --theme-scanline: rgb(27 92 145 / 0.045);
   --theme-selection: rgb(47 143 232 / 0.18);
-  --cursor-default: url("/cursors/archive/default.cur") 6 10, auto;
-  --cursor-pointer: url("/cursors/archive/pointer.cur") 6 10, pointer;
-  --cursor-text: url("/cursors/archive/text.cur") 15 16, text;
-  --cursor-move: url("/cursors/archive/move.cur") 15 16, move;
+  --cursor-default: url("/cursors/bluearchive/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/bluearchive/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/bluearchive/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/bluearchive/move.cur") 15 16, move;
 }
 
 html[data-theme="sakura"] {
@@ -237,10 +237,10 @@ html[data-theme="sakura"] {
   --color-rhine-red: #e05273;
   --theme-scanline: rgb(160 70 110 / 0.04);
   --theme-selection: rgb(240 93 157 / 0.18);
-  --cursor-default: url("/cursors/sakura/default.cur") 6 10, auto;
-  --cursor-pointer: url("/cursors/sakura/pointer.cur") 6 10, pointer;
-  --cursor-text: url("/cursors/sakura/text.cur") 15 16, text;
-  --cursor-move: url("/cursors/sakura/move.cur") 15 16, move;
+  --cursor-default: url("/cursors/bluearchive/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/bluearchive/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/bluearchive/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/bluearchive/move.cur") 15 16, move;
 }
 
 html[data-theme="noctis"] {
@@ -260,10 +260,10 @@ html[data-theme="noctis"] {
   --color-rhine-red: #ff7299;
   --theme-scanline: rgb(0 0 0 / 0.14);
   --theme-selection: rgb(154 134 255 / 0.28);
-  --cursor-default: url("/cursors/noctis/default.cur") 6 10, auto;
-  --cursor-pointer: url("/cursors/noctis/pointer.cur") 6 10, pointer;
-  --cursor-text: url("/cursors/noctis/text.cur") 15 16, text;
-  --cursor-move: url("/cursors/noctis/move.cur") 15 16, move;
+  --cursor-default: url("/cursors/bluearchive/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/bluearchive/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/bluearchive/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/bluearchive/move.cur") 15 16, move;
 }
 
 @media (pointer: fine) {

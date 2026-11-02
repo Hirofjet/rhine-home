@@ -54,13 +54,7 @@ cd /www/wwwroot/rhine-home
 
 - 导航栏调色板切换：**莱茵生命 / 碧蓝档案 / 樱色协议 / 深空协议**；
 - 主题保存在浏览器 `localStorage`，全站生效；
-- 动态鼠标来自 `public/cursors/animated/`，静态备用来自 `public/cursors/<theme>/`；
-- 重新生成光标：
-
-```bash
-python scripts/generate-cursors.py "Blue.Archive.Millennium.Edition.v1.3 路径"
-python scripts/generate-animated-cursors.py "同上路径"
-```
+- 鼠标直接使用原始 Blue Archive `.cur` 文件（`public/cursors/bluearchive/`），浏览器原生渲染，无自绘覆盖层、无重叠。
 
 ## 5. 后台与权限
 

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { ContactIcon } from '../../content'
 import { contactLinks, emailAddress } from '../../content'
+import { useSiteHomeContent } from '../../hooks/useSiteHomeContent'
 import { useCopy } from '../../hooks/useCopy'
 import { cx } from '../../lib/cx'
 import { fadeUp, viewportOnce } from '../../lib/motion'
@@ -27,6 +28,10 @@ const ICONS: Record<ContactIcon, LucideIcon> = {
 }
 
 export function ContactSection() {
+  const content = useSiteHomeContent()
+  const contacts = content.contacts.length ? content.contacts : contactLinks
+  const email = content.profile?.contactEmail || emailAddress
+  const extraLinks = content.links
   const { copied, copy } = useCopy()
   const [signal, setSignal] = useState('')
   const [log, setLog] = useState<string[]>([
@@ -59,7 +64,7 @@ export function ContactSection() {
           >
             <Panel code="RL-05" title="CHANNELS" titleZh="通讯频道" className="h-full">
               <ul className="divide-y divide-rhine-line/60">
-                {contactLinks.map((link) => {
+                {contacts.map((link) => {
                   const Icon = ICONS[link.icon]
                   return (
                     <li key={link.id}>
@@ -111,11 +116,11 @@ export function ContactSection() {
               </p>
               <div className="mt-3 flex items-center gap-3">
                 <p className="min-w-0 flex-1 truncate font-mono text-sm text-rhine-cyan">
-                  {emailAddress}
+                  {email}
                 </p>
                 <button
                   type="button"
-                  onClick={() => void copy(emailAddress)}
+                  onClick={() => void copy(email)}
                   className={cx(
                     'flex shrink-0 items-center gap-1.5 border px-3 py-1.5 font-mono text-[10px] tracking-[0.2em] transition-all duration-300',
                     copied
@@ -134,6 +139,28 @@ export function ContactSection() {
                   )}
                 </button>
               </div>
+
+              {extraLinks.length > 0 && (
+                <div className="mt-5 border-t border-rhine-line/60 pt-3">
+                  <p className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+                    EXTERNAL LINKS // 外部链接
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {extraLinks.map((link) => (
+                      <a
+                        key={link.id}
+                        href={link.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="border border-rhine-line px-2.5 py-1.5 font-mono text-[10px] tracking-wider text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
+                      >
+                        {link.label}
+                        {link.note ? ` · ${link.note}` : ''}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* 迷你讯号终端 */}
               <div className="mt-7">

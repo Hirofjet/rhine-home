@@ -73,6 +73,42 @@ export interface HomeProfile {
   github: string
 }
 
+export interface SiteAbility {
+  id: string
+  code: string
+  name: string
+  nameEn: string
+  desc: string
+  level: number
+  grade: 'S' | 'A' | 'B'
+  icon: 'code' | 'design' | 'research' | 'game' | 'data' | 'music'
+}
+
+export interface SiteContact {
+  id: string
+  label: string
+  labelEn: string
+  value: string
+  href: string
+  icon: 'github' | 'bilibili' | 'mail' | 'music' | 'chat'
+  note?: string
+}
+
+export interface SiteLink {
+  id: string
+  label: string
+  href: string
+  note?: string
+}
+
+export interface SiteHomeContent {
+  profile: HomeProfile | null
+  abilities: SiteAbility[]
+  contacts: SiteContact[]
+  links: SiteLink[]
+  updatedAt: string | null
+}
+
 export interface SiteProject {
   id: number
   code: string
@@ -499,15 +535,22 @@ export const siteApi = {
     }>('/api/site/profile', { auth: false })
   },
   home() {
-    return api<{ profile: HomeProfile | null; updatedAt: string | null }>(
-      '/api/site/home',
-      { auth: false },
-    )
+    return api<SiteHomeContent>('/api/site/home', { auth: false })
   },
-  saveHome(profile: HomeProfile) {
-    return api<{ profile: HomeProfile }>('/api/site/home', {
+  saveHome(content: {
+    profile: HomeProfile
+    abilities: SiteAbility[]
+    contacts: SiteContact[]
+    links: SiteLink[]
+  }) {
+    return api<{
+      profile: HomeProfile
+      abilities: SiteAbility[]
+      contacts: SiteContact[]
+      links: SiteLink[]
+    }>('/api/site/home', {
       method: 'PUT',
-      body: { profile },
+      body: content,
     })
   },
 }

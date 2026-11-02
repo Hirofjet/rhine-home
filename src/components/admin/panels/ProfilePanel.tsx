@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Save, Upload } from 'lucide-react'
-import { errorMessage, siteApi, type HomeProfile } from '../../../lib/api'
-import { profile as fallbackProfile } from '../../../content'
+import {
+  errorMessage,
+  siteApi,
+  type HomeProfile,
+  type SiteAbility,
+  type SiteContact,
+  type SiteLink,
+} from '../../../lib/api'
+import { abilityModules, contactLinks, profile as fallbackProfile } from '../../../content'
 import {
   AdminButton,
   AdminError,
@@ -35,6 +42,9 @@ const parseList = (value: string) =>
 
 export function ProfilePanel() {
   const [draft, setDraft] = useState<HomeProfile>(FALLBACK)
+  const [abilities, setAbilities] = useState<SiteAbility[]>(abilityModules)
+  const [contacts, setContacts] = useState<SiteContact[]>(contactLinks)
+  const [links, setLinks] = useState<SiteLink[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -56,6 +66,9 @@ export function ProfilePanel() {
           }
         }
         if (next) setDraft({ ...FALLBACK, ...next })
+        if (data.abilities?.length) setAbilities(data.abilities)
+        if (data.contacts?.length) setContacts(data.contacts)
+        if (data.links?.length) setLinks(data.links)
       })
       .catch(() => undefined)
     return () => {
@@ -74,8 +87,16 @@ export function ProfilePanel() {
         specialties: draft.specialties.filter(Boolean),
         traits: draft.traits.filter(Boolean),
       }
-      await siteApi.saveHome(normalized)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+      await siteApi.saveHome({
+        profile: normalized,
+        abilities,
+        contacts,
+        links,
+      })
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ profile: normalized, abilities, contacts, links }),
+      )
       setNotice('主页资料已保存，并写入本地备份')
     } catch (err) {
       setError(errorMessage(err))
@@ -183,6 +204,48 @@ export function ProfilePanel() {
         </AdminField>
         <AdminField label="特性 / TRAITS（逗号分隔）">
           <AdminInput value={list(draft.traits)} onChange={(e) => setDraft({ ...draft, traits: parseList(e.target.value) })} />
+        </AdminField>
+        <AdminField label="能力模块 / JSON">
+          <AdminTextarea
+            value={JSON.stringify(abilities, null, 2)}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value)
+                if (Array.isArray(parsed)) setAbilities(parsed)
+              } catch {
+                /* 输入中允许暂时不合法 */
+              }
+            }}
+            rows={6}
+          />
+        </AdminField>
+        <AdminField label="联系方式 / JSON">
+          <AdminTextarea
+            value={JSON.stringify(contacts, null, 2)}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value)
+                if (Array.isArray(parsed)) setContacts(parsed)
+              } catch {
+                /* ignore */
+              }
+            }}
+            rows={6}
+          />
+        </AdminField>
+        <AdminField label="外部链接 / JSON">
+          <AdminTextarea
+            value={JSON.stringify(links, null, 2)}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value)
+                if (Array.isArray(parsed)) setLinks(parsed)
+              } catch {
+                /* ignore */
+              }
+            }}
+            rows={4}
+          />
         </AdminField>
         <p className="mt-3 font-mono text-[9px] leading-relaxed text-rhine-faint">
           数据保存到 MySQL，同时在本浏览器的 localStorage 留一份备份；换电脑可用“导出 / 导入本地”迁移。
