@@ -11,6 +11,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { config } from './config.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(__dirname, '..')
@@ -39,7 +40,7 @@ function parseMarkdown(raw, filename) {
 
 async function readLegacyJson(name) {
   try {
-    const raw = await fs.readFile(path.join(__dirname, 'data', `${name}.json`), 'utf8')
+    const raw = await fs.readFile(path.join(config.dataDir, `${name}.json`), 'utf8')
     const parsed = JSON.parse(raw)
     const rows = Array.isArray(parsed) ? parsed : (parsed.items ?? [])
     return Array.isArray(rows) ? rows : []

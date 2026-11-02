@@ -72,7 +72,26 @@ cd /www/wwwroot/rhine-home
 - 「导入本地」可在数据库重置后恢复；
 - 个人备份文件已被 `.gitignore` 排除，禁止提交公开仓库。
 
-## 7. 隐私与示例数据
+## 7. 项目外数据目录
+
+为了避免更新网站时覆盖个人数据，本地上传与旧数据已经移到项目外：
+
+```text
+F:\文档\rhine-local\rhine-data\
+├── uploads\     # 头像、照片、视频、附件
+└── data\        # 旧版 JSON 数据
+```
+
+在 `server/.env` 或系统环境变量中设置：
+
+```ini
+UPLOAD_DIR=F:\文档\rhine-local\rhine-data\uploads
+DATA_DIR=F:\文档\rhine-local\rhine-data\data
+```
+
+`server/.env` 已被 `.gitignore` 排除；部署时同样建议把这两个目录放到项目目录之外，并定期备份。
+
+## 8. 隐私与示例数据
 
 - 仓库默认内容中的昵称、邮箱、GitHub 账号、所在地等均为示例；
 - 真实资料只保存在数据库/浏览器本地，不进入 Git；
@@ -85,7 +104,7 @@ git diff --staged
 
 不要提交 `.env`、`server/uploads`、`server/data`、`rhine-home-profile.json`。
 
-## 8. 快捷命令
+## 9. 快捷命令
 
 ```bash
 npm run lint

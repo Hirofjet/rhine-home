@@ -219,6 +219,7 @@ Git 常用操作（提交、分支、撤销、冲突、部署拉取）见 **[GIT
 
 - 内容全部保存在 MySQL，重新部署代码不会清空数据库；
 - 容器部署需要给 MySQL 挂载 volume，并保留 `server/uploads`；
+- 本地上传目录可移到项目外：设置 `UPLOAD_DIR`（如 `F:\文档\rhine-local\rhine-data\uploads`），旧 JSON 数据用 `DATA_DIR`；
 - 若数据库为空，后端首次启动会自动从 `src/assets/articles`、`src/assets/logs`、旧版 `server/data/*.json` 恢复内容；
 - 详见 [DEPLOY.md](DEPLOY.md) 的「重新部署与旧数据恢复」。
 

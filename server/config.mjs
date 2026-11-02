@@ -55,8 +55,11 @@ export const config = {
   // 会话时长（小时）
   sessionHours: Number(process.env.SESSION_HOURS ?? 12),
 
-  // 上传目录
+  // 上传目录（默认 server/uploads；可指向项目外，避免更新代码时丢失）
   uploadDir: process.env.UPLOAD_DIR ?? '',
+
+  // 旧版 JSON 数据目录（默认 server/data；可指向项目外）
+  dataDir: process.env.DATA_DIR ?? path.join(__dirname, 'data'),
 
   // 跨域（默认同源部署，留空即可）
   corsOrigin: process.env.CORS_ORIGIN ?? '',
