@@ -884,11 +884,6 @@ export const adminApi = {
       body: { approve },
     })
   },
-  removeBoard(id: number) {
-    return api<{ ok: boolean }>(`/api/admin/forum/boards/${id}`, {
-      method: 'DELETE',
-    })
-  },
   requestBoardDeletion(id: number) {
     return api<{ ok: boolean }>(`/api/admin/forum/boards/${id}/deletion-request`, {
       method: 'POST',

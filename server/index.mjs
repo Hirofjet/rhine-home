@@ -1830,20 +1830,8 @@ app.post('/api/admin/forum/deletion-requests/:id/vote', requireAuth, async (req,
   res.json({ ok: true, status: 'pending', approvals: voteCount })
 })
 
-app.delete('/api/admin/forum/boards/:id', requireAuth, requireForumAccess, async (req, res) => {
-  if (!(req.user.isSuper || hasPermission(req.user, 'forum'))) {
-    return res.status(403).json({ error: 'forbidden' })
-  }
-  const id = Number(req.params.id)
-  await transaction(async (connection) => {
-    await connection.execute(
-      'DELETE r FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE p.board_id = ?',
-      [id],
-    )
-    await connection.execute('DELETE FROM forum_posts WHERE board_id = ?', [id])
-    await connection.execute('DELETE FROM forum_boards WHERE id = ?', [id])
-  })
-  res.json({ ok: true })
+app.delete('/api/admin/forum/boards/:id', requireAuth, requireForumAccess, (_req, res) => {
+  res.status(409).json({ error: 'deletion_requires_approval' })
 })
 
 app.get('/api/admin/forum/pending', requireAuth, requireForumAccess, async (req, res) => {
