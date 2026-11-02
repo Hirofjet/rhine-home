@@ -121,7 +121,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     }
 
     list.push({
-      title: '账号',
+      title: '设置',
       items: [{ key: 'settings', label: '设置', labelEn: 'SETTINGS' }],
     })
     return list

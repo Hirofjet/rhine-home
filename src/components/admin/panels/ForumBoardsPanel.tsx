@@ -450,6 +450,22 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
                   <p className="mt-1 font-mono text-[10px] tracking-wider text-rhine-faint">
                     {board.description || '暂无描述'} · {board.postCount} 帖
                   </p>
+                  <div className="mt-2 flex items-center gap-1">
+                    <span className="h-1.5 flex-1 bg-rhine-line/40">
+                      <span
+                        className="block h-full bg-rhine-cyan/60"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            8 + (board.postCount / Math.max(1, ...boards.map((item) => item.postCount))) * 92,
+                          )}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="font-mono text-[8px] text-rhine-faint">
+                      {board.tags?.length ? board.tags.join(' · ') : 'NO TAGS'}
+                    </span>
+                  </div>
                 </div>
                 {canManageAll && (
                   <div className="flex gap-2">
