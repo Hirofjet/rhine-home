@@ -191,10 +191,10 @@
 :root {
   --theme-scanline: rgb(0 0 0 / 0.16);
   --theme-selection: rgb(211 178 122 / 0.3);
-  --cursor-default: url("/cursors/rhine/default.png") 6 10, auto;
-  --cursor-pointer: url("/cursors/rhine/pointer.png") 6 10, pointer;
-  --cursor-text: url("/cursors/rhine/text.png") 15 16, text;
-  --cursor-move: url("/cursors/rhine/move.png") 15 16, move;
+  --cursor-default: url("/cursors/rhine/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/rhine/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/rhine/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/rhine/move.cur") 15 16, move;
 }
 
 html[data-theme="archive"] {
@@ -214,10 +214,10 @@ html[data-theme="archive"] {
   --color-rhine-red: #e0526f;
   --theme-scanline: rgb(27 92 145 / 0.045);
   --theme-selection: rgb(47 143 232 / 0.18);
-  --cursor-default: url("/cursors/archive/default.png") 6 10, auto;
-  --cursor-pointer: url("/cursors/archive/pointer.png") 6 10, pointer;
-  --cursor-text: url("/cursors/archive/text.png") 15 16, text;
-  --cursor-move: url("/cursors/archive/move.png") 15 16, move;
+  --cursor-default: url("/cursors/archive/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/archive/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/archive/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/archive/move.cur") 15 16, move;
 }
 
 html[data-theme="sakura"] {
@@ -237,10 +237,10 @@ html[data-theme="sakura"] {
   --color-rhine-red: #e05273;
   --theme-scanline: rgb(160 70 110 / 0.04);
   --theme-selection: rgb(240 93 157 / 0.18);
-  --cursor-default: url("/cursors/sakura/default.png") 6 10, auto;
-  --cursor-pointer: url("/cursors/sakura/pointer.png") 6 10, pointer;
-  --cursor-text: url("/cursors/sakura/text.png") 15 16, text;
-  --cursor-move: url("/cursors/sakura/move.png") 15 16, move;
+  --cursor-default: url("/cursors/sakura/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/sakura/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/sakura/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/sakura/move.cur") 15 16, move;
 }
 
 html[data-theme="noctis"] {
@@ -260,10 +260,10 @@ html[data-theme="noctis"] {
   --color-rhine-red: #ff7299;
   --theme-scanline: rgb(0 0 0 / 0.14);
   --theme-selection: rgb(154 134 255 / 0.28);
-  --cursor-default: url("/cursors/noctis/default.png") 6 10, auto;
-  --cursor-pointer: url("/cursors/noctis/pointer.png") 6 10, pointer;
-  --cursor-text: url("/cursors/noctis/text.png") 15 16, text;
-  --cursor-move: url("/cursors/noctis/move.png") 15 16, move;
+  --cursor-default: url("/cursors/noctis/default.cur") 6 10, auto;
+  --cursor-pointer: url("/cursors/noctis/pointer.cur") 6 10, pointer;
+  --cursor-text: url("/cursors/noctis/text.cur") 15 16, text;
+  --cursor-move: url("/cursors/noctis/move.cur") 15 16, move;
 }
 
 @media (pointer: fine) {
@@ -285,36 +285,8 @@ html[data-theme="noctis"] {
   .cursor-move {
     cursor: var(--cursor-move);
   }
-  html.has-animated-cursor,
-  html.has-animated-cursor * {
-    cursor: none !important;
-  }
 }
 
-.animated-cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 9999;
-  height: 32px;
-  pointer-events: none;
-  background-repeat: no-repeat;
-  image-rendering: pixelated;
-  will-change: transform, background-position;
-  transition: opacity 120ms ease;
-}
-.animated-cursor[data-cursor-theme="archive"] {
-  filter: none;
-}
-.animated-cursor[data-cursor-theme="rhine"] {
-  filter: sepia(0.55) saturate(1.8) hue-rotate(-8deg) brightness(1.06);
-}
-.animated-cursor[data-cursor-theme="sakura"] {
-  filter: hue-rotate(300deg) saturate(1.35) brightness(1.08);
-}
-.animated-cursor[data-cursor-theme="noctis"] {
-  filter: hue-rotate(225deg) saturate(1.4) brightness(1.12);
-}
 
 html.theme-switching *,
 html.theme-switching *::before,
@@ -695,17 +667,17 @@ html.theme-switching *::after {
 
 /* 整体字号：小字在 1080p 下也清晰可读 */
 html {
-  font-size: 17px;
+  font-size: 18px;
 }
 
 [class~="text-[9px]"] {
-  font-size: 10px;
-}
-
-[class~="text-[10px]"] {
   font-size: 11px;
 }
 
-[class~="text-[11px]"] {
+[class~="text-[10px]"] {
   font-size: 12px;
+}
+
+[class~="text-[11px]"] {
+  font-size: 13px;
 }

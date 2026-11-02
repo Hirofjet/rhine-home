@@ -6,7 +6,6 @@ import { BootScreen } from './components/boot/BootScreen'
 import { SessionProvider } from './components/auth/SessionProvider'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { BackgroundFX } from './components/layout/BackgroundFX'
-import { AnimatedCursor } from './components/layout/AnimatedCursor'
 import { MouseTrail } from './components/layout/MouseTrail'
 import { Footer } from './components/layout/Footer'
 import { NavBar } from './components/layout/NavBar'
@@ -254,7 +253,6 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <AnimatedCursor />
         <SessionProvider>
           <BootGate>
             <ScrollManager />
