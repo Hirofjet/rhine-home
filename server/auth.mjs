@@ -237,7 +237,7 @@ export function sanitizePermissions(value, actor) {
   const allowed = new Set(PERMISSION_KEYS)
   const list = value
     .filter((item) => typeof item === 'string')
-    .filter((item) => allowed.has(item) || /^forum\.\d+$/.test(item))
+    .filter((item) => allowed.has(item) || /^forum\.\d+(?:\.(?:post|reply)\.(?:publish|pin|hide|delete|review))?$/.test(item))
   const unique = [...new Set(list)]
   if (!actor?.isSuper) {
     return unique.filter(

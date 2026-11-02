@@ -1542,7 +1542,7 @@ app.delete('/api/forum/posts/:id', requireAuth, async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
   const allowed =
     rows[0].author_id === req.user.id ||
-    canModerateBoard(req.user, Number(rows[0].board_id))
+    hasForumAction(req.user, Number(rows[0].board_id), 'post.delete')
   if (!allowed) return res.status(403).json({ error: 'forbidden' })
   await execute(`UPDATE forum_posts SET status = 'deleted' WHERE id = ?`, [id])
   res.json({ ok: true })
@@ -1601,7 +1601,7 @@ app.delete('/api/forum/replies/:id', requireAuth, async (req, res) => {
   const allowed =
     row.author_id === req.user.id ||
     row.post_author === req.user.id ||
-    canModerateBoard(req.user, Number(row.board_id))
+    hasForumAction(req.user, Number(row.board_id), 'reply.delete')
   if (!allowed) return res.status(403).json({ error: 'forbidden' })
   await execute(`UPDATE forum_replies SET status = 'deleted' WHERE id = ?`, [id])
   res.json({ ok: true })
