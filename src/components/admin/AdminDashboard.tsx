@@ -100,9 +100,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
     const forum: MenuItem[] = []
     if (forumAccess) {
-      forum.push({ key: 'forum-boards', label: '板块管理', labelEn: 'BOARDS' })
+      forum.push({ key: 'forum-boards', label: '论坛管理', labelEn: 'BOARDS' })
       forum.push({ key: 'forum-posts', label: '帖子管理', labelEn: 'THREADS' })
-      forum.push({ key: 'review', label: '内容审核', labelEn: 'REVIEW' })
+      forum.push({ key: 'review', label: '审核平台', labelEn: 'REVIEW' })
     }
     if (forum.length) list.push({ title: '论坛', items: forum })
 

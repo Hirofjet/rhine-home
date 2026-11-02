@@ -23,6 +23,15 @@ import {
 export function ReviewPanel() {
   const [posts, setPosts] = useState<PendingPost[]>([])
   const [replies, setReplies] = useState<PendingReply[]>([])
+  const [requests, setRequests] = useState<
+    Array<{
+      id: number
+      boardName: string
+      username: string
+      status: string
+      createdAt: string
+    }>
+  >([])
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -31,9 +40,13 @@ export function ReviewPanel() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await adminApi.pending()
+      const [data, requestData] = await Promise.all([
+        adminApi.pending(),
+        adminApi.requests().catch(() => ({ requests: [] })),
+      ])
       setPosts(data.posts)
       setReplies(data.replies)
+      setRequests(requestData.requests)
       setError('')
     } catch (err) {
       setError(errorMessage(err))
@@ -58,6 +71,12 @@ export function ReviewPanel() {
       .finally(() => {
         if (alive) setLoading(false)
       })
+    adminApi
+      .requests()
+      .then((data) => {
+        if (alive) setRequests(data.requests)
+      })
+      .catch(() => undefined)
     return () => {
       alive = false
     }
@@ -75,12 +94,66 @@ export function ReviewPanel() {
     }
   }
 
+  const reviewRequest = async (id: number, approve: boolean) => {
+    try {
+      await adminApi.reviewRequest(id, approve)
+      setRequests((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, status: approve ? 'approved' : 'rejected' } : item,
+        ),
+      )
+      setNotice(approve ? '已通过访问申请' : '已拒绝访问申请')
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
   const total = posts.length + replies.length
 
   return (
     <div className="space-y-4">
       <AdminError message={error} />
       <AdminNotice message={notice} />
+
+      {requests.length > 0 && (
+        <AdminPanel title="特殊论坛申请" subtitle="ACCESS REQUESTS">
+          <ul className="divide-y divide-rhine-line/60">
+            {requests.map((request) => (
+              <li key={request.id} className="flex flex-wrap items-center gap-2 py-2">
+                <span className="text-xs text-rhine-ink">{request.username}</span>
+                <span className="font-mono text-[10px] text-rhine-dim">
+                  申请访问「{request.boardName}」
+                </span>
+                <AdminBadge
+                  tone={
+                    request.status === 'approved'
+                      ? 'green'
+                      : request.status === 'rejected'
+                        ? 'red'
+                        : 'gold'
+                  }
+                >
+                  {request.status === 'approved'
+                    ? '已通过'
+                    : request.status === 'rejected'
+                      ? '已拒绝'
+                      : '待审批'}
+                </AdminBadge>
+                {request.status === 'pending' && (
+                  <span className="ml-auto flex gap-2">
+                    <AdminButton variant="ghost" onClick={() => void reviewRequest(request.id, true)}>
+                      同意
+                    </AdminButton>
+                    <AdminButton variant="danger" onClick={() => void reviewRequest(request.id, false)}>
+                      拒绝
+                    </AdminButton>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </AdminPanel>
+      )}
 
       <AdminPanel
         title={`待审核内容${total ? `（${total}）` : ''}`}
