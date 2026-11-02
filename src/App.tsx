@@ -6,6 +6,7 @@ import { BootScreen } from './components/boot/BootScreen'
 import { SessionProvider } from './components/auth/SessionProvider'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { BackgroundFX } from './components/layout/BackgroundFX'
+import { AnimatedCursor } from './components/layout/AnimatedCursor'
 import { MouseTrail } from './components/layout/MouseTrail'
 import { Footer } from './components/layout/Footer'
 import { NavBar } from './components/layout/NavBar'
@@ -44,6 +45,9 @@ const ForumComposePage = lazy(() =>
 )
 const ProfilePage = lazy(() =>
   import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
+)
+const MessagesPage = lazy(() =>
+  import('./pages/MessagesPage').then((m) => ({ default: m.MessagesPage })),
 )
 const PublicUserPage = lazy(() =>
   import('./pages/PublicUserPage').then((m) => ({ default: m.PublicUserPage })),
@@ -208,23 +212,26 @@ function AnimatedRoutes() {
         className="relative"
       >
         <span className="page-enter-scan" aria-hidden />
-        <Suspense fallback={<PageLoading />}>
-          <Routes location={location}>
-            <Route path="/" element={<HomePage />} />
-            {/* ==== 扩展模块页面：新增页面时在这里注册路由 ==== */}
-            <Route path="/archive" element={<ArchivePage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/logs" element={<LogsPage />} />
-            <Route path="/forum" element={<ForumPage />} />
-            <Route path="/forum/new" element={<ForumComposePage />} />
-            <Route path="/forum/post/:id" element={<ForumPostPage />} />
-            <Route path="/forum/:slug" element={<ForumBoardPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/u/:id" element={<PublicUserPage />} />
-            <Route path="/guestbook" element={<GuestbookPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
+        <div className="route-content">
+          <Suspense fallback={<PageLoading />}>
+            <Routes location={location}>
+              <Route path="/" element={<HomePage />} />
+              {/* ==== 扩展模块页面：新增页面时在这里注册路由 ==== */}
+              <Route path="/archive" element={<ArchivePage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/logs" element={<LogsPage />} />
+              <Route path="/forum" element={<ForumPage />} />
+              <Route path="/forum/new" element={<ForumComposePage />} />
+              <Route path="/forum/post/:id" element={<ForumPostPage />} />
+              <Route path="/forum/:slug" element={<ForumBoardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/messages" element={<MessagesPage />} />
+              <Route path="/u/:id" element={<PublicUserPage />} />
+              <Route path="/guestbook" element={<GuestbookPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+        </div>
       </motion.div>
     </AnimatePresence>
   )
@@ -247,6 +254,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
+        <AnimatedCursor />
         <SessionProvider>
           <BootGate>
             <ScrollManager />

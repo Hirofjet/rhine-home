@@ -11,6 +11,8 @@ export interface Project {
   /** 项目编号 */
   code: string
   /** 项目名（中文） */
+  name?: string
+  /** 项目名（中文） */
   title: string
   /** 项目名（英文小字） */
   subtitle: string
@@ -22,19 +24,37 @@ export interface Project {
   status: ProjectStatus
   /** 外链（可选） */
   link?: string
+  shortName?: string
+  type?: string
+  author?: string
+  version?: string
+  githubUrl?: string
+  details?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export const projects: Project[] = [
   {
     id: 'rhine-home',
     code: 'RL-PJ-01',
-    title: '本项目：示例用户的主页',
+    name: '示例项目：个人主页',
+    title: '示例项目：个人主页',
+    shortName: 'SAMPLE-HOME',
     subtitle: 'SAMPLE-HOME',
     description:
-      '你正在浏览的这个主页。基于 React + Vite 构建，包含开机动画、模块化面板与内容配置系统。',
+      '一个可自由替换内容的个人主页模板，包含开机动画、模块化面板、论坛与内容管理。',
     tags: ['React', 'Tailwind', 'Motion'],
     status: 'ACTIVE',
-    link: '/',
+    type: 'Web / Personal Site',
+    author: 'SAMPLE',
+    version: '0.9.0',
+    githubUrl: 'https://github.com/example/rhine-home',
+    details:
+      '技术栈：React 19 / TypeScript / Vite 8 / Tailwind CSS v4 / Framer Motion。\n支持主题切换、内容管理、权限系统、论坛、留言板与好友私信。',
+    createdAt: '2026-10-30',
+    updatedAt: '2026-11-02',
+    link: 'https://github.com/example/rhine-home',
   },
   {
     id: 'reserved-2',

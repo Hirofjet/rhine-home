@@ -30,6 +30,11 @@ THEMES = {
         "accent": (255, 158, 201),
         "border": (43, 16, 33),
     },
+    "noctis": {
+        "fill": (232, 225, 255),
+        "accent": (154, 134, 255),
+        "border": (18, 12, 38),
+    },
 }
 
 # fixed hotspots for the 32px frame (x, y)

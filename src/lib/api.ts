@@ -56,6 +56,41 @@ export interface ContentLog {
   markdown: string
 }
 
+export interface HomeProfile {
+  codeName: string
+  realName: string
+  roles: string[]
+  intro: string
+  dossier: string[]
+  occupation: string
+  affiliation: string
+  status: string
+  location: string
+  specialties: string[]
+  traits: string[]
+  contactEmail: string
+  github: string
+}
+
+export interface SiteProject {
+  id: number
+  code: string
+  name: string
+  shortName: string
+  description: string
+  type: string
+  tags: string[]
+  author: string
+  status: string
+  version: string
+  githubUrl: string
+  details: string
+  visible: boolean
+  sort: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ContentPhoto {
   id: number
   url: string
@@ -158,6 +193,15 @@ export interface Conversation {
   user: { id: number; username: string; avatarUrl?: string; isFollowing?: boolean }
   last: { content: string; createdAt: string; fromMe: boolean } | null
   unread: number
+}
+
+export interface Friend {
+  id: number
+  username: string
+  account: string
+  avatarUrl: string
+  unread: number
+  last: { id: number; content: string; createdAt: string; fromMe: boolean } | null
 }
 
 export interface ChatMessage {
@@ -439,6 +483,12 @@ export const contentApi = {
     })
     return data.items ?? []
   },
+  async projects(): Promise<SiteProject[]> {
+    const data = await api<{ items?: SiteProject[] }>('/api/content/projects', {
+      auth: false,
+    })
+    return data.items ?? []
+  },
 }
 
 export const siteApi = {
@@ -446,6 +496,18 @@ export const siteApi = {
     return api<{
       profile: { id: number | null; nickname: string; avatarUrl: string }
     }>('/api/site/profile', { auth: false })
+  },
+  home() {
+    return api<{ profile: HomeProfile | null; updatedAt: string | null }>(
+      '/api/site/home',
+      { auth: false },
+    )
+  },
+  saveHome(profile: HomeProfile) {
+    return api<{ profile: HomeProfile }>('/api/site/home', {
+      method: 'PUT',
+      body: { profile },
+    })
   },
 }
 
@@ -621,6 +683,18 @@ export interface AdminOverview {
 export const adminApi = {
   overview() {
     return api<AdminOverview>('/api/admin/overview')
+  },
+  projects() {
+    return api<{ items: SiteProject[] }>('/api/admin/projects')
+  },
+  createProject(data: Record<string, unknown>) {
+    return api<SiteProject>('/api/admin/projects', { method: 'POST', body: data })
+  },
+  updateProject(id: number, data: Record<string, unknown>) {
+    return api<SiteProject>(`/api/admin/projects/${id}`, { method: 'PUT', body: data })
+  },
+  deleteProject(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/projects/${id}`, { method: 'DELETE' })
   },
   list(name: string) {
     return api<{ items: unknown[] }>(`/api/admin/${name}`)
@@ -852,6 +926,9 @@ export const userApi = {
   },
   conversations() {
     return api<{ conversations: Conversation[] }>('/api/messages/conversations')
+  },
+  friends() {
+    return api<{ friends: Friend[] }>('/api/friends')
   },
   messagesWith(id: number) {
     return api<{

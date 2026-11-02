@@ -92,7 +92,7 @@ export function NotificationMenu() {
               消息
             </p>
             <Link
-              to="/profile?tab=messages"
+              to="/messages"
               onClick={() => setOpen(false)}
               className="font-mono text-[9px] text-rhine-cyan hover:text-rhine-gold"
             >
@@ -108,7 +108,7 @@ export function NotificationMenu() {
               {important.slice(0, 2).map((item) => (
                 <Link
                   key={item.id}
-                  to={item.link || '/profile?tab=messages'}
+                  to={item.link || '/messages'}
                   onClick={() => setOpen(false)}
                   className="mt-1 block truncate text-xs text-rhine-gold/90"
                 >
@@ -125,7 +125,7 @@ export function NotificationMenu() {
             {recentNotifications.map((item) => (
               <Link
                 key={`n-${item.id}`}
-                to={item.link || '/profile?tab=messages'}
+                to={item.link || '/messages'}
                 onClick={() => setOpen(false)}
                 className={`block border-b border-rhine-line/40 px-3 py-2 hover:bg-rhine-gold/5 ${
                   item.read ? 'opacity-60' : ''
@@ -145,7 +145,7 @@ export function NotificationMenu() {
             {recentConversations.map((conversation) => (
               <Link
                 key={`c-${conversation.user.id}`}
-                to="/profile?tab=messages"
+                to={`/messages?with=${conversation.user.id}`}
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-2 border-b border-rhine-line/40 px-3 py-2 hover:bg-rhine-gold/5 ${
                   conversation.user.isFollowing && conversation.unread > 0

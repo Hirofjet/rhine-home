@@ -189,6 +189,8 @@
    因此切换 data-theme 即可全局换肤。
    ============================================================ */
 :root {
+  --theme-scanline: rgb(0 0 0 / 0.16);
+  --theme-selection: rgb(211 178 122 / 0.3);
   --cursor-default: url("/cursors/rhine/default.png") 6 10, auto;
   --cursor-pointer: url("/cursors/rhine/pointer.png") 6 10, pointer;
   --cursor-text: url("/cursors/rhine/text.png") 15 16, text;
@@ -196,20 +198,22 @@
 }
 
 html[data-theme="archive"] {
-  --color-rhine-abyss: #050e1b;
-  --color-rhine-abyss-2: #071628;
-  --color-rhine-panel: #0a1f35;
-  --color-rhine-panel-2: #0d2945;
-  --color-rhine-line: #183b5b;
-  --color-rhine-line-2: #2c6490;
-  --color-rhine-ink: #eaf5ff;
-  --color-rhine-dim: #9cb8d5;
-  --color-rhine-faint: #5f809f;
-  --color-rhine-gold: #5fb2ff;
-  --color-rhine-gold-deep: #2d70ae;
-  --color-rhine-cyan: #ff9ecb;
-  --color-rhine-green: #66e3c4;
-  --color-rhine-red: #ff6f91;
+  --color-rhine-abyss: #f4f9ff;
+  --color-rhine-abyss-2: #eaf4ff;
+  --color-rhine-panel: #ffffff;
+  --color-rhine-panel-2: #f7fbff;
+  --color-rhine-line: #c3dcef;
+  --color-rhine-line-2: #8fbcdf;
+  --color-rhine-ink: #17324d;
+  --color-rhine-dim: #55738e;
+  --color-rhine-faint: #88a3b8;
+  --color-rhine-gold: #2f8fe8;
+  --color-rhine-gold-deep: #1b6cba;
+  --color-rhine-cyan: #ff7fae;
+  --color-rhine-green: #1fae8b;
+  --color-rhine-red: #e0526f;
+  --theme-scanline: rgb(27 92 145 / 0.045);
+  --theme-selection: rgb(47 143 232 / 0.18);
   --cursor-default: url("/cursors/archive/default.png") 6 10, auto;
   --cursor-pointer: url("/cursors/archive/pointer.png") 6 10, pointer;
   --cursor-text: url("/cursors/archive/text.png") 15 16, text;
@@ -217,24 +221,49 @@ html[data-theme="archive"] {
 }
 
 html[data-theme="sakura"] {
-  --color-rhine-abyss: #100812;
-  --color-rhine-abyss-2: #170b1b;
-  --color-rhine-panel: #1d0f22;
-  --color-rhine-panel-2: #28152f;
-  --color-rhine-line: #3c2345;
-  --color-rhine-line-2: #60396b;
-  --color-rhine-ink: #fceff7;
-  --color-rhine-dim: #c7a8bd;
-  --color-rhine-faint: #876580;
-  --color-rhine-gold: #ff9ec9;
-  --color-rhine-gold-deep: #b85b8c;
-  --color-rhine-cyan: #c9a7ff;
-  --color-rhine-green: #8ee6c1;
-  --color-rhine-red: #ff6f91;
+  --color-rhine-abyss: #fff6fb;
+  --color-rhine-abyss-2: #ffeaf5;
+  --color-rhine-panel: #ffffff;
+  --color-rhine-panel-2: #fff9fc;
+  --color-rhine-line: #f0c9dc;
+  --color-rhine-line-2: #dda0bf;
+  --color-rhine-ink: #4a2338;
+  --color-rhine-dim: #8c5d75;
+  --color-rhine-faint: #b78ca2;
+  --color-rhine-gold: #f05d9d;
+  --color-rhine-gold-deep: #c9447f;
+  --color-rhine-cyan: #a77cff;
+  --color-rhine-green: #2fb98f;
+  --color-rhine-red: #e05273;
+  --theme-scanline: rgb(160 70 110 / 0.04);
+  --theme-selection: rgb(240 93 157 / 0.18);
   --cursor-default: url("/cursors/sakura/default.png") 6 10, auto;
   --cursor-pointer: url("/cursors/sakura/pointer.png") 6 10, pointer;
   --cursor-text: url("/cursors/sakura/text.png") 15 16, text;
   --cursor-move: url("/cursors/sakura/move.png") 15 16, move;
+}
+
+html[data-theme="noctis"] {
+  --color-rhine-abyss: #080511;
+  --color-rhine-abyss-2: #0d091a;
+  --color-rhine-panel: #120d24;
+  --color-rhine-panel-2: #18112e;
+  --color-rhine-line: #2b2147;
+  --color-rhine-line-2: #4b3a72;
+  --color-rhine-ink: #f0eaff;
+  --color-rhine-dim: #b3a3d6;
+  --color-rhine-faint: #74648f;
+  --color-rhine-gold: #9a86ff;
+  --color-rhine-gold-deep: #6d5ac2;
+  --color-rhine-cyan: #3cf0c8;
+  --color-rhine-green: #7ee6b8;
+  --color-rhine-red: #ff7299;
+  --theme-scanline: rgb(0 0 0 / 0.14);
+  --theme-selection: rgb(154 134 255 / 0.28);
+  --cursor-default: url("/cursors/noctis/default.png") 6 10, auto;
+  --cursor-pointer: url("/cursors/noctis/pointer.png") 6 10, pointer;
+  --cursor-text: url("/cursors/noctis/text.png") 15 16, text;
+  --cursor-move: url("/cursors/noctis/move.png") 15 16, move;
 }
 
 @media (pointer: fine) {
@@ -256,6 +285,35 @@ html[data-theme="sakura"] {
   .cursor-move {
     cursor: var(--cursor-move);
   }
+  html.has-animated-cursor,
+  html.has-animated-cursor * {
+    cursor: none !important;
+  }
+}
+
+.animated-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  height: 32px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  will-change: transform, background-position;
+  transition: opacity 120ms ease;
+}
+.animated-cursor[data-cursor-theme="archive"] {
+  filter: none;
+}
+.animated-cursor[data-cursor-theme="rhine"] {
+  filter: sepia(0.55) saturate(1.8) hue-rotate(-8deg) brightness(1.06);
+}
+.animated-cursor[data-cursor-theme="sakura"] {
+  filter: hue-rotate(300deg) saturate(1.35) brightness(1.08);
+}
+.animated-cursor[data-cursor-theme="noctis"] {
+  filter: hue-rotate(225deg) saturate(1.4) brightness(1.12);
 }
 
 html.theme-switching *,
@@ -287,7 +345,7 @@ html.theme-switching *::after {
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--color-rhine-gold) 32%, transparent);
+    background: var(--theme-selection);
     color: var(--color-rhine-ink);
   }
 
@@ -322,8 +380,8 @@ html.theme-switching *::after {
       0deg,
       rgb(0 0 0 / 0) 0px,
       rgb(0 0 0 / 0) 2px,
-      rgb(0 0 0 / 0.16) 2px,
-      rgb(0 0 0 / 0.16) 3px
+      var(--theme-scanline) 2px,
+      var(--theme-scanline) 3px
     );
   }
 
@@ -504,6 +562,13 @@ html.theme-switching *::after {
     radial-gradient(ellipse 80% 55% at 50% 110%, color-mix(in srgb, var(--color-rhine-gold-deep) 12%, transparent), transparent 70%);
 }
 
+.bg-theme-noctis {
+  background:
+    radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--color-rhine-gold) 16%, transparent), transparent 40%),
+    radial-gradient(circle at 85% 70%, color-mix(in srgb, var(--color-rhine-cyan) 12%, transparent), transparent 44%),
+    radial-gradient(ellipse 70% 50% at 50% 110%, color-mix(in srgb, var(--color-rhine-gold-deep) 12%, transparent), transparent 70%);
+}
+
 .theme-grid-archive {
   background-image:
     linear-gradient(color-mix(in srgb, var(--color-rhine-gold) 9%, transparent) 1px, transparent 1px),
@@ -534,6 +599,24 @@ html.theme-switching *::after {
 }
 
 /* 页面切换时的一次性扫描光 */
+/* 页面切换时的一次性扫描光与内容入场 */
+.route-content {
+  animation: route-content-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes route-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.997);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 .page-enter-scan {
   position: absolute;
   inset: 0;
@@ -593,7 +676,8 @@ html.theme-switching *::after {
   .notification-active,
   .notification-active .bell-icon,
   .notification-badge,
-  .page-enter-scan::after {
+  .page-enter-scan::after,
+  .route-content {
     animation: none !important;
   }
   html {

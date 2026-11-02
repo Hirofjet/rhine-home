@@ -19,10 +19,7 @@ import { config } from './config.mjs'
 import { query, execute } from './db.mjs'
 
 export const PERMISSION_KEYS = [
-  'archive',
-  'archive.articles',
-  'archive.photos',
-  'archive.videos',
+  'projects',
   'logs',
   'guestbook',
   'forum',
@@ -140,6 +137,8 @@ export function roleLabel(user) {
 export function hasPermission(user, permission) {
   if (!user) return false
   if (user.isSuper) return true
+  // 主页资料与档案包含个人信息，只允许 admin 修改
+  if (permission.startsWith('archive')) return false
   if (user.permissions.includes(permission)) return true
   if (permission.startsWith('archive.')) {
     return user.permissions.includes('archive')
@@ -159,7 +158,7 @@ export function isStaff(user) {
     user.permissions.includes('members.grant') ||
     user.permissions.some(
       (p) =>
-        p === 'archive' ||
+        p === 'projects' ||
         p === 'logs' ||
         p === 'guestbook' ||
         isForumPermission(p),

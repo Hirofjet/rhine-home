@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
-import { ArrowRight, ArrowUpRight, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, ArrowUpRight, ChevronDown, GitBranch, Plus } from 'lucide-react'
 import type { Project, ProjectStatus } from '../../content'
-import { projects } from '../../content'
+import { useSiteProjects } from '../../hooks/useSiteProjects'
 import { cx } from '../../lib/cx'
 import { fadeUp, stagger, viewportOnce } from '../../lib/motion'
 import { GlowButton, SectionTitle, StatusDot, Tag } from '../ui'
@@ -26,6 +27,9 @@ export function ProjectCard({
   index: number
 }) {
   const st = STATUS_STYLE[project.status]
+  const [expanded, setExpanded] = useState(false)
+  const details = project.details?.trim()
+  const repository = project.githubUrl || project.link || ''
   return (
     <motion.article
       variants={fadeUp}
@@ -52,31 +56,55 @@ export function ProjectCard({
           </span>
         </div>
         <h3 className="mt-3 text-lg font-medium text-rhine-ink">
-          {project.title}
+          {project.name || project.title}
         </h3>
         <p className="mt-0.5 font-mono text-[10px] tracking-[0.25em] text-rhine-faint">
-          {project.subtitle}
+          {project.shortName || project.subtitle}
         </p>
         <p className="mt-3 flex-1 text-sm leading-relaxed text-rhine-dim">
           {project.description}
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {project.tags.map((t) => (
+        <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-rhine-line/50 pt-3 font-mono text-[9px] text-rhine-faint">
+          <span>TYPE // <span className="text-rhine-dim">{project.type || 'GENERAL'}</span></span>
+          <span>AUTHOR // <span className="text-rhine-dim">{project.author || 'SAMPLE'}</span></span>
+          <span>VERSION // <span className="text-rhine-dim">{project.version || '0.1.0'}</span></span>
+          <span>UPDATED // <span className="text-rhine-dim">{project.updatedAt ? project.updatedAt.slice(0, 10) : '—'}</span></span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(project.tags ?? []).map((t) => (
             <Tag key={t}>{t}</Tag>
           ))}
         </div>
+        {details && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              className="flex items-center gap-1 font-mono text-[9px] tracking-[0.16em] text-rhine-cyan"
+            >
+              {expanded ? '收起详细信息' : '展开详细信息'}
+              <ChevronDown className={cx('h-3 w-3 transition-transform', expanded && 'rotate-180')} />
+            </button>
+            {expanded && (
+              <p className="mt-2 whitespace-pre-line border-l border-rhine-cyan/40 bg-rhine-cyan/[0.04] px-3 py-2 text-[11px] leading-relaxed text-rhine-dim">
+                {details}
+              </p>
+            )}
+          </div>
+        )}
         <div className="mt-5 flex items-center justify-between border-t border-rhine-line/60 pt-3">
           <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
             NO.{String(index + 1).padStart(2, '0')}
           </span>
-          {project.link ? (
+          {repository ? (
             <a
-              href={project.link}
+              href={repository}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 font-mono text-[11px] tracking-[0.2em] text-rhine-gold transition-colors hover:text-rhine-ink"
             >
-              查看详情
+              <GitBranch className="h-3.5 w-3.5" />
+              仓库地址
               <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </a>
           ) : (
@@ -91,6 +119,7 @@ export function ProjectCard({
 }
 
 export function ProjectsSection() {
+  const projects = useSiteProjects()
   return (
     <section id="projects" className="relative py-20 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">

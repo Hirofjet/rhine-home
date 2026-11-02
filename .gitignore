@@ -23,6 +23,12 @@ tmp-*
 .env.*
 !.env.example
 
+# 个人资料 / 本地备份，禁止入库
+rhine-home-profile.json
+*.personal.json
+*.profile-backup.json
+local-data/
+
 # 后端运行时数据（上传文件、旧版 JSON 数据）
 server/node_modules
 server/data

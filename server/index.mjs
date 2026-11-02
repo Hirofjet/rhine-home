@@ -756,6 +756,167 @@ app.get('/api/content/videos', async (_req, res) => {
   res.json({ items: rows.map(mapContentRow) })
 })
 
+// ---------- 项目库 ----------
+const projectSanitize = (body) => {
+  if (!body) return null
+  const code = asString(body.code, 64).toUpperCase()
+  const name = asString(body.name, 200)
+  const description = asString(body.description, 1000)
+  if (!code || !name || !description) return null
+  return {
+    code,
+    name,
+    short_name: asString(body.shortName ?? body.short_name, 100) || code,
+    description,
+    type: asString(body.type, 100),
+    tags: Array.isArray(body.tags)
+      ? body.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 12)
+      : [],
+    author: asString(body.author, 120),
+    status: asString(body.status, 32) || 'ACTIVE',
+    version: asString(body.version, 64) || '0.1.0',
+    github_url: asString(body.githubUrl ?? body.github_url, 500),
+    details: asString(body.details, 20000),
+    visible: body.visible === false ? 0 : 1,
+    sort: Number(body.sort) || 0,
+  }
+}
+
+const mapProject = (row) => ({
+  id: Number(row.id),
+  code: row.code,
+  name: row.name,
+  shortName: row.short_name,
+  description: row.description,
+  type: row.type,
+  tags: (() => {
+    try {
+      return Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags ?? '[]')
+    } catch {
+      return []
+    }
+  })(),
+  author: row.author,
+  status: row.status,
+  version: row.version,
+  githubUrl: row.github_url ?? '',
+  details: row.details ?? '',
+  visible: Boolean(row.visible),
+  sort: Number(row.sort),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+})
+
+app.get('/api/content/projects', async (_req, res) => {
+  const rows = await query(
+    'SELECT * FROM projects WHERE visible = 1 ORDER BY sort ASC, id DESC LIMIT 100',
+  )
+  res.set('Cache-Control', 'public, max-age=30')
+  res.json({ items: rows.map(mapProject) })
+})
+
+app.get('/api/admin/projects', requireAuth, requirePermission('projects'), async (_req, res) => {
+  const rows = await query('SELECT * FROM projects ORDER BY sort ASC, id DESC LIMIT 200')
+  res.json({ items: rows.map(mapProject) })
+})
+
+app.post('/api/admin/projects', requireAuth, requirePermission('projects'), async (req, res) => {
+  const data = projectSanitize(req.body)
+  if (!data) return res.status(400).json({ error: 'invalid_input' })
+  const columns = Object.keys(data)
+  try {
+    const result = await execute(
+      `INSERT INTO projects (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+      columns.map((column) => (column === 'tags' ? JSON.stringify(data[column]) : data[column])),
+    )
+    const rows = await query('SELECT * FROM projects WHERE id = ?', [result.insertId])
+    res.status(201).json(mapProject(rows[0]))
+  } catch (error) {
+    if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'code_exists' })
+    throw error
+  }
+})
+
+app.put('/api/admin/projects/:id', requireAuth, requirePermission('projects'), async (req, res) => {
+  const data = projectSanitize(req.body)
+  if (!data) return res.status(400).json({ error: 'invalid_input' })
+  const columns = Object.keys(data)
+  await execute(
+    `UPDATE projects SET ${columns.map((column) => `${column} = ?`).join(', ')} WHERE id = ?`,
+    [
+      ...columns.map((column) => (column === 'tags' ? JSON.stringify(data[column]) : data[column])),
+      Number(req.params.id),
+    ],
+  )
+  const rows = await query('SELECT * FROM projects WHERE id = ?', [Number(req.params.id)])
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  res.json(mapProject(rows[0]))
+})
+
+app.delete('/api/admin/projects/:id', requireAuth, requirePermission('projects'), async (req, res) => {
+  await execute('DELETE FROM projects WHERE id = ?', [Number(req.params.id)])
+  res.json({ ok: true })
+})
+
+// ---------- 主页资料（仅 admin 可改） ----------
+const HOME_FIELDS = [
+  'codeName',
+  'realName',
+  'roles',
+  'intro',
+  'dossier',
+  'occupation',
+  'affiliation',
+  'status',
+  'location',
+  'specialties',
+  'traits',
+  'contactEmail',
+  'github',
+]
+
+const sanitizeHomeProfile = (body) => {
+  if (!body || typeof body !== 'object') return null
+  const profile = {}
+  for (const field of HOME_FIELDS) {
+    const value = body[field]
+    if (field === 'roles' || field === 'dossier' || field === 'specialties' || field === 'traits') {
+      profile[field] = Array.isArray(value)
+        ? value.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
+        : []
+    } else {
+      profile[field] = asString(value, field === 'dossier' ? 500 : 300)
+    }
+  }
+  return profile
+}
+
+app.get('/api/site/home', async (_req, res) => {
+  const rows = await query('SELECT data, updated_at FROM site_profile WHERE id = 1')
+  let profile = null
+  if (rows.length) {
+    try {
+      profile = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data
+    } catch {
+      profile = null
+    }
+  }
+  res.set('Cache-Control', 'public, max-age=15')
+  res.json({ profile, updatedAt: rows[0]?.updated_at ?? null })
+})
+
+app.put('/api/site/home', requireAuth, async (req, res) => {
+  if (!req.user.isSuper) return res.status(403).json({ error: 'forbidden' })
+  const profile = sanitizeHomeProfile(req.body?.profile ?? req.body)
+  if (!profile) return res.status(400).json({ error: 'invalid_input' })
+  await execute(
+    `INSERT INTO site_profile (id, data, updated_by) VALUES (1, ?, ?)
+     ON DUPLICATE KEY UPDATE data = VALUES(data), updated_by = VALUES(updated_by)`,
+    [JSON.stringify(profile), req.user.id],
+  )
+  res.json({ profile })
+})
+
 // 站点所有者资料：主页头像与后台超级管理员保持同步
 app.get('/api/site/profile', async (_req, res) => {
   const rows = await query(
@@ -1811,8 +1972,62 @@ app.post('/api/notifications/read', requireAuth, async (req, res) => {
 })
 
 // ============================================================
-// 私信
+// 私信 / 好友（互相关注即好友）
 // ============================================================
+async function areFriends(firstId, secondId) {
+  const rows = await query(
+    `SELECT 1 FROM follows f1
+     JOIN follows f2
+       ON f2.follower_id = f1.following_id
+      AND f2.following_id = f1.follower_id
+     WHERE f1.follower_id = ? AND f1.following_id = ? LIMIT 1`,
+    [firstId, secondId],
+  )
+  return rows.length > 0
+}
+
+app.get('/api/friends', requireAuth, async (req, res) => {
+  const userId = req.user.id
+  const rows = await query(
+    `SELECT u.id, u.username, u.nickname, u.avatar_url,
+            (SELECT COUNT(*) FROM direct_messages dm
+              WHERE dm.receiver_id = ? AND dm.sender_id = u.id AND dm.read_at IS NULL) AS unread
+     FROM follows f1
+     JOIN follows f2
+       ON f2.follower_id = f1.following_id
+      AND f2.following_id = f1.follower_id
+     JOIN users u ON u.id = f1.following_id
+     WHERE f1.follower_id = ? AND u.status = 'active'
+     ORDER BY unread DESC, u.id DESC LIMIT 100`,
+    [userId, userId],
+  )
+  const friends = []
+  for (const row of rows) {
+    const last = await query(
+      `SELECT id, sender_id, content, created_at FROM direct_messages
+       WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+       ORDER BY id DESC LIMIT 1`,
+      [userId, Number(row.id), Number(row.id), userId],
+    )
+    friends.push({
+      id: Number(row.id),
+      username: row.nickname || row.username,
+      account: row.username,
+      avatarUrl: row.avatar_url ?? '',
+      unread: Number(row.unread),
+      last: last.length
+        ? {
+            id: Number(last[0].id),
+            content: last[0].content.slice(0, 80),
+            createdAt: last[0].created_at,
+            fromMe: Number(last[0].sender_id) === userId,
+          }
+        : null,
+    })
+  }
+  res.json({ friends })
+})
+
 app.get('/api/messages/conversations', requireAuth, async (req, res) => {
   const userId = req.user.id
   const rows = await query(
@@ -1875,6 +2090,9 @@ app.get('/api/messages/with/:id', requireAuth, async (req, res) => {
     [otherId],
   )
   if (!users.length) return res.status(404).json({ error: 'not_found' })
+  if (!(await areFriends(req.user.id, otherId))) {
+    return res.status(403).json({ error: 'not_friends' })
+  }
   const messages = await query(
     `SELECT id, sender_id, content, created_at
      FROM direct_messages
@@ -1916,6 +2134,9 @@ app.post('/api/messages/dm', requireAuth, async (req, res) => {
     [toId],
   )
   if (!users.length) return res.status(404).json({ error: 'not_found' })
+  if (!(await areFriends(req.user.id, toId))) {
+    return res.status(403).json({ error: 'not_friends' })
+  }
   if (!rateLimit(`dm:${req.user.id}`, 60 * 1000, 30)) {
     return res.status(429).json({ error: 'too_many_requests' })
   }
@@ -1923,7 +2144,13 @@ app.post('/api/messages/dm', requireAuth, async (req, res) => {
     'INSERT INTO direct_messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
     [req.user.id, toId, content],
   )
-  await notify(toId, 'dm', '收到新私信', content.slice(0, 120), `/profile?chat=${req.user.id}`)
+  await notify(
+    toId,
+    'dm',
+    '收到新私信',
+    content.slice(0, 120),
+    `/messages?with=${req.user.id}&message=${result.insertId}`,
+  )
   res.status(201).json({ id: Number(result.insertId) })
 })
 
@@ -2085,6 +2312,26 @@ app.post('/api/users/:id/follow', requireAuth, async (req, res) => {
     'INSERT IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)',
     [req.user.id, targetId],
   )
+  const reverse = await query(
+    'SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? LIMIT 1',
+    [targetId, req.user.id],
+  )
+  if (reverse.length) {
+    await notify(
+      targetId,
+      'friend',
+      '你们成为好友了',
+      `${req.user.nickname || req.user.username} 与你互相关注，现在可以私信`,
+      `/messages?with=${req.user.id}`,
+    )
+    await notify(
+      req.user.id,
+      'friend',
+      '你们成为好友了',
+      `你与 ${target[0].nickname || target[0].username} 互相关注，现在可以私信`,
+      `/messages?with=${targetId}`,
+    )
+  }
   await notify(
     targetId,
     'follow',

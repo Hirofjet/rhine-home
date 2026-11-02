@@ -7,7 +7,7 @@
 >
 > **当前版本：v0.9.x**（发布记录见 Git tags；更新后执行 `npm run release -- "说明"` 自动推送 GitHub）
 >
-> 版本规划与 v0.1–v0.9 各里程碑说明见 **[VERSION_HISTORY.md](VERSION_HISTORY.md)**。
+> 版本规划与 v0.1–v0.9 各里程碑说明见 **[VERSION_HISTORY.md](VERSION_HISTORY.md)**；统一使用与部署指南见 **[GUIDE.md](GUIDE.md)**。
 
 ---
 

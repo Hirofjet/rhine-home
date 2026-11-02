@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 
-export type ThemeId = 'rhine' | 'archive' | 'sakura'
+export type ThemeId = 'rhine' | 'archive' | 'sakura' | 'noctis'
 
 export interface ThemeDefinition {
   id: ThemeId
@@ -33,24 +33,32 @@ export const THEMES: ThemeDefinition[] = [
     id: 'archive',
     label: '碧蓝档案',
     labelEn: 'BLUE ARCHIVE',
-    description: '千年蓝 · 晴空白 · 圣娅粉',
-    colors: ['#050e1b', '#5fb2ff', '#ff9ecb'],
-    metaColor: '#050e1b',
+    description: '晴空蓝 · 纯白 · 圣娅粉',
+    colors: ['#f4f9ff', '#4aa8f0', '#ff8fb4'],
+    metaColor: '#f4f9ff',
   },
   {
     id: 'sakura',
     label: '樱色协议',
     labelEn: 'SAKURA PROTOCOL',
-    description: '夜樱 · 桃粉 · 薄紫',
-    colors: ['#100812', '#ff9ec9', '#c9a7ff'],
-    metaColor: '#100812',
+    description: '樱白 · 桃粉 · 薄紫',
+    colors: ['#fff6fb', '#f26fa7', '#b287ff'],
+    metaColor: '#fff6fb',
+  },
+  {
+    id: 'noctis',
+    label: '深空协议',
+    labelEn: 'NOCTIS',
+    description: '深空紫 · 极光青 · 星辉',
+    colors: ['#080511', '#9a86ff', '#3cf0c8'],
+    metaColor: '#080511',
   },
 ]
 
 export const THEME_STORAGE_KEY = 'rhine:theme'
 
 const isTheme = (value: string | null): value is ThemeId =>
-  value === 'rhine' || value === 'archive' || value === 'sakura'
+  value === 'rhine' || value === 'archive' || value === 'sakura' || value === 'noctis'
 
 interface ThemeContextValue {
   theme: ThemeId

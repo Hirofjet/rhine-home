@@ -24,14 +24,19 @@ const THEME_TRAIL: Record<
     halo: 'rgba(211, 178, 122, 0.45)',
   },
   archive: {
-    colors: ['#5fb2ff', '#ff9ecb', '#eaf5ff'],
+    colors: ['#2f8fe8', '#ff7fae', '#ffffff'],
     shape: 'pixel',
-    halo: 'rgba(95, 178, 255, 0.5)',
+    halo: 'rgba(47, 143, 232, 0.45)',
   },
   sakura: {
-    colors: ['#ff9ec9', '#c9a7ff', '#ffe7f3'],
+    colors: ['#f05d9d', '#a77cff', '#ffffff'],
     shape: 'petal',
-    halo: 'rgba(255, 158, 201, 0.5)',
+    halo: 'rgba(240, 93, 157, 0.4)',
+  },
+  noctis: {
+    colors: ['#9a86ff', '#3cf0c8', '#e8e0ff'],
+    shape: 'dust',
+    halo: 'rgba(154, 134, 255, 0.5)',
   },
 }
 
@@ -40,6 +45,7 @@ const randomBetween = (min: number, max: number) => min + Math.random() * (max -
 /** 主题化鼠标拖尾：莱茵星尘、千年像素、樱色花瓣 */
 export function MouseTrail() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const pointerRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
   const { theme } = useTheme()
 
   useEffect(() => {
@@ -53,8 +59,8 @@ export function MouseTrail() {
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
     let particles: Particle[] = []
     let frame = 0
-    let lastX = window.innerWidth / 2
-    let lastY = window.innerHeight / 2
+    let lastX = pointerRef.current.x
+    let lastY = pointerRef.current.y
     let pointerX = lastX
     let pointerY = lastY
     let haloX = lastX
@@ -96,6 +102,7 @@ export function MouseTrail() {
     const onMove = (event: PointerEvent) => {
       pointerX = event.clientX
       pointerY = event.clientY
+      pointerRef.current = { x: pointerX, y: pointerY }
       const distance = Math.hypot(pointerX - lastX, pointerY - lastY)
       if (distance > 2.5) {
         spawn(pointerX, pointerY, distance > 24 ? 2 : 1)

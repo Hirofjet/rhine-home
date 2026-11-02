@@ -1,12 +1,6 @@
 import type { Board } from '../../lib/api'
 import { AdminCheckbox } from './AdminUi'
 
-const ARCHIVE_CHILDREN: Array<[string, string]> = [
-  ['archive.articles', '文章'],
-  ['archive.photos', '照片'],
-  ['archive.videos', '视频'],
-]
-
 interface PermissionTreeProps {
   value: string[]
   onChange: (next: string[]) => void
@@ -25,34 +19,12 @@ export function PermissionTree({
   disabled = false,
 }: PermissionTreeProps) {
   const has = (key: string) => value.includes(key)
-  const archiveAll = ARCHIVE_CHILDREN.every(([key]) => has(key))
-  const archiveParent = has('archive') || archiveAll
   const forumChildren = boards.map((board) => `forum.${board.id}`)
   const forumAll = forumChildren.length > 0 && forumChildren.every((key) => has(key))
   const forumParent = has('forum') || forumAll
 
   const apply = (next: string[]) => {
     if (!disabled) onChange([...new Set(next)])
-  }
-
-  const toggleArchiveParent = (checked: boolean) => {
-    let next = value.filter((item) => item !== 'archive')
-    next = next.filter((item) => !item.startsWith('archive.'))
-    if (checked) next.push('archive', ...ARCHIVE_CHILDREN.map(([key]) => key))
-    apply(next)
-  }
-
-  const toggleArchiveChild = (key: string, checked: boolean) => {
-    let next = value.filter((item) => item !== 'archive')
-    if (checked) {
-      if (!next.includes(key)) next.push(key)
-      if (ARCHIVE_CHILDREN.every(([child]) => next.includes(child))) {
-        next.push('archive')
-      }
-    } else {
-      next = next.filter((item) => item !== key)
-    }
-    apply(next)
   }
 
   const toggleForumParent = (checked: boolean) => {
@@ -83,25 +55,20 @@ export function PermissionTree({
 
   return (
     <div className="space-y-4">
-      {groupTitle('档案 / ARCHIVE')}
-      <div className="space-y-2 border-l border-rhine-line/60 pl-3">
+      {groupTitle('项目库 / PROJECTS')}
+      <div className="border-l border-rhine-line/60 pl-3">
         <AdminCheckbox
-          checked={archiveParent}
-          onChange={toggleArchiveParent}
-          label="档案（全部）"
+          checked={has('projects')}
+          onChange={(checked) => {
+            const next = value.filter((item) => item !== 'projects')
+            apply(checked ? [...next, 'projects'] : next)
+          }}
+          label="项目库管理"
           disabled={disabled}
         />
-        <div className="flex flex-wrap gap-4 pl-4">
-          {ARCHIVE_CHILDREN.map(([key, label]) => (
-            <AdminCheckbox
-              key={key}
-              checked={archiveParent || has(key)}
-              onChange={(checked) => toggleArchiveChild(key, checked)}
-              label={label}
-              disabled={disabled}
-            />
-          ))}
-        </div>
+        <p className="mt-1 font-mono text-[8px] leading-relaxed text-rhine-faint">
+          主页资料与档案包含个人信息，固定只有 admin 可以修改。
+        </p>
       </div>
 
       {groupTitle('日志 / LOGS')}

@@ -14,12 +14,16 @@ import { LogsPanel } from './panels/LogsPanel'
 import { MembersPanel } from './panels/MembersPanel'
 import { OverviewPanel } from './panels/OverviewPanel'
 import { PhotosPanel } from './panels/PhotosPanel'
+import { ProfilePanel } from './panels/ProfilePanel'
+import { ProjectsPanel } from './panels/ProjectsPanel'
 import { ReviewPanel } from './panels/ReviewPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
 import { VideosPanel } from './panels/VideosPanel'
 
 type PanelKey =
   | 'overview'
+  | 'home-profile'
+  | 'projects'
   | 'articles'
   | 'photos'
   | 'videos'
@@ -70,6 +74,20 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       archive.push({ key: 'videos', label: '视频', labelEn: 'VIDEOS' })
     }
     if (archive.length) list.push({ title: '档案', items: archive })
+
+    if (user.isSuper) {
+      list.push({
+        title: '主页',
+        items: [{ key: 'home-profile', label: '主页资料', labelEn: 'PROFILE' }],
+      })
+    }
+
+    if (user.isSuper || hasPerm(user, 'projects')) {
+      list.push({
+        title: '项目',
+        items: [{ key: 'projects', label: '项目库', labelEn: 'PROJECTS' }],
+      })
+    }
 
     if (hasPerm(user, 'logs')) {
       list.push({
@@ -198,6 +216,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               {current === 'overview' && (
                 <OverviewPanel user={user} onNavigate={(key) => setPanel(key as PanelKey)} />
               )}
+              {current === 'home-profile' && <ProfilePanel />}
+              {current === 'projects' && <ProjectsPanel />}
               {current === 'articles' && <ArticlesPanel />}
               {current === 'photos' && <PhotosPanel />}
               {current === 'videos' && <VideosPanel />}

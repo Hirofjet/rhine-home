@@ -2,10 +2,11 @@ import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
 import { ProjectCard } from '../components/home/ProjectsSection'
 import { GlowButton, SectionTitle } from '../components/ui'
-import { projects } from '../content'
+import { useSiteProjects } from '../hooks/useSiteProjects'
 import { stagger, viewportOnce } from '../lib/motion'
 
 export function ProjectsPage() {
+  const projects = useSiteProjects()
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 pb-24 pt-28 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4">

@@ -398,16 +398,6 @@ export function ProfilePage() {
         {(
           [
             ['profile', '资料'],
-            [
-              'messages',
-              `消息${
-                notifications.filter((item) => !item.read).length +
-                  conversations.reduce((sum, item) => sum + item.unread, 0) >
-                0
-                  ? ' •'
-                  : ''
-              }`,
-            ],
             ['posts', '我的帖子'],
             ['follows', '关注'],
             ['account', '账号'],

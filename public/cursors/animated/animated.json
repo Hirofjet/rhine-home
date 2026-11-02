@@ -1,0 +1,35 @@
+{
+  "default": {
+    "file": "default.png",
+    "frames": 36,
+    "width": 32,
+    "height": 32,
+    "hotspot": [
+      6,
+      10
+    ],
+    "frameMs": 48
+  },
+  "pointer": {
+    "file": "pointer.png",
+    "frames": 36,
+    "width": 32,
+    "height": 32,
+    "hotspot": [
+      6,
+      10
+    ],
+    "frameMs": 48
+  },
+  "text": {
+    "file": "text.png",
+    "frames": 19,
+    "width": 32,
+    "height": 32,
+    "hotspot": [
+      15,
+      16
+    ],
+    "frameMs": 64
+  }
+}

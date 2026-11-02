@@ -2,6 +2,7 @@ import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-moti
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useEffect, useState, type PointerEvent } from 'react'
 import { profile, site } from '../../content'
+import type { OperatorProfile } from '../../content/profile'
 import { useClock } from '../../hooks/useClock'
 import { resolveMediaUrl, siteApi } from '../../lib/api'
 import { fadeUp, stagger } from '../../lib/motion'
@@ -12,6 +13,7 @@ export function HeroSection() {
   const clock = useClock(site.timezone)
   const reduce = useReducedMotion()
   const [ownerAvatar, setOwnerAvatar] = useState('')
+  const [remoteProfile, setRemoteProfile] = useState<OperatorProfile | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -21,10 +23,20 @@ export function HeroSection() {
         if (alive && data.profile.avatarUrl) setOwnerAvatar(data.profile.avatarUrl)
       })
       .catch(() => undefined)
+    siteApi
+      .home()
+      .then((data) => {
+        if (alive && data.profile) {
+          setRemoteProfile({ ...profile, ...data.profile, trust: profile.trust })
+        }
+      })
+      .catch(() => undefined)
     return () => {
       alive = false
     }
   }, [])
+
+  const current = remoteProfile ?? profile
 
   const avatarSrc = ownerAvatar
     ? resolveMediaUrl(ownerAvatar)
@@ -52,9 +64,9 @@ export function HeroSection() {
 
   const readouts: Array<{ label: string; value: string; dot?: DotColor }> = [
     { label: 'OPERATOR ID', value: site.operatorId },
-    { label: 'STATUS', value: profile.status, dot: 'green' },
-    { label: 'LOCATION', value: profile.location },
-    { label: 'AFFILIATION', value: profile.affiliation },
+    { label: 'STATUS', value: current.status, dot: 'green' },
+    { label: 'LOCATION', value: current.location },
+    { label: 'AFFILIATION', value: current.affiliation },
     { label: 'LOCAL TIME', value: clock, dot: 'cyan' },
   ]
 
@@ -74,7 +86,7 @@ export function HeroSection() {
               className="font-mono text-xs tracking-[0.3em] text-rhine-faint"
             >
               CODENAME //{' '}
-              <span className="text-rhine-cyan">{profile.codeName}</span>
+              <span className="text-rhine-cyan">{current.codeName}</span>
             </motion.p>
             <motion.div variants={fadeUp} className="mt-5 flex items-center gap-4">
               <img
@@ -85,18 +97,18 @@ export function HeroSection() {
               />
               <div className="font-mono text-[10px] leading-relaxed tracking-[0.2em] text-rhine-faint">
                 <p className="text-rhine-dim">OPERATOR</p>
-                <p>{profile.codeName}</p>
+                <p>{current.codeName}</p>
               </div>
             </motion.div>
             <motion.h1
               variants={fadeUp}
               className="text-glow-gold mt-3 text-5xl font-bold leading-tight text-rhine-ink sm:text-6xl md:text-7xl"
             >
-              {profile.realName}
+              {current.realName}
             </motion.h1>
             <motion.div variants={fadeUp} className="mt-4">
               <TypingText
-                words={profile.roles}
+                words={current.roles}
                 label="身份认证 //"
                 className="text-sm tracking-wider sm:text-base"
               />
@@ -105,7 +117,7 @@ export function HeroSection() {
               variants={fadeUp}
               className="mt-5 max-w-lg text-sm leading-relaxed text-rhine-dim sm:text-base"
             >
-              {profile.intro}
+              {current.intro}
             </motion.p>
 
             {/* 状态读数 */}
@@ -148,7 +160,7 @@ export function HeroSection() {
 
             {/* 标签 */}
             <motion.div variants={fadeUp} className="mt-7 flex flex-wrap gap-2">
-              {profile.specialties.map((s) => (
+              {current.specialties.map((s) => (
                 <Tag key={s} tone="gold">
                   ◆ {s}
                 </Tag>
@@ -207,7 +219,7 @@ export function HeroSection() {
                 {/* 中心菱形 */}
                 <span className="absolute flex h-24 w-24 rotate-45 items-center justify-center border border-rhine-gold/70 bg-rhine-gold/5 shadow-[0_0_36px_rgb(211_178_122/0.18)] sm:h-28 sm:w-28">
                   <span className="text-glow-gold -rotate-45 text-4xl font-bold text-rhine-gold sm:text-5xl">
-                    {profile.realName.charAt(0) || '◆'}
+                    {current.realName.charAt(0) || '◆'}
                   </span>
                 </span>
                 {/* 底部状态条 */}

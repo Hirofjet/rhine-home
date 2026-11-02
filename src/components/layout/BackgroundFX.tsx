@@ -200,6 +200,22 @@ function SakuraLayers() {
   )
 }
 
+function NoctisLayers() {
+  return (
+    <>
+      <div className="absolute inset-0 bg-theme-noctis" />
+      <div className="absolute inset-0 opacity-60 [background-image:radial-gradient(var(--color-rhine-gold)_0.65px,transparent_0.8px),radial-gradient(var(--color-rhine-cyan)_0.5px,transparent_0.7px)] [background-size:47px_47px,83px_83px] [background-position:0_0,19px_31px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_85%)]" />
+      <div className="absolute left-1/2 top-1/2 h-[680px] w-[680px] -translate-x-1/2 -translate-y-1/2 animate-spin-slower rounded-full border border-rhine-gold/10" />
+      <div className="absolute left-1/2 top-1/2 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 animate-spin-reverse rounded-full border border-dashed border-rhine-cyan/15" />
+      <div className="absolute -right-24 top-16 h-80 w-80 rounded-full bg-rhine-gold/10 blur-3xl" />
+      <div className="absolute -left-20 bottom-8 h-72 w-72 rounded-full bg-rhine-cyan/[0.08] blur-3xl" />
+      <div className="absolute inset-x-0 top-24 text-center font-mono text-[8px] tracking-[0.6em] text-rhine-gold/25">
+        NOCTIS // DEEP SPACE
+      </div>
+    </>
+  )
+}
+
 export function BackgroundFX() {
   const { theme } = useTheme()
   return (
@@ -210,6 +226,7 @@ export function BackgroundFX() {
       {theme === 'rhine' && <RhineLayers />}
       {theme === 'archive' && <ArchiveLayers />}
       {theme === 'sakura' && <SakuraLayers />}
+      {theme === 'noctis' && <NoctisLayers />}
 
       <div className="absolute inset-0 scanlines opacity-[0.18]" />
       <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-rhine-abyss/60 to-transparent" />
