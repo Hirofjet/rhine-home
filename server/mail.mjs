@@ -17,6 +17,7 @@ if (config.smtp.host) {
       config.smtp.user && config.smtp.pass
         ? { user: config.smtp.user, pass: config.smtp.pass }
         : undefined,
+        authMethod: 'LOGIN'
   })
 }
 
