@@ -2,12 +2,17 @@ import { ArrowUp, Diamond } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { moduleLinks, navItems, site } from '../../content'
 import { useSiteBrand } from '../../hooks/useSiteBrand'
+import { useSession } from '../auth/useSession'
 import { Barcode } from '../ui'
 
 const YEAR = new Date().getFullYear()
 
 export function Footer() {
   const brand = useSiteBrand()
+  const { user } = useSession()
+  const visibleModuleLinks = moduleLinks.filter(
+    (item) => item.href !== '/forum' || Boolean(user),
+  )
   return (
     <footer className="relative z-10 border-t border-rhine-line bg-rhine-abyss/90">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -57,7 +62,7 @@ export function Footer() {
                 MODULES
               </p>
               <ul className="space-y-2.5">
-                {moduleLinks.map((item) => (
+                {visibleModuleLinks.map((item) => (
                   <li key={item.id}>
                     <Link
                       to={item.href}
