@@ -50,6 +50,7 @@ export function ProfilePage() {
     setSearch(params, { replace: true })
   }
   const [authOpen, setAuthOpen] = useState(false)
+  const [authTab, setAuthTab] = useState<'login' | 'register'>('login')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -330,14 +331,33 @@ export function ProfilePage() {
         <p className="mt-3 font-mono text-[11px] tracking-wider text-rhine-dim">
           登录后进入个人主页
         </p>
-        <button
-          type="button"
-          onClick={() => setAuthOpen(true)}
-          className="mt-5 border border-rhine-gold/60 bg-rhine-gold/10 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-rhine-gold"
-        >
-          登录 / 注册
-        </button>
-        <ForumAuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setAuthTab('login')
+              setAuthOpen(true)
+            }}
+            className="border border-rhine-gold/60 bg-rhine-gold/10 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-rhine-gold"
+          >
+            登录
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthTab('register')
+              setAuthOpen(true)
+            }}
+            className="border border-rhine-line px-5 py-2 font-mono text-[11px] uppercase tracking-[0.2em] text-rhine-dim"
+          >
+            注册
+          </button>
+        </div>
+        <ForumAuthModal
+          open={authOpen}
+          initialTab={authTab}
+          onClose={() => setAuthOpen(false)}
+        />
       </section>
     )
   }

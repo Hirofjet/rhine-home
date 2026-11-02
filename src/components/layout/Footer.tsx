@@ -27,7 +27,6 @@ export function Footer() {
                 </span>
               </span>
             </div>
-            <p className="mt-4 text-sm text-rhine-dim">{site.slogan}</p>
             <Barcode className="mt-5 max-w-[220px]" />
           </div>
 
