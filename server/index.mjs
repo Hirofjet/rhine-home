@@ -20,6 +20,7 @@ import {
   createSession,
   destroySession,
   hasPermission,
+  hasForumAction,
   hashPassword,
   isForumPermission,
   isStaff,
@@ -1560,7 +1561,13 @@ app.post(
       [id],
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
-    if (!canModerateBoard(req.user, Number(rows[0].board_id))) {
+    const actionKey =
+      action === 'hide' || action === 'restore'
+        ? 'post.hide'
+        : action === 'delete'
+          ? 'post.delete'
+          : 'post.pin'
+    if (!hasForumAction(req.user, Number(rows[0].board_id), actionKey)) {
       return res.status(403).json({ error: 'forbidden' })
     }
     if (action === 'hide') {

@@ -86,7 +86,16 @@ export function permissionsForRole(role) {
 }
 
 export const isForumPermission = (permission) =>
-  permission === 'forum' || /^forum\.\d+$/.test(permission)
+  permission === 'forum' || /^forum\.\d+$/.test(permission) || /^forum\.\d+\.(post|reply)\.(publish|pin|hide|delete|review)$/.test(permission)
+
+export const hasForumAction = (user, boardId, action) => {
+  if (!user) return false
+  if (user.isSuper || user.permissions.includes('forum')) return true
+  return (
+    user.permissions.includes(`forum.${boardId}.${action}`) ||
+    user.permissions.includes(`forum.${boardId}`)
+  )
+}
 
 export function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex')
