@@ -393,6 +393,14 @@ async function ensureSchemaUpgrades() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   )
   await pool.query(
+    `CREATE TABLE IF NOT EXISTS forum_deletion_votes (
+      request_id BIGINT UNSIGNED NOT NULL,
+      user_id BIGINT UNSIGNED NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (request_id, user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  )
+  await pool.query(
     `CREATE TABLE IF NOT EXISTS forum_deletion_requests (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       board_id BIGINT UNSIGNED NOT NULL,

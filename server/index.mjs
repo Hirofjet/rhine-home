@@ -1730,7 +1730,8 @@ app.post('/api/admin/forum/boards/:id/deletion-request', requireAuth, requireFor
 app.get('/api/admin/forum/deletion-requests', requireAuth, requireForumAccess, async (req, res) => {
   const rows = await query(
     `SELECT r.*, b.name AS board_name,
-            COALESCE(NULLIF(u.nickname,''), u.username) AS requester
+            COALESCE(NULLIF(u.nickname,''), u.username) AS requester,
+            (SELECT COUNT(*) FROM forum_deletion_votes v WHERE v.request_id = r.id) AS vote_count
      FROM forum_deletion_requests r
      JOIN forum_boards b ON b.id = r.board_id
      JOIN users u ON u.id = r.requester_id
@@ -1741,19 +1742,13 @@ app.get('/api/admin/forum/deletion-requests', requireAuth, requireForumAccess, a
     requests: rows
       .filter((row) => isSenior || canModerateBoard(req.user, Number(row.board_id)))
       .map((row) => {
-        let approvals = []
-        try {
-          approvals = JSON.parse(row.approvals ?? '[]')
-        } catch {
-          approvals = []
-        }
         return {
           id: Number(row.id),
           boardId: Number(row.board_id),
           boardName: row.board_name,
           requester: row.requester,
           status: row.status,
-          approvals: approvals.length,
+          approvals: Number(row.vote_count ?? 0),
           createdAt: row.created_at,
           canVote: isSenior,
         }
@@ -1775,11 +1770,15 @@ app.post('/api/admin/forum/deletion-requests/:id/vote', requireAuth, async (req,
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
   if (rows[0].status !== 'pending') return res.status(409).json({ error: 'already_reviewed' })
   let approvals = []
-  try {
-    approvals = JSON.parse(rows[0].approvals ?? '[]')
-  } catch {
-    approvals = []
-  }
+  await execute(
+    'INSERT IGNORE INTO forum_deletion_votes (request_id, user_id) VALUES (?, ?)',
+    [id, req.user.id],
+  )
+  const voteRows = await query(
+    'SELECT COUNT(*) AS n FROM forum_deletion_votes WHERE request_id = ?',
+    [id],
+  )
+  const voteCount = Number(voteRows[0]?.n ?? 0)
   if (!approve) {
     await execute(
       "UPDATE forum_deletion_requests SET status = 'rejected', vetoed_by = ?, reviewed_at = NOW() WHERE id = ?",
@@ -1797,7 +1796,8 @@ app.post('/api/admin/forum/deletion-requests/:id/vote', requireAuth, async (req,
   if (!approvals.some((item) => Number(item.userId) === req.user.id)) {
     approvals.push({ userId: req.user.id, at: new Date().toISOString() })
   }
-  if (approvals.length >= 3) {
+  if (voteCount >= 3) {
+    approvals = Array.from({ length: voteCount }, (_, index) => ({ userId: index + 1 }))
     await transaction(async (connection) => {
       await connection.execute(
         'DELETE r FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE p.board_id = ?',
@@ -1827,7 +1827,7 @@ app.post('/api/admin/forum/deletion-requests/:id/vote', requireAuth, async (req,
     JSON.stringify(approvals),
     id,
   ])
-  res.json({ ok: true, status: 'pending', approvals: approvals.length })
+  res.json({ ok: true, status: 'pending', approvals: voteCount })
 })
 
 app.delete('/api/admin/forum/boards/:id', requireAuth, requireForumAccess, async (req, res) => {

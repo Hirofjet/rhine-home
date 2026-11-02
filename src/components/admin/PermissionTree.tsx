@@ -47,6 +47,14 @@ export function PermissionTree({
     apply(next)
   }
 
+  const toggleAction = (key: string, checked: boolean) => {
+    if (forumParent) return
+    const next = checked
+      ? [...value.filter((item) => item !== key), key]
+      : value.filter((item) => item !== key)
+    apply(next)
+  }
+
   const groupTitle = (text: string) => (
     <p className="mb-1.5 font-mono text-[9px] tracking-[0.28em] text-rhine-faint">
       {text}
@@ -106,21 +114,48 @@ export function PermissionTree({
           disabled={disabled}
         />
         <div className="flex flex-wrap gap-x-5 gap-y-2 pl-4">
-          {boards.map((board) => (
-            <AdminCheckbox
-              key={board.id}
-              checked={forumParent || has(`forum.${board.id}`)}
-              onChange={(checked) => toggleForumChild(`forum.${board.id}`, checked)}
-              label={`${board.name}${
-                board.access === 'core'
-                  ? '（核心）'
-                  : board.access === 'special'
-                    ? '（特殊）'
-                    : ''
-              }`}
-              disabled={disabled}
-            />
-          ))}
+          {boards.map((board) => {
+            const boardKey = `forum.${board.id}`
+            const full = forumParent || has(boardKey)
+            const actions = [
+              ['post.pin', '置顶'],
+              ['post.hide', '隐藏'],
+              ['post.delete', '删帖'],
+              ['post.review', '审帖'],
+              ['reply.delete', '删回复'],
+              ['reply.review', '审回复'],
+            ] as const
+            return (
+              <div key={board.id} className="min-w-48 space-y-1">
+                <AdminCheckbox
+                  checked={full}
+                  onChange={(checked) => toggleForumChild(boardKey, checked)}
+                  label={`${board.name}${
+                    board.access === 'core'
+                      ? '（核心）'
+                      : board.access === 'special'
+                        ? '（特殊）'
+                        : ''
+                  }`}
+                  disabled={disabled}
+                />
+                <div className="flex flex-wrap gap-x-3 gap-y-1 pl-4">
+                  {actions.map(([action, label]) => {
+                    const key = `${boardKey}.${action}`
+                    return (
+                      <AdminCheckbox
+                        key={key}
+                        checked={full || has(key)}
+                        onChange={(checked) => toggleAction(key, checked)}
+                        label={label}
+                        disabled={disabled || full}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
           {boards.length === 0 && (
             <span className="font-mono text-[9px] tracking-wider text-rhine-faint">
               暂无板块
