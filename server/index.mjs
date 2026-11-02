@@ -741,7 +741,11 @@ app.get('/api/content/articles', async (_req, res) => {
   res.json({ items: rows.map(mapContentRow) })
 })
 app.get('/api/content/logs', async (_req, res) => {
-  const rows = await query('SELECT * FROM logs ORDER BY date DESC, id DESC LIMIT 60')
+  const rows = await query(
+    `SELECT l.*, COALESCE(NULLIF(u.nickname, ''), u.username, '示例用户') AS author
+     FROM logs l LEFT JOIN users u ON u.id = l.author_id
+     ORDER BY l.date DESC, l.id DESC LIMIT 60`,
+  )
   res.set('Cache-Control', 'public, max-age=30')
   res.json({ items: rows.map(mapContentRow) })
 })

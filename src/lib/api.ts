@@ -54,6 +54,7 @@ export interface ContentLog {
   title: string
   date?: string | null
   markdown: string
+  author?: string | null
 }
 
 export interface HomeProfile {

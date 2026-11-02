@@ -23,8 +23,8 @@ function logsToSlots(logs: ContentLog[]): SlotModule[] {
   return logs.map((log) => ({
     id: `server-log-${log.id}`,
     label: log.title,
-    labelEn: log.date ? `LOG · ${log.date}` : 'LOG',
-    summary: summaryOf(log.markdown),
+    labelEn: `#${String(log.id).padStart(2, '0')} · ${log.date ?? 'LOG'} · ${log.author || '示例用户'}`,
+    summary: `[日志] ${summaryOf(log.markdown)}`,
     content: {
       custom: (
         <ArticleBlock
