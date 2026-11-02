@@ -79,6 +79,10 @@ export function LogsPage() {
           <p className="animate-pulse-soft font-mono text-xs tracking-[0.3em] text-rhine-faint">
             LOADING LOGS …
           </p>
+        ) : slots.length === 0 ? (
+          <p className="border border-dashed border-rhine-line/70 px-4 py-8 text-center font-mono text-[10px] tracking-wider text-rhine-faint">
+            暂无已发布日志
+          </p>
         ) : (
           <SlotGrid slots={slots} />
         )}

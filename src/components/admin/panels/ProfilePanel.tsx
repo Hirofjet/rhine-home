@@ -232,10 +232,10 @@ export function ProfilePanel() {
               </div>
             ))}
           </div>
-          <AdminButton variant="ghost" className="mt-2" onClick={() => setAbilities((prev) => [...prev, { id: `ability-${Date.now()}`, code: '', name: '', nameEn: '', desc: '', level: 50, grade: 'B', icon: 'code' }])}>
-            <Plus className="h-3 w-3" /> 添加能力
-          </AdminButton>
         </AdminField>
+        <AdminButton variant="ghost" className="mt-2" onClick={() => setAbilities((prev) => [...prev, { id: `ability-${Date.now()}`, code: '', name: '', nameEn: '', desc: '', level: 50, grade: 'B', icon: 'code' }])}>
+          <Plus className="h-3 w-3" /> 添加能力
+        </AdminButton>
 
         <AdminField label="联系方式 / CONTACT CARDS">
           <div className="grid gap-3 md:grid-cols-2">
@@ -260,10 +260,10 @@ export function ProfilePanel() {
               </div>
             ))}
           </div>
-          <AdminButton variant="ghost" className="mt-2" onClick={() => setContacts((prev) => [...prev, { id: `contact-${Date.now()}`, label: '', labelEn: '', value: '', href: '', icon: 'chat', note: '' }])}>
-            <Plus className="h-3 w-3" /> 添加联系方式
-          </AdminButton>
         </AdminField>
+        <AdminButton variant="ghost" className="mt-2" onClick={() => setContacts((prev) => [...prev, { id: `contact-${Date.now()}`, label: '', labelEn: '', value: '', href: '', icon: 'chat', note: '' }])}>
+          <Plus className="h-3 w-3" /> 添加联系方式
+        </AdminButton>
 
         <AdminField label="外部链接 / LINK CARDS">
           <div className="grid gap-3 md:grid-cols-2">
@@ -283,10 +283,10 @@ export function ProfilePanel() {
               </div>
             ))}
           </div>
-          <AdminButton variant="ghost" className="mt-2" onClick={() => setLinks((prev) => [...prev, { id: `link-${Date.now()}`, label: '', href: '', note: '' }])}>
-            <Plus className="h-3 w-3" /> 添加链接
-          </AdminButton>
         </AdminField>
+        <AdminButton variant="ghost" className="mt-2" onClick={() => setLinks((prev) => [...prev, { id: `link-${Date.now()}`, label: '', href: '', note: '' }])}>
+          <Plus className="h-3 w-3" /> 添加链接
+        </AdminButton>
         <p className="mt-3 font-mono text-[9px] leading-relaxed text-rhine-faint">
           数据保存到 MySQL，同时在本浏览器的 localStorage 留一份备份；换电脑可用“导出 / 导入本地”迁移。
           主页与后台共享的字段会自动同步。

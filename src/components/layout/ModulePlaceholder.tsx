@@ -44,6 +44,12 @@ export function ModulePlaceholder({
         </motion.p>
       )}
 
+      {slots.length === 0 && (
+        <p className="mt-8 border border-dashed border-rhine-line/70 px-4 py-8 text-center font-mono text-[10px] tracking-wider text-rhine-faint">
+          暂无已发布内容
+        </p>
+      )}
+
       {/* 槽位模块 */}
       {slots.length > 0 && (
         <motion.div

@@ -58,9 +58,12 @@ export function AdminPanel({
   className?: string
 }) {
   return (
-    <section
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className={cx(
-        'border border-rhine-line/70 bg-rhine-panel/30',
+        'border border-rhine-line/70 bg-rhine-panel/30 shadow-[0_10px_30px_rgb(0_0_0/0.08)]',
         className,
       )}
     >
@@ -78,7 +81,7 @@ export function AdminPanel({
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </header>
       <div className="p-4">{children}</div>
-    </section>
+    </motion.section>
   )
 }
 

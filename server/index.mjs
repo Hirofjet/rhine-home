@@ -766,11 +766,11 @@ const projectSanitize = (body) => {
   const code = asString(body.code, 64).toUpperCase()
   const name = asString(body.name, 200)
   const description = asString(body.description, 1000)
-  if (!code || !name || !description) return null
+  if (!name || !description) return null
   return {
     code,
     name,
-    short_name: asString(body.shortName ?? body.short_name, 100) || code,
+    short_name: asString(body.shortName ?? body.short_name, 100) || code || name,
     description,
     type: asString(body.type, 100),
     tags: Array.isArray(body.tags)
@@ -827,6 +827,15 @@ app.get('/api/admin/projects', requireAuth, requirePermission('projects'), async
 app.post('/api/admin/projects', requireAuth, requirePermission('projects'), async (req, res) => {
   const data = projectSanitize(req.body)
   if (!data) return res.status(400).json({ error: 'invalid_input' })
+  if (!data.code) {
+    const rows = await query('SELECT code FROM projects')
+    const max = rows.reduce((value, row) => {
+      const match = /(\d+)\s*$/.exec(String(row.code ?? ''))
+      return Math.max(value, match ? Number(match[1]) : 0)
+    }, 0)
+    data.code = `RL-PJ-${String(max + 1).padStart(2, '0')}`
+    if (!data.short_name) data.short_name = data.name
+  }
   const columns = Object.keys(data)
   try {
     const result = await execute(
@@ -844,6 +853,11 @@ app.post('/api/admin/projects', requireAuth, requirePermission('projects'), asyn
 app.put('/api/admin/projects/:id', requireAuth, requirePermission('projects'), async (req, res) => {
   const data = projectSanitize(req.body)
   if (!data) return res.status(400).json({ error: 'invalid_input' })
+  if (!data.code) {
+    const existing = await query('SELECT code FROM projects WHERE id = ?', [Number(req.params.id)])
+    if (!existing.length) return res.status(404).json({ error: 'not_found' })
+    data.code = existing[0].code
+  }
   const columns = Object.keys(data)
   await execute(
     `UPDATE projects SET ${columns.map((column) => `${column} = ?`).join(', ')} WHERE id = ?`,

@@ -146,6 +146,11 @@ export function ProjectsSection() {
             <ProjectCard key={p.id} project={p} index={i} />
           ))}
         </motion.div>
+        {projects.length === 0 && (
+          <p className="mt-8 border border-dashed border-rhine-line/70 px-4 py-8 text-center font-mono text-[10px] tracking-wider text-rhine-faint">
+            暂无已发布项目
+          </p>
+        )}
 
         <div className="mt-10 flex justify-center">
           <GlowButton to="/projects" variant="ghost">

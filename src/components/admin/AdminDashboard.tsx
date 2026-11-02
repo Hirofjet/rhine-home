@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Diamond, Home, LogOut, ShieldCheck } from 'lucide-react'
+import { Home, LogOut, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { site } from '../../content'
 import { cx } from '../../lib/cx'
 import { hasPerm, ROLE_LABELS, type ApiUser } from '../../lib/api'
 import { ThemeMenu } from '../theme/ThemeMenu'
@@ -131,31 +132,21 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   return (
     <div className="min-h-screen bg-rhine-abyss text-rhine-ink">
       <header className="sticky top-0 z-20 border-b border-rhine-line/70 bg-rhine-abyss/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5">
-                <Diamond className="h-4 w-4 text-rhine-gold" />
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+          <Link to="/" className="group flex shrink-0 items-center gap-3" title="返回前台主页">
+            <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:border-rhine-gold group-hover:bg-rhine-gold/10">
+              <Home className="h-4 w-4 text-rhine-gold" />
+            </span>
+            <span className="hidden flex-col leading-none sm:flex">
+              <span className="whitespace-nowrap font-display text-sm font-medium tracking-[0.18em] text-rhine-ink">
+                {site.title}
               </span>
-              <div>
-                <p className="font-display text-xs tracking-[0.22em] text-rhine-ink">
-                  RHINE//ADMIN
-                </p>
-                <p className="mt-0.5 font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
-                  CONTENT CONSOLE
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 font-mono text-[10px] tracking-wider text-rhine-dim">
-            <Link
-              to="/"
-              title="返回前台主页"
-              aria-label="返回前台主页"
-              className="flex h-9 w-9 items-center justify-center border border-rhine-line text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
-            >
-              <Home className="h-3.5 w-3.5" />
-            </Link>
+              <span className="mt-1 whitespace-nowrap font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
+                CONTENT CONSOLE
+              </span>
+            </span>
+          </Link>
+          <div className="flex shrink-0 flex-wrap items-center gap-3 font-mono text-[10px] tracking-wider text-rhine-dim">
             <ThemeMenu compact />
             <ShieldCheck className="h-3.5 w-3.5 text-rhine-cyan" />
             <span>{user.username}</span>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, Diamond, Menu, Terminal, UserRound, X } from 'lucide-react'
+import { ChevronDown, House, Menu, Terminal, UserRound, X } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { moduleLinks, navItems, site } from '../../content'
 import { useActiveSection } from '../../hooks/useActiveSection'
@@ -48,7 +48,7 @@ export function NavBar() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link to="/" className="group flex shrink-0 items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:shadow-[0_0_18px_color-mix(in_srgb,var(--color-rhine-gold)_35%,transparent)]">
-              <Diamond className="h-4 w-4 text-rhine-gold" />
+              <House className="h-4 w-4 text-rhine-gold" />
             </span>
             <span className="hidden flex-col leading-none sm:flex">
               <span className="whitespace-nowrap font-display text-sm font-medium tracking-[0.18em] text-rhine-ink">

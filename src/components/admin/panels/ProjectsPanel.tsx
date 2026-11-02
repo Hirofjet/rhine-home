@@ -1,6 +1,6 @@
 /* oxlint-disable react/set-state-in-effect */
 import { useCallback, useEffect, useState } from 'react'
-import { FolderKanban, Plus, Trash2 } from 'lucide-react'
+import { FolderKanban, Trash2 } from 'lucide-react'
 import { adminApi, errorMessage, type SiteProject } from '../../../lib/api'
 import {
   AdminButton,
@@ -130,15 +130,7 @@ export function ProjectsPanel() {
     <div className="space-y-4">
       <AdminError message={error} />
       <AdminNotice message={notice} />
-      <AdminPanel
-        title="项目库"
-        subtitle="PROJECT DATABASE"
-        actions={
-          <AdminButton variant="ghost" onClick={() => setDraft(empty())}>
-            <Plus className="h-3 w-3" /> 新建
-          </AdminButton>
-        }
-      >
+      <AdminPanel title="项目库" subtitle="PROJECT DATABASE">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => (
             <article key={item.id} className="border border-rhine-line/70 bg-rhine-abyss/40 p-3">
@@ -178,7 +170,9 @@ export function ProjectsPanel() {
       <AdminPanel title={draft.id ? '编辑项目' : '新建项目'} subtitle="PROJECT FORM">
         <div className="grid gap-3 sm:grid-cols-2">
           <AdminField label="项目编号 / CODE">
-            <AdminInput value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="RL-PJ-01" />
+            <div className="border border-rhine-line bg-rhine-abyss/40 px-2 py-1.5 font-mono text-[10px] text-rhine-faint">
+              {draft.code || '保存时自动生成（RL-PJ-XX）'}
+            </div>
           </AdminField>
           <AdminField label="项目简称 / SHORT NAME">
             <AdminInput value={draft.shortName} onChange={(e) => setDraft({ ...draft, shortName: e.target.value })} />
