@@ -1206,6 +1206,7 @@ const boardPublic = (row) => ({
   name: row.name,
   description: row.description ?? '',
   access: row.access ?? 'public',
+  tags: parseTags(row.tags),
   sort: Number(row.sort),
   postCount: Number(row.post_count ?? 0),
   lastPostAt: row.last_post_at ?? null,
@@ -1635,6 +1636,9 @@ app.post('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req,
   const slug = asString(req.body?.slug, 64).toLowerCase()
   const description = asString(req.body?.description, 500)
   const sort = Number(req.body?.sort) || 0
+  const tags = Array.isArray(req.body?.tags)
+    ? req.body.tags.map((tag) => asString(tag, 32)).filter(Boolean).slice(0, 8)
+    : []
   const access = requestedAccess
   if (!name || !SLUG_RE.test(slug)) {
     return res.status(400).json({ error: 'invalid_input' })
@@ -1642,8 +1646,8 @@ app.post('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req,
   const exists = await query('SELECT id FROM forum_boards WHERE slug = ?', [slug])
   if (exists.length) return res.status(409).json({ error: 'slug_taken' })
   const result = await execute(
-    'INSERT INTO forum_boards (slug, name, description, access, sort) VALUES (?, ?, ?, ?, ?)',
-    [slug, name, description, access, sort],
+    'INSERT INTO forum_boards (slug, name, description, access, sort, tags) VALUES (?, ?, ?, ?, ?, ?)',
+    [slug, name, description, access, sort, JSON.stringify(tags)],
   )
   res.status(201).json({ id: Number(result.insertId) })
 })
@@ -1658,6 +1662,13 @@ app.put('/api/admin/forum/boards/:id', requireAuth, requireForumAccess, async (r
   if (req.body?.slug !== undefined) patch.slug = asString(req.body.slug, 64).toLowerCase()
   if (req.body?.description !== undefined) patch.description = asString(req.body.description, 500)
   if (req.body?.sort !== undefined) patch.sort = Number(req.body.sort) || 0
+  if (req.body?.tags !== undefined) {
+    patch.tags = JSON.stringify(
+      Array.isArray(req.body.tags)
+        ? req.body.tags.map((tag) => asString(tag, 32)).filter(Boolean).slice(0, 8)
+        : [],
+    )
+  }
   if (req.body?.access !== undefined) {
     if (!['public', 'special', 'core'].includes(req.body.access)) {
       return res.status(400).json({ error: 'invalid_access' })

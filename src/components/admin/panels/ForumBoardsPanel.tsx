@@ -27,6 +27,7 @@ interface BoardForm {
   description: string
   access: 'public' | 'special' | 'core'
   sort: string
+  tags: string
 }
 
 const emptyForm: BoardForm = {
@@ -35,6 +36,7 @@ const emptyForm: BoardForm = {
   description: '',
   access: 'public',
   sort: '0',
+  tags: '',
 }
 
 const ACCESS_LABEL: Record<string, string> = {
@@ -257,6 +259,7 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
       description: board.description,
       access: board.access ?? 'public',
       sort: String(board.sort),
+      tags: (board.tags ?? []).join(', '),
     })
     setOpen(true)
   }
@@ -276,6 +279,7 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
         description: form.description.trim(),
         access: form.access,
         sort: Number(form.sort) || 0,
+        tags: form.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean),
       }
       if (editing) await adminApi.updateBoard(editing.id, payload)
       else await adminApi.createBoard(payload)
@@ -315,6 +319,35 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
     <div className="space-y-4">
       <AdminError message={error} />
       <AdminNotice message={notice} />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {(['public', 'special', 'core'] as const).map((access) => {
+          const scoped = boards.filter((board) => board.access === access)
+          const posts = scoped.reduce((sum, board) => sum + board.postCount, 0)
+          const max = Math.max(1, ...scoped.map((board) => board.postCount))
+          return (
+            <div key={access} className="border border-rhine-line/60 bg-rhine-panel/30 p-3">
+              <div className="flex items-center justify-between font-mono text-[10px] tracking-wider text-rhine-faint">
+                <span>{ACCESS_LABEL[access]}论坛</span>
+                <span>{scoped.length} 板块 / {posts} 帖</span>
+              </div>
+              <div className="mt-3 flex h-16 items-end gap-1">
+                {scoped.slice(0, 12).map((board) => (
+                  <span
+                    key={board.id}
+                    title={`${board.name}: ${board.postCount}`}
+                    className="min-w-1 flex-1 bg-rhine-gold/40"
+                    style={{ height: `${Math.max(4, (board.postCount / max) * 100)}%` }}
+                  />
+                ))}
+                {scoped.length === 0 && (
+                  <span className="font-mono text-[9px] text-rhine-faint">暂无数据</span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
       <AdminPanel
         title="论坛板块"
@@ -587,7 +620,8 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
                 (item) =>
                   !modQuery.trim() ||
                   item.boardName.toLowerCase().includes(modQuery.trim().toLowerCase()) ||
-                  item.username.toLowerCase().includes(modQuery.trim().toLowerCase()),
+                  item.username.toLowerCase().includes(modQuery.trim().toLowerCase()) ||
+                  boards.find((board) => board.id === item.boardId)?.tags?.some((tag) => tag.toLowerCase().includes(modQuery.trim().toLowerCase())),
               )
               .map((item) => (
               <li key={item.id} className="flex items-center gap-2 py-2">
@@ -633,6 +667,13 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
               value={form.description}
               onChange={(event) => setForm({ ...form, description: event.target.value })}
               className="min-h-20"
+            />
+          </AdminField>
+          <AdminField label="标签 / TAGS">
+            <AdminInput
+              value={form.tags}
+              onChange={(event) => setForm({ ...form, tags: event.target.value })}
+              placeholder="技术, 活动, 公告"
             />
           </AdminField>
           <AdminField label="板块类别 / ACCESS">

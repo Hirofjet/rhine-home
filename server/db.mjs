@@ -413,6 +413,7 @@ async function ensureSchemaUpgrades() {
     'access',
     "access ENUM('public','special','core') NOT NULL DEFAULT 'public'",
   )
+  await ensureColumn('forum_boards', 'tags', 'tags JSON NULL')
   await pool.query(
     `ALTER TABLE forum_posts MODIFY status
      ENUM('pending','approved','rejected','hidden','deleted') NOT NULL DEFAULT 'pending'`,

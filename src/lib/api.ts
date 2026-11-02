@@ -170,6 +170,7 @@ export interface Board {
   description: string
   sort: number
   access: BoardAccess
+  tags?: string[]
   canAccess?: boolean
   requestStatus?: '' | 'pending' | 'approved' | 'rejected'
   postCount: number
