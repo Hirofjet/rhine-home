@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { adminApi, type ContentVideo } from '../../../lib/api'
+import { notifyContentUpdated } from '../../../lib/contentEvents'
 import {
   AdminButton,
   AdminError,
@@ -96,6 +97,7 @@ export function VideosPanel() {
       else await adminApi.create('videos', payload)
       setNotice(draft.id ? '视频已更新' : '视频已发布')
       setDraft(null)
+      notifyContentUpdated()
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
@@ -108,7 +110,9 @@ export function VideosPanel() {
     if (!window.confirm(`删除视频「${item.title}」？`)) return
     try {
       await adminApi.remove('videos', item.id)
+      setItems((current) => current.filter((row) => row.id !== item.id))
       setNotice('视频已删除')
+      notifyContentUpdated()
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败')

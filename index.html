@@ -13,6 +13,8 @@
           if (theme === 'rhine' || theme === 'archive' || theme === 'sakura' || theme === 'noctis') {
             document.documentElement.dataset.theme = theme
           }
+          const brand = localStorage.getItem('rhine:brand')
+          if (brand) document.title = `${brand} · 个人主页`
         } catch {
           /* ignore */
         }

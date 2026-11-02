@@ -91,25 +91,30 @@ export function PhotoTimeline({ className }: { className?: string }) {
   // 后台新增的照片（接口不可用时为空，不影响本地照片）
   useEffect(() => {
     let alive = true
-    contentApi
-      .photos()
-      .then((list) => {
-        if (!alive) return
-        setRemotePhotos(
-          list.map((photo) => ({
-            key: `remote-${photo.id}`,
-            url: resolveMediaUrl(photo.url),
-            name: photo.name,
-            date: photo.date ? new Date(photo.date) : null,
-            description: photo.description ?? '',
-          })),
-        )
-      })
-      .catch(() => {
-        if (alive) setRemotePhotos([])
-      })
+    const loadRemote = () => {
+      contentApi
+        .photos()
+        .then((list) => {
+          if (!alive) return
+          setRemotePhotos(
+            list.map((photo) => ({
+              key: `remote-${photo.id}`,
+              url: resolveMediaUrl(photo.url),
+              name: photo.name,
+              date: photo.date ? new Date(photo.date) : null,
+              description: photo.description ?? '',
+            })),
+          )
+        })
+        .catch(() => {
+          if (alive) setRemotePhotos([])
+        })
+    }
+    loadRemote()
+    window.addEventListener('rhine:content-updated', loadRemote)
     return () => {
       alive = false
+      window.removeEventListener('rhine:content-updated', loadRemote)
     }
   }, [])
 

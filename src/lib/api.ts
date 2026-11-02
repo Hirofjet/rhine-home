@@ -5,6 +5,13 @@
    - 论坛（板块、帖子、回复）
    - 管理后台（内容、成员、权限、论坛板块、审核、上传）
    ============================================================ */
+import { notifyContentUpdated } from './contentEvents'
+
+const changed = <T>(promise: Promise<T>) =>
+  promise.then((result) => {
+    notifyContentUpdated()
+    return result
+  })
 
 export const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 const TOKEN_KEY = 'rhine:token'
@@ -543,15 +550,17 @@ export const siteApi = {
     contacts: SiteContact[]
     links: SiteLink[]
   }) {
-    return api<{
-      profile: HomeProfile
-      abilities: SiteAbility[]
-      contacts: SiteContact[]
-      links: SiteLink[]
-    }>('/api/site/home', {
-      method: 'PUT',
-      body: content,
-    })
+    return changed(
+      api<{
+        profile: HomeProfile
+        abilities: SiteAbility[]
+        contacts: SiteContact[]
+        links: SiteLink[]
+      }>('/api/site/home', {
+        method: 'PUT',
+        body: content,
+      }),
+    )
   },
 }
 
@@ -732,25 +741,27 @@ export const adminApi = {
     return api<{ items: SiteProject[] }>('/api/admin/projects')
   },
   createProject(data: Record<string, unknown>) {
-    return api<SiteProject>('/api/admin/projects', { method: 'POST', body: data })
+    return changed(api<SiteProject>('/api/admin/projects', { method: 'POST', body: data }))
   },
   updateProject(id: number, data: Record<string, unknown>) {
-    return api<SiteProject>(`/api/admin/projects/${id}`, { method: 'PUT', body: data })
+    return changed(
+      api<SiteProject>(`/api/admin/projects/${id}`, { method: 'PUT', body: data }),
+    )
   },
   deleteProject(id: number) {
-    return api<{ ok: boolean }>(`/api/admin/projects/${id}`, { method: 'DELETE' })
+    return changed(api<{ ok: boolean }>(`/api/admin/projects/${id}`, { method: 'DELETE' }))
   },
   list(name: string) {
     return api<{ items: unknown[] }>(`/api/admin/${name}`)
   },
   create<T>(name: string, data: unknown) {
-    return api<T>(`/api/admin/${name}`, { method: 'POST', body: data })
+    return changed(api<T>(`/api/admin/${name}`, { method: 'POST', body: data }))
   },
   update<T>(name: string, id: number, data: unknown) {
-    return api<T>(`/api/admin/${name}/${id}`, { method: 'PUT', body: data })
+    return changed(api<T>(`/api/admin/${name}/${id}`, { method: 'PUT', body: data }))
   },
   remove(name: string, id: number) {
-    return api<{ ok: boolean }>(`/api/admin/${name}/${id}`, { method: 'DELETE' })
+    return changed(api<{ ok: boolean }>(`/api/admin/${name}/${id}`, { method: 'DELETE' }))
   },
   upload: uploadFile,
   users(q?: string) {

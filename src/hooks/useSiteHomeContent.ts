@@ -16,17 +16,21 @@ export function useSiteHomeContent(): SiteHomeContent {
   const [content, setContent] = useState<SiteHomeContent>(cached ?? EMPTY)
 
   useEffect(() => {
-    if (cached) return undefined
     let alive = true
-    siteApi
-      .home()
-      .then((data) => {
-        cached = data
-        if (alive) setContent(data)
-      })
-      .catch(() => undefined)
+    const load = () => {
+      siteApi
+        .home()
+        .then((data) => {
+          cached = data
+          if (alive) setContent(data)
+        })
+        .catch(() => undefined)
+    }
+    if (!cached) load()
+    window.addEventListener('rhine:content-updated', load)
     return () => {
       alive = false
+      window.removeEventListener('rhine:content-updated', load)
     }
   }, [])
 

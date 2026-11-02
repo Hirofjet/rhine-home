@@ -26,14 +26,19 @@ export function useSiteProjects(): Project[] {
   const [items, setItems] = useState<Project[]>(fallback)
   useEffect(() => {
     let alive = true
-    contentApi
-      .projects()
-      .then((list) => {
-        if (alive && list.length) setItems(list.map(toProject))
-      })
-      .catch(() => undefined)
+    const load = () => {
+      contentApi
+        .projects()
+        .then((list) => {
+          if (alive) setItems(list.map(toProject))
+        })
+        .catch(() => undefined)
+    }
+    load()
+    window.addEventListener('rhine:content-updated', load)
     return () => {
       alive = false
+      window.removeEventListener('rhine:content-updated', load)
     }
   }, [])
   return items

@@ -3,7 +3,14 @@ import { site } from '../content'
 import { siteApi } from '../lib/api'
 
 const listeners = new Set<(brand: string) => void>()
-let currentBrand = site.title
+const STORAGE_KEY = 'rhine:brand'
+let currentBrand = (() => {
+  try {
+    return localStorage.getItem(STORAGE_KEY) || site.title
+  } catch {
+    return site.title
+  }
+})()
 let initialized = false
 
 const brandFromCodeName = (codeName: string | null | undefined) => {
@@ -13,9 +20,14 @@ const brandFromCodeName = (codeName: string | null | undefined) => {
 
 export function setSiteBrandName(codeName: string | null | undefined) {
   const next = brandFromCodeName(codeName)
+  try {
+    localStorage.setItem(STORAGE_KEY, next)
+  } catch {
+    /* ignore */
+  }
+  document.title = `${next} · 个人主页`
   if (next === currentBrand) return
   currentBrand = next
-  document.title = `${next} · 个人主页`
   for (const listener of listeners) listener(next)
 }
 

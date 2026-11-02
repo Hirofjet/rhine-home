@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ImagePlus, Link2, Upload } from 'lucide-react'
 import { adminApi, type ContentPhoto } from '../../../lib/api'
 import {
@@ -21,7 +21,7 @@ export function PhotosPanel() {
   const [descriptions, setDescriptions] = useState<Record<number, string>>({})
   const [pendingFiles, setPendingFiles] = useState<FileList | null>(null)
   const [pendingUrl, setPendingUrl] = useState('')
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingDescription, setPendingDescription] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -68,11 +68,13 @@ export function PhotosPanel() {
           url: uploaded.url,
           name: uploaded.name,
           date: uploaded.date ?? '',
+          description: pendingDescription,
         })
       }
       setNotice(`已上传 ${files.length} 张照片`)
       setPendingFiles(null)
       setPendingUrl('')
+      setPendingDescription('')
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : '上传失败')
@@ -157,30 +159,35 @@ export function PhotosPanel() {
               </div>
             ) : (
               <>
-                <AdminButton onClick={() => inputRef.current?.click()} disabled={busy}>
-                  <Upload className="h-3 w-3" /> {busy ? '上传中…' : '选择照片上传'}
-                </AdminButton>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    const files = event.target.files
-                    if (files && files[0]) {
-                      setPendingFiles(files)
-                      setPendingUrl(URL.createObjectURL(files[0]))
-                    }
-                    event.target.value = ''
-                  }}
-                />
+                <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 border border-rhine-gold/70 bg-rhine-gold/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-rhine-gold transition-colors hover:border-rhine-gold hover:bg-rhine-gold/15">
+                  <Upload className="h-3 w-3" /> 选择照片上传
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => {
+                      const files = event.target.files
+                      if (files && files[0]) {
+                        setPendingFiles(files)
+                        setPendingUrl(URL.createObjectURL(files[0]))
+                      }
+                      event.target.value = ''
+                    }}
+                  />
+                </label>
                 {pendingUrl && (
                   <div className="mt-3 border border-rhine-line/70 bg-rhine-abyss/40 p-2">
                     <p className="mb-2 font-mono text-[9px] tracking-[0.2em] text-rhine-faint">
                       PREVIEW // 预览
                     </p>
                     <img src={pendingUrl} alt="待上传照片预览" className="max-h-56 w-full object-contain" />
+                    <AdminInput
+                      value={pendingDescription}
+                      onChange={(event) => setPendingDescription(event.target.value)}
+                      placeholder="照片描述"
+                      className="mt-2"
+                    />
                     <div className="mt-2 flex gap-2">
                       <AdminButton onClick={() => void uploadFiles(pendingFiles)} disabled={busy}>
                         <Upload className="h-3 w-3" /> 确认上传
@@ -190,6 +197,7 @@ export function PhotosPanel() {
                         onClick={() => {
                           setPendingFiles(null)
                           setPendingUrl('')
+                          setPendingDescription('')
                         }}
                       >
                         取消

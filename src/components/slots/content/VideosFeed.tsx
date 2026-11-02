@@ -19,18 +19,23 @@ export function VideosFeed({ fallback }: VideosFeedProps) {
 
   useEffect(() => {
     let alive = true
-    contentApi
-      .videos()
-      .then((list) => {
-        if (!alive) return
-        setVideos(list)
-        setState('ready')
-      })
-      .catch(() => {
-        if (alive) setState('offline')
-      })
+    const load = () => {
+      contentApi
+        .videos()
+        .then((list) => {
+          if (!alive) return
+          setVideos(list)
+          setState('ready')
+        })
+        .catch(() => {
+          if (alive) setState('offline')
+        })
+    }
+    load()
+    window.addEventListener('rhine:content-updated', load)
     return () => {
       alive = false
+      window.removeEventListener('rhine:content-updated', load)
     }
   }, [])
 

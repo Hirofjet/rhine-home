@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Plus } from 'lucide-react'
+import { FileUp, Plus } from 'lucide-react'
 import { adminApi, type ContentArticle } from '../../../lib/api'
 import {
   AdminButton,
@@ -63,6 +63,7 @@ export function ArticlesPanel() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const fileRef = useRef<HTMLInputElement | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -98,6 +99,20 @@ export function ArticlesPanel() {
     setPreview(false)
     setNotice('')
     setError('')
+  }
+
+  const importFile = async (file: File | undefined) => {
+    if (!file) return
+    const raw = await file.text()
+    const title = /^#\s+(.+)$/m.exec(raw)?.[1]?.trim()
+    const date = /(\d{4}-\d{2}-\d{2})/.exec(file.name)?.[1]
+    setDraft({
+      ...emptyDraft(),
+      title: title || file.name.replace(/\.md$/i, ''),
+      date: date ?? emptyDraft().date,
+      markdown: raw,
+    })
+    setPreview(false)
   }
 
   const startEdit = (item: ContentArticle) => {
@@ -171,6 +186,19 @@ export function ArticlesPanel() {
           subtitle="ARTICLE EDITOR"
           actions={
             <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".md,.markdown,text/markdown"
+                className="hidden"
+                onChange={(event) => {
+                  void importFile(event.target.files?.[0])
+                  event.target.value = ''
+                }}
+              />
+              <AdminButton variant="ghost" onClick={() => fileRef.current?.click()}>
+                <FileUp className="h-3 w-3" /> 导入 md
+              </AdminButton>
               <AdminButton variant="ghost" onClick={() => setPreview((value) => !value)}>
                 {preview ? '编辑内容' : '预览效果'}
               </AdminButton>

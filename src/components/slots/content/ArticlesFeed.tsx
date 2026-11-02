@@ -22,18 +22,23 @@ export function ArticlesFeed({ fallback }: ArticlesFeedProps) {
 
   useEffect(() => {
     let alive = true
-    contentApi
-      .articles()
-      .then((list) => {
-        if (!alive) return
-        setArticles(list)
-        setState('ready')
-      })
-      .catch(() => {
-        if (alive) setState('offline')
-      })
+    const load = () => {
+      contentApi
+        .articles()
+        .then((list) => {
+          if (!alive) return
+          setArticles(list)
+          setState('ready')
+        })
+        .catch(() => {
+          if (alive) setState('offline')
+        })
+    }
+    load()
+    window.addEventListener('rhine:content-updated', load)
     return () => {
       alive = false
+      window.removeEventListener('rhine:content-updated', load)
     }
   }, [])
 

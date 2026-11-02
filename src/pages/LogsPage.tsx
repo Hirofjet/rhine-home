@@ -48,16 +48,21 @@ export function LogsPage() {
 
   useEffect(() => {
     let alive = true
-    contentApi
-      .logs()
-      .then((list) => {
-        if (alive) setServerLogs(list)
-      })
-      .catch(() => {
-        if (alive) setServerLogs([])
-      })
+    const load = () => {
+      contentApi
+        .logs()
+        .then((list) => {
+          if (alive) setServerLogs(list)
+        })
+        .catch(() => {
+          if (alive) setServerLogs([])
+        })
+    }
+    load()
+    window.addEventListener('rhine:content-updated', load)
     return () => {
       alive = false
+      window.removeEventListener('rhine:content-updated', load)
     }
   }, [])
 
