@@ -828,6 +828,12 @@ export const adminApi = {
       method: 'DELETE',
     })
   },
+  inviteToBoard(boardId: number, userId: number) {
+    return api<{ ok: boolean }>(`/api/admin/forum/boards/${boardId}/invite`, {
+      method: 'POST',
+      body: { userId },
+    })
+  },
   createBoard(data: {
     name: string
     slug: string

@@ -1955,6 +1955,29 @@ app.get('/api/admin/forum/requests', requireAuth, requireForumAccess, async (req
      WHERE status = 'pending' AND escalated_at IS NULL
        AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
   ).catch(() => undefined)
+  const escalated = await query(
+    `SELECT r.id, r.user_id, b.name AS board_name
+     FROM forum_access_requests r JOIN forum_boards b ON b.id = r.board_id
+     WHERE r.status = 'pending' AND r.escalated_at IS NOT NULL
+       AND r.escalation_notified = 0`,
+  ).catch(() => [])
+  const globalAdmins = await query(
+    "SELECT id FROM users WHERE is_super = 1 OR role_code IN ('senior','forum_master')",
+  ).catch(() => [])
+  for (const request of escalated.slice(0, 20)) {
+    for (const admin of globalAdmins) {
+      await notify(
+        Number(admin.id),
+        'access',
+        '论坛访问申请已升级',
+        `「${request.board_name}」有超过 1 小时未处理的申请`,
+        '/admin',
+      ).catch(() => undefined)
+    }
+    await execute('UPDATE forum_access_requests SET escalation_notified = 1 WHERE id = ?', [
+      Number(request.id),
+    ]).catch(() => undefined)
+  }
   const rows = await query(
     `SELECT r.*, b.name AS board_name, b.access,
             COALESCE(NULLIF(u.nickname,''), u.username) AS username

@@ -71,6 +71,10 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
   const [modBoard, setModBoard] = useState('')
   const [modUser, setModUser] = useState('')
   const [modRole, setModRole] = useState<'master' | 'admin'>('admin')
+  const [inviteBoard, setInviteBoard] = useState('')
+  const [inviteUser, setInviteUser] = useState('')
+  const [modQuery, setModQuery] = useState('')
+  const [modAccess, setModAccess] = useState('all')
   const [requests, setRequests] = useState<
     Array<{
       id: number
@@ -136,6 +140,25 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
       await load()
     } catch (err) {
       setError(errorMessage(err))
+    }
+  }
+
+  const inviteCore = async () => {
+    if (!inviteBoard || !inviteUser) {
+      setError('请选择核心板块和成员')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await adminApi.inviteToBoard(Number(inviteBoard), Number(inviteUser))
+      setNotice('核心论坛邀请已发送')
+      setInviteBoard('')
+      setInviteUser('')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -439,15 +462,38 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
       </AdminPanel>
 
       <AdminPanel title="板块管理员" subtitle="BOARD MODERATORS">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <AdminInput
+            value={modQuery}
+            onChange={(event) => setModQuery(event.target.value)}
+            placeholder="搜索板块或成员"
+            className="max-w-56"
+          />
+          <select
+            value={modAccess}
+            onChange={(event) => setModAccess(event.target.value)}
+            className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink"
+          >
+            <option value="all">全部类别</option>
+            <option value="public">公开</option>
+            <option value="special">特殊</option>
+            <option value="core">核心</option>
+          </select>
+        </div>
         {canManageAll && (
           <div className="mb-4 grid gap-2 border border-rhine-line/60 bg-rhine-abyss/30 p-3 sm:grid-cols-4">
             <select value={modBoard} onChange={(e) => setModBoard(e.target.value)} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
               <option value="">选择板块</option>
-              {boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
+              {boards
+                .filter((board) => modAccess === 'all' || board.access === modAccess)
+                .filter((board) => !modQuery.trim() || board.name.toLowerCase().includes(modQuery.trim().toLowerCase()))
+                .map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
             </select>
             <select value={modUser} onChange={(e) => setModUser(e.target.value)} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
               <option value="">选择成员</option>
-              {allUsers.map((member) => <option key={member.id} value={member.id}>{member.username}</option>)}
+              {allUsers
+                .filter((member) => !modQuery.trim() || member.username.toLowerCase().includes(modQuery.trim().toLowerCase()))
+                .map((member) => <option key={member.id} value={member.id}>{member.username}</option>)}
             </select>
             <select value={modRole} onChange={(e) => setModRole(e.target.value as 'master' | 'admin')} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
               <option value="admin">子管理员</option>
@@ -456,11 +502,32 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
             <AdminButton onClick={() => void assignModerator()} disabled={busy}>授权</AdminButton>
           </div>
         )}
+        {canManageAll && (
+          <div className="mb-4 grid gap-2 border border-rhine-gold/30 bg-rhine-gold/[0.03] p-3 sm:grid-cols-3">
+            <select value={inviteBoard} onChange={(e) => setInviteBoard(e.target.value)} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
+              <option value="">核心板块邀请</option>
+              {boards.filter((board) => board.access === 'core').map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
+            </select>
+            <select value={inviteUser} onChange={(e) => setInviteUser(e.target.value)} className="border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[11px] text-rhine-ink">
+              <option value="">选择成员</option>
+              {allUsers.map((member) => <option key={member.id} value={member.id}>{member.username}</option>)}
+            </select>
+            <AdminButton variant="ghost" onClick={() => void inviteCore()} disabled={busy}>发送邀请</AdminButton>
+          </div>
+        )}
         {moderators.length === 0 ? (
           <p className="font-mono text-[10px] text-rhine-faint">暂无板块管理员</p>
         ) : (
           <ul className="divide-y divide-rhine-line/60">
-            {moderators.map((item) => (
+            {moderators
+              .filter((item) => modAccess === 'all' || item.access === modAccess)
+              .filter(
+                (item) =>
+                  !modQuery.trim() ||
+                  item.boardName.toLowerCase().includes(modQuery.trim().toLowerCase()) ||
+                  item.username.toLowerCase().includes(modQuery.trim().toLowerCase()),
+              )
+              .map((item) => (
               <li key={item.id} className="flex items-center gap-2 py-2">
                 <span className="text-xs text-rhine-ink">{item.username}</span>
                 <span className="font-mono text-[10px] text-rhine-dim">{item.boardName}</span>

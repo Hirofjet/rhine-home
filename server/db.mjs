@@ -359,6 +359,11 @@ async function ensureSchemaUpgrades() {
     'escalated_at',
     'escalated_at DATETIME NULL',
   )
+  await ensureColumn(
+    'forum_access_requests',
+    'escalation_notified',
+    'escalation_notified TINYINT(1) NOT NULL DEFAULT 0',
+  )
   await pool.query(
     `CREATE TABLE IF NOT EXISTS forum_invites (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
