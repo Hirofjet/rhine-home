@@ -5,6 +5,19 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05070b" />
+    <script>
+      // 在首屏绘制前应用主题，避免刷新时闪回默认配色
+      ;(() => {
+        try {
+          const theme = localStorage.getItem('rhine:theme')
+          if (theme === 'rhine' || theme === 'archive' || theme === 'sakura') {
+            document.documentElement.dataset.theme = theme
+          }
+        } catch {
+          /* ignore */
+        }
+      })()
+    </script>
     <meta
       name="description"
       content="RHINE//HOME —— 莱茵生命风格的个人主页：干员档案、能力模块、项目档案与联络终端。"

@@ -41,6 +41,12 @@
   --animate-pulse-soft: pulse-soft 2.6s ease-in-out infinite;
   --animate-marquee: marquee 30s linear infinite;
   --animate-beam: beam-drift 26s ease-in-out infinite;
+  --animate-bell-ring: bell-ring 2.8s ease-in-out infinite;
+  --animate-bell-glow: bell-glow 2.8s ease-in-out infinite;
+  --animate-badge-pulse: badge-pulse 1.8s ease-in-out infinite;
+  --animate-petal-fall: petal-fall 18s linear infinite;
+  --animate-hud-pulse: hud-pulse 4s ease-in-out infinite;
+  --animate-ticker: ticker 18s linear infinite;
 
   @keyframes beam-drift {
     0%,
@@ -95,7 +101,175 @@
       transform: translateX(-50%);
     }
   }
+  @keyframes bell-ring {
+    0%,
+    72%,
+    100% {
+      transform: rotate(0deg);
+    }
+    76% {
+      transform: rotate(12deg);
+    }
+    80% {
+      transform: rotate(-10deg);
+    }
+    84% {
+      transform: rotate(7deg);
+    }
+    88% {
+      transform: rotate(-4deg);
+    }
+    92% {
+      transform: rotate(2deg);
+    }
+  }
+  @keyframes bell-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-rhine-gold) 0%, transparent);
+      border-color: color-mix(in srgb, var(--color-rhine-gold) 45%, transparent);
+    }
+    50% {
+      box-shadow: 0 0 18px 2px color-mix(in srgb, var(--color-rhine-gold) 28%, transparent);
+      border-color: color-mix(in srgb, var(--color-rhine-gold) 85%, transparent);
+    }
+  }
+  @keyframes badge-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-rhine-red) 45%, transparent);
+    }
+    50% {
+      transform: scale(1.12);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-rhine-red) 0%, transparent);
+    }
+  }
+  @keyframes petal-fall {
+    0% {
+      transform: translate3d(0, -12vh, 0) rotate(0deg);
+      opacity: 0;
+    }
+    12% {
+      opacity: 0.9;
+    }
+    60% {
+      transform: translate3d(6vw, 58vh, 0) rotate(170deg);
+    }
+    100% {
+      transform: translate3d(-4vw, 112vh, 0) rotate(340deg);
+      opacity: 0;
+    }
+  }
+  @keyframes hud-pulse {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.985);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.015);
+    }
+  }
+  @keyframes ticker {
+    to {
+      transform: translateX(-50%);
+    }
+  }
 }
+
+/* ============================================================
+   主题令牌
+   ------------------------------------------------------------
+   默认：RHINE / 莱茵生命
+   archive：碧蓝档案（千年蓝 + 圣娅粉）
+   sakura：樱色协议（夜樱 + 桃粉 + 薄紫）
+   所有 Tailwind 的 bg-rhine-* / text-rhine-* 都引用这些变量，
+   因此切换 data-theme 即可全局换肤。
+   ============================================================ */
+:root {
+  --cursor-default: url("/cursors/rhine/default.png") 6 10, auto;
+  --cursor-pointer: url("/cursors/rhine/pointer.png") 6 10, pointer;
+  --cursor-text: url("/cursors/rhine/text.png") 15 16, text;
+  --cursor-move: url("/cursors/rhine/move.png") 15 16, move;
+}
+
+html[data-theme="archive"] {
+  --color-rhine-abyss: #050e1b;
+  --color-rhine-abyss-2: #071628;
+  --color-rhine-panel: #0a1f35;
+  --color-rhine-panel-2: #0d2945;
+  --color-rhine-line: #183b5b;
+  --color-rhine-line-2: #2c6490;
+  --color-rhine-ink: #eaf5ff;
+  --color-rhine-dim: #9cb8d5;
+  --color-rhine-faint: #5f809f;
+  --color-rhine-gold: #5fb2ff;
+  --color-rhine-gold-deep: #2d70ae;
+  --color-rhine-cyan: #ff9ecb;
+  --color-rhine-green: #66e3c4;
+  --color-rhine-red: #ff6f91;
+  --cursor-default: url("/cursors/archive/default.png") 6 10, auto;
+  --cursor-pointer: url("/cursors/archive/pointer.png") 6 10, pointer;
+  --cursor-text: url("/cursors/archive/text.png") 15 16, text;
+  --cursor-move: url("/cursors/archive/move.png") 15 16, move;
+}
+
+html[data-theme="sakura"] {
+  --color-rhine-abyss: #100812;
+  --color-rhine-abyss-2: #170b1b;
+  --color-rhine-panel: #1d0f22;
+  --color-rhine-panel-2: #28152f;
+  --color-rhine-line: #3c2345;
+  --color-rhine-line-2: #60396b;
+  --color-rhine-ink: #fceff7;
+  --color-rhine-dim: #c7a8bd;
+  --color-rhine-faint: #876580;
+  --color-rhine-gold: #ff9ec9;
+  --color-rhine-gold-deep: #b85b8c;
+  --color-rhine-cyan: #c9a7ff;
+  --color-rhine-green: #8ee6c1;
+  --color-rhine-red: #ff6f91;
+  --cursor-default: url("/cursors/sakura/default.png") 6 10, auto;
+  --cursor-pointer: url("/cursors/sakura/pointer.png") 6 10, pointer;
+  --cursor-text: url("/cursors/sakura/text.png") 15 16, text;
+  --cursor-move: url("/cursors/sakura/move.png") 15 16, move;
+}
+
+@media (pointer: fine) {
+  body {
+    cursor: var(--cursor-default);
+  }
+  a,
+  button,
+  [role="button"],
+  summary,
+  select {
+    cursor: var(--cursor-pointer);
+  }
+  input,
+  textarea,
+  [contenteditable="true"] {
+    cursor: var(--cursor-text);
+  }
+  .cursor-move {
+    cursor: var(--cursor-move);
+  }
+}
+
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition:
+    background-color 480ms ease,
+    border-color 480ms ease,
+    color 360ms ease,
+    fill 360ms ease,
+    stroke 360ms ease,
+    box-shadow 480ms ease !important;
+}
+
 
 @layer base {
   html {
@@ -113,8 +287,8 @@
   }
 
   ::selection {
-    background: rgb(211 178 122 / 0.3);
-    color: #ffffff;
+    background: color-mix(in srgb, var(--color-rhine-gold) 32%, transparent);
+    color: var(--color-rhine-ink);
   }
 
   ::-webkit-scrollbar {
@@ -137,8 +311,8 @@
   /* 数据网格背景 */
   .bg-grid {
     background-image:
-      linear-gradient(rgb(99 212 220 / 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(99 212 220 / 0.05) 1px, transparent 1px);
+      linear-gradient(color-mix(in srgb, var(--color-rhine-cyan) 7%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--color-rhine-cyan) 7%, transparent) 1px, transparent 1px);
     background-size: 44px 44px;
   }
 
@@ -155,10 +329,10 @@
 
   /* 文字辉光 */
   .text-glow-gold {
-    text-shadow: 0 0 14px rgb(211 178 122 / 0.5);
+    text-shadow: 0 0 16px color-mix(in srgb, var(--color-rhine-gold) 55%, transparent);
   }
   .text-glow-cyan {
-    text-shadow: 0 0 14px rgb(99 212 220 / 0.5);
+    text-shadow: 0 0 16px color-mix(in srgb, var(--color-rhine-cyan) 55%, transparent);
   }
 
   /* ---------- Markdown 正文样式（ArticleBlock 使用） ---------- */
@@ -309,7 +483,119 @@
   will-change: transform;
 }
 
+/* ---------- 主题背景 / 动效补充 ---------- */
+.bg-theme-rhine {
+  background:
+    radial-gradient(ellipse 62% 46% at 50% 0%, color-mix(in srgb, var(--color-rhine-cyan) 10%, transparent), transparent 70%),
+    radial-gradient(ellipse 64% 56% at 50% 108%, color-mix(in srgb, var(--color-rhine-gold) 9%, transparent), transparent 70%);
+}
+
+.bg-theme-archive {
+  background:
+    radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--color-rhine-gold) 15%, transparent), transparent 38%),
+    radial-gradient(circle at 84% 74%, color-mix(in srgb, var(--color-rhine-cyan) 13%, transparent), transparent 42%),
+    radial-gradient(ellipse 70% 45% at 50% 105%, color-mix(in srgb, var(--color-rhine-gold) 8%, transparent), transparent 70%);
+}
+
+.bg-theme-sakura {
+  background:
+    radial-gradient(circle at 18% 24%, color-mix(in srgb, var(--color-rhine-gold) 16%, transparent), transparent 36%),
+    radial-gradient(circle at 82% 60%, color-mix(in srgb, var(--color-rhine-cyan) 13%, transparent), transparent 42%),
+    radial-gradient(ellipse 80% 55% at 50% 110%, color-mix(in srgb, var(--color-rhine-gold-deep) 12%, transparent), transparent 70%);
+}
+
+.theme-grid-archive {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-rhine-gold) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-rhine-gold) 9%, transparent) 1px, transparent 1px),
+    radial-gradient(color-mix(in srgb, var(--color-rhine-cyan) 18%, transparent) 0.7px, transparent 0.8px);
+  background-size: 52px 52px, 52px 52px, 15px 15px;
+}
+
+.theme-grid-sakura {
+  background-image:
+    radial-gradient(color-mix(in srgb, var(--color-rhine-gold) 22%, transparent) 0.6px, transparent 0.7px),
+    radial-gradient(color-mix(in srgb, var(--color-rhine-cyan) 16%, transparent) 0.8px, transparent 0.9px);
+  background-size: 34px 34px, 62px 62px;
+  background-position: 0 0, 17px 23px;
+}
+
+/* 未读消息：铃铛持续摇摆 + 呼吸高亮 */
+.notification-active {
+  color: var(--color-rhine-gold) !important;
+  animation: bell-glow 2.8s ease-in-out infinite;
+}
+.notification-active .bell-icon {
+  animation: bell-ring 2.8s ease-in-out infinite;
+  transform-origin: 50% 10%;
+}
+.notification-badge {
+  animation: badge-pulse 1.8s ease-in-out infinite;
+}
+
+/* 页面切换时的一次性扫描光 */
+.page-enter-scan {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: hidden;
+}
+.page-enter-scan::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: -10%;
+  height: 12%;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--color-rhine-cyan) 9%, transparent),
+    transparent
+  );
+  animation: page-scan 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes page-scan {
+  from {
+    top: -12%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    top: 106%;
+    opacity: 0;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .reveal-view {
+    animation: reveal-view linear both;
+    animation-timeline: view();
+    animation-range: entry 4% cover 26%;
+  }
+}
+
+@keyframes reveal-view {
+  from {
+    opacity: 0.2;
+    transform: translateY(22px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .notification-active,
+  .notification-active .bell-icon,
+  .notification-badge,
+  .page-enter-scan::after {
+    animation: none !important;
+  }
   html {
     scroll-behavior: auto;
   }
@@ -319,6 +605,7 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

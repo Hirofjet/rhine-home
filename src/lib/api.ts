@@ -441,6 +441,14 @@ export const contentApi = {
   },
 }
 
+export const siteApi = {
+  owner() {
+    return api<{
+      profile: { id: number | null; nickname: string; avatarUrl: string }
+    }>('/api/site/profile', { auth: false })
+  },
+}
+
 export interface GuestMessage {
   id: number
   name: string
@@ -592,9 +600,27 @@ export async function uploadFile(
 }
 
 // ---------- 管理后台 ----------
+export interface OverviewTimelinePoint {
+  date: string
+  users: number
+  posts: number
+  replies: number
+  messages: number
+}
+
+export interface AdminOverview {
+  counts: Record<string, number>
+  role: string
+  timeline?: OverviewTimelinePoint[]
+  postsByStatus?: Record<string, number>
+  usersByRole?: Record<string, number>
+  topBoards?: Array<{ name: string; count: number }>
+  generatedAt?: string
+}
+
 export const adminApi = {
   overview() {
-    return api<{ counts: Record<string, number>; role: string }>('/api/admin/overview')
+    return api<AdminOverview>('/api/admin/overview')
   },
   list(name: string) {
     return api<{ items: unknown[] }>(`/api/admin/${name}`)

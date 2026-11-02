@@ -756,6 +756,23 @@ app.get('/api/content/videos', async (_req, res) => {
   res.json({ items: rows.map(mapContentRow) })
 })
 
+// 站点所有者资料：主页头像与后台超级管理员保持同步
+app.get('/api/site/profile', async (_req, res) => {
+  const rows = await query(
+    `SELECT id, nickname, avatar_url FROM users
+     WHERE is_super = 1 ORDER BY id ASC LIMIT 1`,
+  )
+  const owner = rows[0]
+  res.set('Cache-Control', 'public, max-age=30')
+  res.json({
+    profile: {
+      id: owner ? Number(owner.id) : null,
+      nickname: owner?.nickname ?? '',
+      avatarUrl: owner?.avatar_url ?? '',
+    },
+  })
+})
+
 // ---------- 留言板 ----------
 const guestTokenOf = (req) => asString(req.headers['x-guest-token'], 64)
 
@@ -2125,36 +2142,117 @@ app.get('/api/users/:id/following', async (req, res) => {
 // ============================================================
 app.get('/api/admin/overview', requireAuth, requireStaff, async (req, res) => {
   const user = req.user
-  const counts = {}
-  if (hasPermission(user, 'archive.articles')) {
-    counts.articles = Number((await query('SELECT COUNT(*) AS n FROM articles'))[0].n)
-  }
-  if (hasPermission(user, 'archive.photos')) {
-    counts.photos = Number((await query('SELECT COUNT(*) AS n FROM photos'))[0].n)
-  }
-  if (hasPermission(user, 'archive.videos')) {
-    counts.videos = Number((await query('SELECT COUNT(*) AS n FROM videos'))[0].n)
-  }
-  if (hasPermission(user, 'logs')) {
-    counts.logs = Number((await query('SELECT COUNT(*) AS n FROM logs'))[0].n)
-  }
-  if (user.isSuper || user.permissions.some(isForumPermission)) {
-    counts.pendingPosts = Number(
-      (await query(`SELECT COUNT(*) AS n FROM forum_posts WHERE status = 'pending'`))[0].n,
-    )
-    counts.pendingReplies = Number(
-      (await query(`SELECT COUNT(*) AS n FROM forum_replies WHERE status = 'pending'`))[0].n,
-    )
-    counts.boards = Number((await query('SELECT COUNT(*) AS n FROM forum_boards'))[0].n)
-  }
-  if (
+  const canForum = user.isSuper || user.permissions.some(isForumPermission)
+  const canMembers =
     user.isSuper ||
     user.permissions.includes('members.manage') ||
     user.permissions.includes('members.grant')
-  ) {
-    counts.users = Number((await query('SELECT COUNT(*) AS n FROM users'))[0].n)
+  const canGuestbook = hasPermission(user, 'guestbook')
+
+  const tasks = []
+  const addCount = (key, sql) => tasks.push([key, query(sql)])
+  if (hasPermission(user, 'archive.articles')) addCount('articles', 'SELECT COUNT(*) AS n FROM articles')
+  if (hasPermission(user, 'archive.photos')) addCount('photos', 'SELECT COUNT(*) AS n FROM photos')
+  if (hasPermission(user, 'archive.videos')) addCount('videos', 'SELECT COUNT(*) AS n FROM videos')
+  if (hasPermission(user, 'logs')) addCount('logs', 'SELECT COUNT(*) AS n FROM logs')
+  if (canForum) {
+    addCount('pendingPosts', `SELECT COUNT(*) AS n FROM forum_posts WHERE status = 'pending'`)
+    addCount('pendingReplies', `SELECT COUNT(*) AS n FROM forum_replies WHERE status = 'pending'`)
+    addCount('boards', 'SELECT COUNT(*) AS n FROM forum_boards')
+    addCount('posts', `SELECT COUNT(*) AS n FROM forum_posts WHERE status <> 'deleted'`)
+    addCount('replies', `SELECT COUNT(*) AS n FROM forum_replies WHERE status <> 'deleted'`)
   }
-  res.json({ counts, role: roleLabel(user) })
+  if (canMembers) addCount('users', 'SELECT COUNT(*) AS n FROM users')
+  if (canGuestbook) addCount('messages', 'SELECT COUNT(*) AS n FROM guest_messages')
+
+  const countEntries = await Promise.all(
+    tasks.map(async ([key, promise]) => [key, Number((await promise)[0].n)]),
+  )
+  const counts = Object.fromEntries(countEntries)
+
+  const dayKeys = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - index))
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+      date.getDate(),
+    ).padStart(2, '0')}`
+  })
+
+  const sinceSql = 'DATE_SUB(CURDATE(), INTERVAL 6 DAY)'
+  const [userDays, postDays, replyDays, messageDays] = await Promise.all([
+    canMembers
+      ? query(
+          `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS day, COUNT(*) AS n
+           FROM users WHERE created_at >= ${sinceSql} GROUP BY day`,
+        )
+      : Promise.resolve([]),
+    canForum
+      ? query(
+          `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS day, COUNT(*) AS n
+           FROM forum_posts WHERE created_at >= ${sinceSql} GROUP BY day`,
+        )
+      : Promise.resolve([]),
+    canForum
+      ? query(
+          `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS day, COUNT(*) AS n
+           FROM forum_replies WHERE created_at >= ${sinceSql} GROUP BY day`,
+        )
+      : Promise.resolve([]),
+    canGuestbook
+      ? query(
+          `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS day, COUNT(*) AS n
+           FROM guest_messages WHERE created_at >= ${sinceSql} GROUP BY day`,
+        )
+      : Promise.resolve([]),
+  ])
+
+  const asMap = (rows) => new Map(rows.map((row) => [String(row.day).slice(0, 10), Number(row.n)]))
+  const userMap = asMap(userDays)
+  const postMap = asMap(postDays)
+  const replyMap = asMap(replyDays)
+  const messageMap = asMap(messageDays)
+
+  const timeline = dayKeys.map((day) => ({
+    date: day.slice(5),
+    users: userMap.get(day) ?? 0,
+    posts: postMap.get(day) ?? 0,
+    replies: replyMap.get(day) ?? 0,
+    messages: messageMap.get(day) ?? 0,
+  }))
+
+  const [postStatusRows, userRoleRows, boardRows] = await Promise.all([
+    canForum
+      ? query('SELECT status, COUNT(*) AS n FROM forum_posts GROUP BY status')
+      : Promise.resolve([]),
+    canMembers
+      ? query('SELECT is_super, permissions FROM users')
+      : Promise.resolve([]),
+    canForum
+      ? query(
+          `SELECT b.name, COUNT(p.id) AS n
+           FROM forum_boards b LEFT JOIN forum_posts p ON p.board_id = b.id
+           GROUP BY b.id, b.name ORDER BY n DESC LIMIT 5`,
+        )
+      : Promise.resolve([]),
+  ])
+
+  const usersByRole = {}
+  for (const row of userRoleRows) {
+    const role = roleLabel(normalizeUser(row))
+    usersByRole[role] = (usersByRole[role] ?? 0) + 1
+  }
+
+  res.json({
+    counts,
+    role: roleLabel(user),
+    timeline,
+    postsByStatus: Object.fromEntries(
+      postStatusRows.map((row) => [row.status, Number(row.n)]),
+    ),
+    usersByRole,
+    topBoards: boardRows.map((row) => ({ name: row.name, count: Number(row.n) })),
+    generatedAt: new Date().toISOString(),
+  })
 })
 
 // ============================================================

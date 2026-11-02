@@ -94,6 +94,8 @@ export function PublicUserPage() {
           <img
             src={avatar}
             alt={profile.nickname}
+            loading="lazy"
+            decoding="async"
             className="h-24 w-24 rounded-full border border-rhine-gold/50 object-cover"
           />
         ) : (

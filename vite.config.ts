@@ -5,6 +5,31 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    // 把不常变化的运行时拆成独立 chunk，利用浏览器长期缓存
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react-router')
+          ) {
+            return 'react'
+          }
+          if (
+            id.includes('framer-motion') ||
+            id.includes('node_modules/motion-dom') ||
+            id.includes('node_modules/motion-utils')
+          ) {
+            return 'motion'
+          }
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     open: false,

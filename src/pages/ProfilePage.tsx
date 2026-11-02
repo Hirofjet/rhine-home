@@ -1,5 +1,6 @@
 /* oxlint-disable react/set-state-in-effect */
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Bell,
@@ -438,7 +439,13 @@ export function ProfilePage() {
         </p>
       )}
 
-      {tab === 'profile' && (
+      <motion.div
+        key={tab}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {tab === 'profile' && (
         <div className="mt-5 space-y-3 border border-rhine-line/70 bg-rhine-panel/30 p-4">
           <label className="block space-y-1">
             <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">昵称</span>
@@ -896,6 +903,7 @@ export function ProfilePage() {
           </div>
         </div>
       )}
+      </motion.div>
     </section>
   )
 }

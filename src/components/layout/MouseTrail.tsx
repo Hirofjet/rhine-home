@@ -1,8 +1,46 @@
 import { useEffect, useRef } from 'react'
+import { useTheme, type ThemeId } from '../theme/ThemeProvider'
 
-/** 鼠标尾迹：细小的金/青粒子，跟随指针淡出（仅桌面、尊重减少动态偏好） */
+type Particle = {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  size: number
+  life: number
+  decay: number
+  color: string
+  spin: number
+  angle: number
+}
+
+const THEME_TRAIL: Record<
+  ThemeId,
+  { colors: string[]; shape: 'dust' | 'pixel' | 'petal'; halo: string }
+> = {
+  rhine: {
+    colors: ['#d3b27a', '#63d4dc', '#f2e4c6'],
+    shape: 'dust',
+    halo: 'rgba(211, 178, 122, 0.45)',
+  },
+  archive: {
+    colors: ['#5fb2ff', '#ff9ecb', '#eaf5ff'],
+    shape: 'pixel',
+    halo: 'rgba(95, 178, 255, 0.5)',
+  },
+  sakura: {
+    colors: ['#ff9ec9', '#c9a7ff', '#ffe7f3'],
+    shape: 'petal',
+    halo: 'rgba(255, 158, 201, 0.5)',
+  },
+}
+
+const randomBetween = (min: number, max: number) => min + Math.random() * (max - min)
+
+/** 主题化鼠标拖尾：莱茵星尘、千年像素、樱色花瓣 */
 export function MouseTrail() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const { theme } = useTheme()
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
@@ -11,52 +49,165 @@ export function MouseTrail() {
     const context = canvas?.getContext('2d')
     if (!canvas || !context) return undefined
 
-    let points: Array<{ x: number; y: number; life: number }> = []
+    const palette = THEME_TRAIL[theme]
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+    let particles: Particle[] = []
     let frame = 0
+    let lastX = window.innerWidth / 2
+    let lastY = window.innerHeight / 2
+    let pointerX = lastX
+    let pointerY = lastY
+    let haloX = lastX
+    let haloY = lastY
+    let visible = !document.hidden
 
     const resize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      canvas.width = Math.floor(window.innerWidth * dpr)
+      canvas.height = Math.floor(window.innerHeight * dpr)
+      canvas.style.width = `${window.innerWidth}px`
+      canvas.style.height = `${window.innerHeight}px`
+      context.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
     resize()
 
+    const spawn = (x: number, y: number, force = 1) => {
+      const count = Math.random() > 0.45 ? 2 : 1
+      for (let index = 0; index < count * force; index += 1) {
+        const color = palette.colors[Math.floor(Math.random() * palette.colors.length)]
+        particles.push({
+          x,
+          y,
+          vx: randomBetween(-0.9, 0.9),
+          vy: randomBetween(-0.9, 0.4),
+          size:
+            palette.shape === 'pixel'
+              ? randomBetween(1.5, 3.6)
+              : randomBetween(1.2, 3.2),
+          life: 1,
+          decay: randomBetween(0.014, 0.032),
+          color,
+          spin: randomBetween(-0.12, 0.12),
+          angle: randomBetween(0, Math.PI),
+        })
+      }
+      if (particles.length > 46) particles.splice(0, particles.length - 46)
+    }
+
     const onMove = (event: PointerEvent) => {
-      points.push({ x: event.clientX, y: event.clientY, life: 1 })
-      if (points.length > 28) points.shift()
+      pointerX = event.clientX
+      pointerY = event.clientY
+      const distance = Math.hypot(pointerX - lastX, pointerY - lastY)
+      if (distance > 2.5) {
+        spawn(pointerX, pointerY, distance > 24 ? 2 : 1)
+        lastX = pointerX
+        lastY = pointerY
+      }
+    }
+
+    const drawParticle = (particle: Particle) => {
+      const alpha = Math.max(0, particle.life)
+      context.globalAlpha = alpha * 0.9
+      context.fillStyle = particle.color
+
+      if (palette.shape === 'pixel') {
+        context.save()
+        context.translate(particle.x, particle.y)
+        context.rotate(particle.angle * 0.25)
+        context.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size)
+        context.restore()
+        return
+      }
+
+      if (palette.shape === 'petal') {
+        context.save()
+        context.translate(particle.x, particle.y)
+        context.rotate(particle.angle)
+        context.beginPath()
+        context.ellipse(0, 0, particle.size, particle.size * 0.52, 0, 0, Math.PI * 2)
+        context.fill()
+        context.restore()
+        return
+      }
+
+      context.beginPath()
+      context.arc(particle.x, particle.y, particle.size * 0.6, 0, Math.PI * 2)
+      context.fill()
     }
 
     const draw = () => {
-      context.clearRect(0, 0, canvas.width, canvas.height)
-      points.forEach((point, index) => {
-        point.life *= 0.94
-        const alpha = Math.max(0, point.life) * (index / Math.max(points.length, 1)) * 0.6
+      if (!visible) {
+        frame = window.requestAnimationFrame(draw)
+        return
+      }
+      context.clearRect(0, 0, window.innerWidth, window.innerHeight)
+      context.globalCompositeOperation = 'lighter'
+
+      haloX += (pointerX - haloX) * 0.12
+      haloY += (pointerY - haloY) * 0.12
+      const haloRadius = 12 + Math.sin(performance.now() / 340) * 2
+      context.beginPath()
+      context.arc(haloX, haloY, haloRadius, 0, Math.PI * 2)
+      context.strokeStyle = palette.halo
+      context.lineWidth = 1
+      context.stroke()
+      context.beginPath()
+      context.arc(haloX, haloY, 2.2, 0, Math.PI * 2)
+      context.fillStyle = palette.halo
+      context.fill()
+
+      if (palette.shape !== 'pixel') {
         context.beginPath()
-        context.arc(point.x, point.y, 1 + index * 0.12, 0, Math.PI * 2)
-        context.fillStyle =
-          index % 2 === 0
-            ? `rgba(211, 178, 122, ${alpha})`
-            : `rgba(99, 212, 220, ${alpha})`
-        context.fill()
-      })
-      points = points.filter((point) => point.life > 0.02)
+        context.moveTo(haloX - 18, haloY)
+        context.lineTo(haloX - 8, haloY)
+        context.moveTo(haloX + 8, haloY)
+        context.lineTo(haloX + 18, haloY)
+        context.strokeStyle = palette.halo
+        context.globalAlpha = 0.5
+        context.stroke()
+        context.globalAlpha = 1
+      }
+
+      particles = particles.filter((particle) => particle.life > 0.02)
+      for (const particle of particles) {
+        particle.life -= particle.decay
+        particle.x += particle.vx
+        particle.y += particle.vy
+        particle.vy += palette.shape === 'petal' ? 0.02 : -0.006
+        particle.vx *= 0.985
+        particle.angle += particle.spin
+        if (palette.shape === 'petal') {
+          particle.x += Math.sin(performance.now() / 500 + particle.y * 0.01) * 0.18
+        }
+        drawParticle(particle)
+      }
+
+      context.globalAlpha = 1
+      context.globalCompositeOperation = 'source-over'
       frame = window.requestAnimationFrame(draw)
     }
 
+    const onVisibility = () => {
+      visible = !document.hidden
+    }
+
     draw()
-    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointermove', onMove, { passive: true })
     window.addEventListener('resize', resize)
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       window.cancelAnimationFrame(frame)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('resize', resize)
+      document.removeEventListener('visibilitychange', onVisibility)
+      context.clearRect(0, 0, canvas.width, canvas.height)
     }
-  }, [])
+  }, [theme])
 
   return (
     <canvas
       ref={canvasRef}
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-[5]"
+      className="pointer-events-none fixed inset-0 z-[6] mix-blend-screen"
     />
   )
 }

@@ -7,6 +7,7 @@ import {
   type Conversation,
   type NotificationItem,
 } from '../../lib/api'
+import { cx } from '../../lib/cx'
 import { formatDateTime } from '../../lib/format'
 import { useSession } from '../auth/useSession'
 
@@ -70,12 +71,15 @@ export function NotificationMenu() {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="relative flex h-9 w-9 items-center justify-center border border-rhine-line text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
-        aria-label="通知与消息"
+        className={cx(
+          'relative flex h-9 w-9 items-center justify-center border border-rhine-line text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold',
+          total > 0 && 'notification-active',
+        )}
+        aria-label={total > 0 ? `通知与消息，${total} 条未读` : '通知与消息'}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="bell-icon h-4 w-4" />
         {total > 0 && (
-          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rhine-red px-1 font-mono text-[9px] text-white">
+          <span className="notification-badge absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rhine-red px-1 font-mono text-[9px] text-white">
             {total > 99 ? '99+' : total}
           </span>
         )}

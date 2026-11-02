@@ -192,6 +192,7 @@ export function PhotoTimeline({ className }: { className?: string }) {
                     src={p.url}
                     alt={p.name}
                     loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover"
                   />
                 </a>

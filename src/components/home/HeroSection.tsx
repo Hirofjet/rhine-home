@@ -1,8 +1,9 @@
 import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { PointerEvent } from 'react'
+import { useEffect, useState, type PointerEvent } from 'react'
 import { profile, site } from '../../content'
 import { useClock } from '../../hooks/useClock'
+import { resolveMediaUrl, siteApi } from '../../lib/api'
 import { fadeUp, stagger } from '../../lib/motion'
 import { CornerFrame, GlowButton, StatusDot, Tag, TypingText } from '../ui'
 import type { DotColor } from '../ui/StatusDot'
@@ -10,6 +11,24 @@ import type { DotColor } from '../ui/StatusDot'
 export function HeroSection() {
   const clock = useClock(site.timezone)
   const reduce = useReducedMotion()
+  const [ownerAvatar, setOwnerAvatar] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    siteApi
+      .owner()
+      .then((data) => {
+        if (alive && data.profile.avatarUrl) setOwnerAvatar(data.profile.avatarUrl)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const avatarSrc = ownerAvatar
+    ? resolveMediaUrl(ownerAvatar)
+    : `${import.meta.env.BASE_URL}avatar.svg`
 
   // 鼠标视差：徽记随指针轻微偏移
   const parallaxX = useMotionValue(0)
@@ -59,9 +78,10 @@ export function HeroSection() {
             </motion.p>
             <motion.div variants={fadeUp} className="mt-5 flex items-center gap-4">
               <img
-                src={`${import.meta.env.BASE_URL}avatar.svg`}
+                src={avatarSrc}
                 alt="站长头像"
-                className="h-20 w-20 rounded-full border border-rhine-gold/50 object-cover shadow-[0_0_24px_rgb(211_178_122/0.18)]"
+                decoding="async"
+                className="h-20 w-20 rounded-full border border-rhine-gold/50 object-cover shadow-[0_0_24px_color-mix(in_srgb,var(--color-rhine-gold)_18%,transparent)]"
               />
               <div className="font-mono text-[10px] leading-relaxed tracking-[0.2em] text-rhine-faint">
                 <p className="text-rhine-dim">OPERATOR</p>

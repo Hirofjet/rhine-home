@@ -1,9 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { BootScreen } from './components/boot/BootScreen'
 import { SessionProvider } from './components/auth/SessionProvider'
+import { ThemeProvider } from './components/theme/ThemeProvider'
 import { BackgroundFX } from './components/layout/BackgroundFX'
 import { MouseTrail } from './components/layout/MouseTrail'
 import { Footer } from './components/layout/Footer'
@@ -117,18 +118,96 @@ function BootGate({ children }: { children: ReactNode }) {
   )
 }
 
+/** 每个版块有自己的入场方式：档案=开柜、项目=抬升、日志=翻页、论坛=叠层 */
+function routeMotion(pathname: string, reduce: boolean) {
+  if (reduce) {
+    return {
+      initial: { opacity: 0 },
+      animate: { opacity: 1 },
+      exit: { opacity: 0 },
+    }
+  }
+
+  if (pathname === '/') {
+    return {
+      initial: { opacity: 0, scale: 1.015, clipPath: 'inset(0 0 10% 0)' },
+      animate: { opacity: 1, scale: 1, clipPath: 'inset(0 0 0% 0)' },
+      exit: { opacity: 0, scale: 0.995, filter: 'blur(5px)' },
+    }
+  }
+
+  if (pathname.startsWith('/archive')) {
+    return {
+      initial: { opacity: 0, y: 18, clipPath: 'inset(0 0 100% 0)' },
+      animate: { opacity: 1, y: 0, clipPath: 'inset(0 0 0% 0)' },
+      exit: { opacity: 0, y: -10, clipPath: 'inset(0 0 8% 0)' },
+    }
+  }
+
+  if (pathname.startsWith('/projects')) {
+    return {
+      initial: { opacity: 0, y: 26, rotateX: 3, transformPerspective: 900 },
+      animate: { opacity: 1, y: 0, rotateX: 0 },
+      exit: { opacity: 0, y: -12, rotateX: -2 },
+    }
+  }
+
+  if (pathname.startsWith('/logs')) {
+    return {
+      initial: { opacity: 0, x: 24, filter: 'blur(4px)' },
+      animate: { opacity: 1, x: 0, filter: 'blur(0px)' },
+      exit: { opacity: 0, x: -18, filter: 'blur(3px)' },
+    }
+  }
+
+  if (pathname.startsWith('/forum')) {
+    return {
+      initial: { opacity: 0, y: 18, scale: 0.997 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      exit: { opacity: 0, y: -8, scale: 0.998 },
+    }
+  }
+
+  if (pathname.startsWith('/guestbook')) {
+    return {
+      initial: { opacity: 0, scale: 0.975 },
+      animate: { opacity: 1, scale: 1 },
+      exit: { opacity: 0, scale: 1.01 },
+    }
+  }
+
+  if (pathname.startsWith('/profile')) {
+    return {
+      initial: { opacity: 0, clipPath: 'inset(0 0 100% 0)' },
+      animate: { opacity: 1, clipPath: 'inset(0 0 0% 0)' },
+      exit: { opacity: 0, clipPath: 'inset(0 0 6% 0)' },
+    }
+  }
+
+  return {
+    initial: { opacity: 0, x: -22 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: 16 },
+  }
+}
+
 /** 前台页面切换动画 */
 function AnimatedRoutes() {
   const location = useLocation()
+  const reduce = useReducedMotion()
+  const variant = routeMotion(location.pathname, Boolean(reduce))
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={location.pathname}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.24, ease: 'easeOut' }}
+        initial={variant.initial}
+        animate={variant.animate}
+        exit={variant.exit}
+        transition={{ duration: reduce ? 0.1 : 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="relative"
       >
+        <span className="page-enter-scan" aria-hidden />
         <Suspense fallback={<PageLoading />}>
           <Routes location={location}>
             <Route path="/" element={<HomePage />} />
@@ -167,23 +246,25 @@ function PublicSite() {
 export default function App() {
   return (
     <BrowserRouter>
-      <SessionProvider>
-        <BootGate>
-          <ScrollManager />
-          <Routes>
-            {/* 后台：独立入口，不出现在前台导航 */}
-            <Route
-              path={`${ADMIN_PATH}/*`}
-              element={
-                <Suspense fallback={<PageLoading />}>
-                  <AdminPage />
-                </Suspense>
-              }
-            />
-            <Route path="*" element={<PublicSite />} />
-          </Routes>
-        </BootGate>
-      </SessionProvider>
+      <ThemeProvider>
+        <SessionProvider>
+          <BootGate>
+            <ScrollManager />
+            <Routes>
+              {/* 后台：独立入口，不出现在前台导航 */}
+              <Route
+                path={`${ADMIN_PATH}/*`}
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AdminPage />
+                  </Suspense>
+                }
+              />
+              <Route path="*" element={<PublicSite />} />
+            </Routes>
+          </BootGate>
+        </SessionProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Diamond, Home, LogOut, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cx } from '../../lib/cx'
 import { hasPerm, ROLE_LABELS, type ApiUser } from '../../lib/api'
+import { ThemeMenu } from '../theme/ThemeMenu'
 import { AdminBadge, AdminButton } from './AdminUi'
 import { ArticlesPanel } from './panels/ArticlesPanel'
 import { AdminBoardPostsPanel } from './panels/AdminBoardPostsPanel'
@@ -113,25 +115,30 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       <header className="sticky top-0 z-20 border-b border-rhine-line/70 bg-rhine-abyss/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5">
-              <Diamond className="h-4 w-4 text-rhine-gold" />
-            </span>
-            <div>
-              <p className="font-display text-xs tracking-[0.22em] text-rhine-ink">
-                RHINE//ADMIN
-              </p>
-              <p className="mt-0.5 font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
-                CONTENT CONSOLE
-              </p>
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5">
+                <Diamond className="h-4 w-4 text-rhine-gold" />
+              </span>
+              <div>
+                <p className="font-display text-xs tracking-[0.22em] text-rhine-ink">
+                  RHINE//ADMIN
+                </p>
+                <p className="mt-0.5 font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
+                  CONTENT CONSOLE
+                </p>
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 font-mono text-[10px] tracking-wider text-rhine-dim">
             <Link
               to="/"
-              className="inline-flex items-center gap-1.5 border border-rhine-line px-2.5 py-1.5 text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
+              title="返回前台主页"
+              aria-label="返回前台主页"
+              className="flex h-9 w-9 items-center justify-center border border-rhine-line text-rhine-dim transition-colors hover:border-rhine-gold/60 hover:text-rhine-gold"
             >
-              <Home className="h-3 w-3" /> 返回主页
+              <Home className="h-3.5 w-3.5" />
             </Link>
+            <ThemeMenu compact />
             <ShieldCheck className="h-3.5 w-3.5 text-rhine-cyan" />
             <span>{user.username}</span>
             <AdminBadge tone={user.isSuper ? 'gold' : 'cyan'}>
@@ -176,29 +183,33 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 </div>
               ))}
             </nav>
-            <Link
-              to="/"
-              className="mt-4 hidden items-center gap-2 border-t border-rhine-line/50 pt-3 font-mono text-[10px] tracking-[0.16em] text-rhine-faint transition-colors hover:text-rhine-gold lg:flex"
-            >
-              <Home className="h-3 w-3" /> 返回主页
-            </Link>
           </div>
         </aside>
 
         <main className="min-w-0 flex-1">
-          {current === 'overview' && (
-            <OverviewPanel user={user} onNavigate={(key) => setPanel(key as PanelKey)} />
-          )}
-          {current === 'articles' && <ArticlesPanel />}
-          {current === 'photos' && <PhotosPanel />}
-          {current === 'videos' && <VideosPanel />}
-          {current === 'logs' && <LogsPanel />}
-          {current === 'guestbook' && <GuestbookPanel />}
-          {current === 'forum-boards' && <ForumBoardsPanel user={user} />}
-          {current === 'forum-posts' && <AdminBoardPostsPanel user={user} />}
-          {current === 'review' && <ReviewPanel />}
-          {current === 'members' && <MembersPanel user={user} />}
-          {current === 'settings' && <SettingsPanel user={user} />}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={current}
+              initial={{ opacity: 0, y: 14, filter: 'blur(2px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {current === 'overview' && (
+                <OverviewPanel user={user} onNavigate={(key) => setPanel(key as PanelKey)} />
+              )}
+              {current === 'articles' && <ArticlesPanel />}
+              {current === 'photos' && <PhotosPanel />}
+              {current === 'videos' && <VideosPanel />}
+              {current === 'logs' && <LogsPanel />}
+              {current === 'guestbook' && <GuestbookPanel />}
+              {current === 'forum-boards' && <ForumBoardsPanel user={user} />}
+              {current === 'forum-posts' && <AdminBoardPostsPanel user={user} />}
+              {current === 'review' && <ReviewPanel />}
+              {current === 'members' && <MembersPanel user={user} />}
+              {current === 'settings' && <SettingsPanel user={user} />}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>
