@@ -63,6 +63,7 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
       id: number
       boardId: number
       boardName: string
+      access: string
       username: string
       role: 'master' | 'admin'
     }>
