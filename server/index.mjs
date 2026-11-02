@@ -1676,6 +1676,142 @@ app.put('/api/admin/forum/boards/:id', requireAuth, requireForumAccess, async (r
   res.json({ ok: true })
 })
 
+app.post('/api/admin/forum/boards/:id/deletion-request', requireAuth, requireForumAccess, async (req, res) => {
+  const boardId = Number(req.params.id)
+  const allowed =
+    req.user.isSuper ||
+    ['senior', 'forum_master'].includes(req.user.identity) ||
+    canModerateBoard(req.user, boardId)
+  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  const boards = await query('SELECT name FROM forum_boards WHERE id = ?', [boardId])
+  if (!boards.length) return res.status(404).json({ error: 'not_found' })
+  const pending = await query(
+    "SELECT id FROM forum_deletion_requests WHERE board_id = ? AND status = 'pending' LIMIT 1",
+    [boardId],
+  )
+  if (pending.length) return res.status(409).json({ error: 'request_pending' })
+  await execute(
+    'INSERT INTO forum_deletion_requests (board_id, requester_id, approvals) VALUES (?, ?, ?)',
+    [boardId, req.user.id, JSON.stringify([])],
+  )
+  const seniors = await query(
+    "SELECT id FROM users WHERE is_super = 1 OR role_code = 'senior'",
+  ).catch(() => [])
+  for (const senior of seniors) {
+    await notify(
+      Number(senior.id),
+      'forum',
+      '论坛删除申请',
+      `「${boards[0].name}」等待高级管理员审批（0/3）`,
+      '/admin',
+    ).catch(() => undefined)
+  }
+  res.status(201).json({ ok: true })
+})
+
+app.get('/api/admin/forum/deletion-requests', requireAuth, requireForumAccess, async (req, res) => {
+  const rows = await query(
+    `SELECT r.*, b.name AS board_name,
+            COALESCE(NULLIF(u.nickname,''), u.username) AS requester
+     FROM forum_deletion_requests r
+     JOIN forum_boards b ON b.id = r.board_id
+     JOIN users u ON u.id = r.requester_id
+     ORDER BY r.id DESC LIMIT 100`,
+  )
+  const isSenior = req.user.isSuper || req.user.identity === 'senior'
+  res.json({
+    requests: rows
+      .filter((row) => isSenior || canModerateBoard(req.user, Number(row.board_id)))
+      .map((row) => {
+        let approvals = []
+        try {
+          approvals = JSON.parse(row.approvals ?? '[]')
+        } catch {
+          approvals = []
+        }
+        return {
+          id: Number(row.id),
+          boardId: Number(row.board_id),
+          boardName: row.board_name,
+          requester: row.requester,
+          status: row.status,
+          approvals: approvals.length,
+          createdAt: row.created_at,
+          canVote: isSenior,
+        }
+      }),
+  })
+})
+
+app.post('/api/admin/forum/deletion-requests/:id/vote', requireAuth, async (req, res) => {
+  if (!(req.user.isSuper || req.user.identity === 'senior')) {
+    return res.status(403).json({ error: 'senior_only' })
+  }
+  const id = Number(req.params.id)
+  const approve = req.body?.approve === true
+  const rows = await query(
+    `SELECT r.*, b.name AS board_name FROM forum_deletion_requests r
+     JOIN forum_boards b ON b.id = r.board_id WHERE r.id = ?`,
+    [id],
+  )
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  if (rows[0].status !== 'pending') return res.status(409).json({ error: 'already_reviewed' })
+  let approvals = []
+  try {
+    approvals = JSON.parse(rows[0].approvals ?? '[]')
+  } catch {
+    approvals = []
+  }
+  if (!approve) {
+    await execute(
+      "UPDATE forum_deletion_requests SET status = 'rejected', vetoed_by = ?, reviewed_at = NOW() WHERE id = ?",
+      [req.user.id, id],
+    )
+    await notify(
+      Number(rows[0].requester_id),
+      'forum',
+      '论坛删除申请被否决',
+      `「${rows[0].board_name}」删除申请已被高级管理员否决`,
+      '/admin',
+    ).catch(() => undefined)
+    return res.json({ ok: true, status: 'rejected' })
+  }
+  if (!approvals.some((item) => Number(item.userId) === req.user.id)) {
+    approvals.push({ userId: req.user.id, at: new Date().toISOString() })
+  }
+  if (approvals.length >= 3) {
+    await transaction(async (connection) => {
+      await connection.execute(
+        'DELETE r FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE p.board_id = ?',
+        [Number(rows[0].board_id)],
+      )
+      await connection.execute('DELETE FROM forum_posts WHERE board_id = ?', [Number(rows[0].board_id)])
+      await connection.execute('DELETE FROM forum_access_requests WHERE board_id = ?', [Number(rows[0].board_id)])
+      await connection.execute('DELETE FROM forum_invites WHERE board_id = ?', [Number(rows[0].board_id)])
+      await connection.execute('DELETE FROM forum_moderators WHERE board_id = ?', [Number(rows[0].board_id)])
+      await connection.execute('DELETE FROM announcements WHERE board_id = ?', [Number(rows[0].board_id)])
+      await connection.execute('DELETE FROM forum_boards WHERE id = ?', [Number(rows[0].board_id)])
+      await connection.execute(
+        "UPDATE forum_deletion_requests SET status = 'approved', approvals = ?, reviewed_at = NOW() WHERE id = ?",
+        [JSON.stringify(approvals), id],
+      )
+    })
+    await notify(
+      Number(rows[0].requester_id),
+      'forum',
+      '论坛删除申请通过',
+      `「${rows[0].board_name}」已被删除`,
+      '/admin',
+    ).catch(() => undefined)
+    return res.json({ ok: true, status: 'approved' })
+  }
+  await execute('UPDATE forum_deletion_requests SET approvals = ? WHERE id = ?', [
+    JSON.stringify(approvals),
+    id,
+  ])
+  res.json({ ok: true, status: 'pending', approvals: approvals.length })
+})
+
 app.delete('/api/admin/forum/boards/:id', requireAuth, requireForumAccess, async (req, res) => {
   if (!(req.user.isSuper || hasPermission(req.user, 'forum'))) {
     return res.status(403).json({ error: 'forbidden' })

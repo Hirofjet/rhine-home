@@ -886,6 +886,30 @@ export const adminApi = {
       method: 'DELETE',
     })
   },
+  requestBoardDeletion(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/forum/boards/${id}/deletion-request`, {
+      method: 'POST',
+    })
+  },
+  deletionRequests() {
+    return api<{
+      requests: Array<{
+        id: number
+        boardId: number
+        boardName: string
+        requester: string
+        status: 'pending' | 'approved' | 'rejected'
+        approvals: number
+        canVote: boolean
+      }>
+    }>('/api/admin/forum/deletion-requests')
+  },
+  voteDeletion(id: number, approve: boolean) {
+    return api<{ ok: boolean; status: string; approvals?: number }>(
+      `/api/admin/forum/deletion-requests/${id}/vote`,
+      { method: 'POST', body: { approve } },
+    )
+  },
   pending(page = 1) {
     return api<{ posts: PendingPost[]; replies: PendingReply[] }>(
       `/api/admin/forum/pending?page=${page}`,

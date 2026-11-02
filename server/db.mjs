@@ -392,6 +392,20 @@ async function ensureSchemaUpgrades() {
       KEY idx_forum_moderator_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   )
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS forum_deletion_requests (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      board_id BIGINT UNSIGNED NOT NULL,
+      requester_id BIGINT UNSIGNED NOT NULL,
+      status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+      approvals JSON NULL,
+      vetoed_by BIGINT UNSIGNED NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at DATETIME NULL,
+      PRIMARY KEY (id),
+      KEY idx_deletion_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  )
   await ensureColumn('guest_messages', 'user_id', 'user_id BIGINT UNSIGNED NULL')
   await ensureColumn('guest_messages', 'owner_token', 'owner_token CHAR(64) NULL')
   await ensureColumn(

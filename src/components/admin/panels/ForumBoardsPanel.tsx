@@ -76,6 +76,16 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
   const [inviteUser, setInviteUser] = useState('')
   const [modQuery, setModQuery] = useState('')
   const [modAccess, setModAccess] = useState('all')
+  const [deletions, setDeletions] = useState<
+    Array<{
+      id: number
+      boardName: string
+      requester: string
+      status: string
+      approvals: number
+      canVote: boolean
+    }>
+  >([])
   const [requests, setRequests] = useState<
     Array<{
       id: number
@@ -95,18 +105,20 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
 
   const load = useCallback(async () => {
     try {
-      const [data, annData, requestData, modData, userData] = await Promise.all([
+      const [data, annData, requestData, modData, userData, deletionData] = await Promise.all([
         adminApi.forumBoards(),
         forumApi.announcements(),
         adminApi.requests(),
         adminApi.forumModerators(),
         canManageAll ? adminApi.users().catch(() => ({ users: [] })) : Promise.resolve({ users: [] }),
+        adminApi.deletionRequests().catch(() => ({ requests: [] })),
       ])
       setBoards(data.boards)
       setAnnouncements(annData.announcements)
       setRequests(requestData.requests)
       setModerators(modData.moderators)
       setAllUsers(userData.users)
+      setDeletions(deletionData.requests)
       setError('')
     } catch (err) {
       setError(errorMessage(err))
@@ -277,11 +289,21 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
     }
   }
 
+  const voteDeletion = async (id: number, approve: boolean) => {
+    try {
+      await adminApi.voteDeletion(id, approve)
+      setNotice(approve ? '已同意删除申请' : '已否决删除申请')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
   const remove = async () => {
     if (!deleteTarget) return
     try {
-      await adminApi.removeBoard(deleteTarget.id)
-      setNotice('板块及其内容已删除')
+      await adminApi.requestBoardDeletion(deleteTarget.id)
+      setNotice('删除申请已提交，等待高级管理员审批（0/3）')
       setDeleteTarget(null)
       await load()
     } catch (err) {
@@ -467,6 +489,40 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
         )}
       </AdminPanel>
 
+      <AdminPanel title="删除申请" subtitle="DELETION REVIEW">
+        {deletions.length === 0 ? (
+          <p className="font-mono text-[10px] text-rhine-faint">暂无删除申请</p>
+        ) : (
+          <ul className="divide-y divide-rhine-line/60">
+            {deletions.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center gap-2 py-2">
+                <span className="text-xs text-rhine-ink">{item.boardName}</span>
+                <span className="font-mono text-[10px] text-rhine-dim">申请人：{item.requester}</span>
+                <AdminBadge
+                  tone={item.status === 'approved' ? 'green' : item.status === 'rejected' ? 'red' : 'gold'}
+                >
+                  {item.status === 'approved'
+                    ? '已通过'
+                    : item.status === 'rejected'
+                      ? '已否决'
+                      : `${item.approvals}/3`}
+                </AdminBadge>
+                {item.status === 'pending' && item.canVote && (
+                  <span className="ml-auto flex gap-2">
+                    <AdminButton variant="ghost" onClick={() => void voteDeletion(item.id, true)}>
+                      同意
+                    </AdminButton>
+                    <AdminButton variant="danger" onClick={() => void voteDeletion(item.id, false)}>
+                      否决
+                    </AdminButton>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </AdminPanel>
+
       <AdminPanel title="板块管理员" subtitle="BOARD MODERATORS">
         <div className="mb-3 flex flex-wrap gap-2">
           <AdminInput
@@ -613,14 +669,14 @@ export function ForumBoardsPanel({ user }: { user: ApiUser }) {
         subtitle="DANGER"
       >
         <p className="font-mono text-[11px] leading-relaxed tracking-wider text-rhine-dim">
-          删除「{deleteTarget?.name}」会同时删除该板块下的全部帖子与回复，且无法恢复。
+          提交删除「{deleteTarget?.name}」申请。需要至少 3 名高级管理员同意；超级管理员与高级管理员可一票否决。
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <AdminButton variant="ghost" onClick={() => setDeleteTarget(null)}>
             取消
           </AdminButton>
           <AdminButton variant="danger" onClick={() => void remove()}>
-            确认删除
+            提交删除申请
           </AdminButton>
         </div>
       </AdminModal>
