@@ -1,11 +1,13 @@
 import { ArrowUp, Diamond } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { moduleLinks, navItems, site } from '../../content'
+import { useSiteBrand } from '../../hooks/useSiteBrand'
 import { Barcode } from '../ui'
 
 const YEAR = new Date().getFullYear()
 
 export function Footer() {
+  const brand = useSiteBrand()
   return (
     <footer className="relative z-10 border-t border-rhine-line bg-rhine-abyss/90">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -18,7 +20,7 @@ export function Footer() {
               </span>
               <span className="flex flex-col leading-none">
                 <span className="font-display text-sm font-medium tracking-[0.18em] text-rhine-ink">
-                  {site.title}
+                  {brand}
                 </span>
                 <span className="mt-1 font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
                   {site.titleSub}

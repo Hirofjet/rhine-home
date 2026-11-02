@@ -175,6 +175,17 @@ export function VideosPanel() {
               value={draft.poster}
               onChange={(value) => updateDraft({ poster: value })}
             />
+            {draft.src && (
+              <div className="sm:col-span-2">
+                <p className="mb-1 font-mono text-[9px] tracking-[0.2em] text-rhine-faint">PREVIEW // 预览</p>
+                <video
+                  controls
+                  src={draft.src}
+                  poster={draft.poster || undefined}
+                  className="max-h-64 w-full border border-rhine-line bg-black/40"
+                />
+              </div>
+            )}
           </div>
         </AdminPanel>
       ) : (

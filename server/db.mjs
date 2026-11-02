@@ -376,7 +376,7 @@ export async function initSchema() {
   const [rows] = await pool.query(
     'SELECT COUNT(*) AS total FROM forum_boards',
   )
-  if (Number(rows[0]?.total ?? 0) === 0) {
+  if (Number(rows[0]?.total ?? 0) === 0 && process.env.SEED_DEFAULT_BOARDS !== '0') {
     await pool.query(
       `INSERT INTO forum_boards (slug, name, description, sort) VALUES
         ('general', '综合讨论', '随便聊聊', 10),

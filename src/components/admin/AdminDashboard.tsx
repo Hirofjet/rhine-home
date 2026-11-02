@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Home, LogOut, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { site } from '../../content'
 import { cx } from '../../lib/cx'
 import { hasPerm, ROLE_LABELS, type ApiUser } from '../../lib/api'
+import { useSiteBrand } from '../../hooks/useSiteBrand'
 import { ThemeMenu } from '../theme/ThemeMenu'
 import { AdminBadge, AdminButton } from './AdminUi'
 import { ArticlesPanel } from './panels/ArticlesPanel'
@@ -50,6 +50,7 @@ interface AdminDashboardProps {
 /** 管理控制台：按权限显示可管理模块 */
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [panel, setPanel] = useState<PanelKey>('overview')
+  const brand = useSiteBrand()
 
   const forumAccess =
     user.isSuper ||
@@ -64,6 +65,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       { title: '总览', items: [{ key: 'overview', label: '概览', labelEn: 'OVERVIEW' }] },
     ]
 
+    if (user.isSuper) {
+      list.push({
+        title: '主页',
+        items: [{ key: 'home-profile', label: '主页资料', labelEn: 'PROFILE' }],
+      })
+    }
+
     const archive: MenuItem[] = []
     if (hasPerm(user, 'archive.articles')) {
       archive.push({ key: 'articles', label: '文章', labelEn: 'ARTICLES' })
@@ -75,13 +83,6 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       archive.push({ key: 'videos', label: '视频', labelEn: 'VIDEOS' })
     }
     if (archive.length) list.push({ title: '档案', items: archive })
-
-    if (user.isSuper) {
-      list.push({
-        title: '主页',
-        items: [{ key: 'home-profile', label: '主页资料', labelEn: 'PROFILE' }],
-      })
-    }
 
     if (user.isSuper || hasPerm(user, 'projects')) {
       list.push({
@@ -97,13 +98,6 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       })
     }
 
-    if (hasPerm(user, 'guestbook')) {
-      list.push({
-        title: '互动',
-        items: [{ key: 'guestbook', label: '留言板', labelEn: 'GUESTBOOK' }],
-      })
-    }
-
     const forum: MenuItem[] = []
     if (forumAccess) {
       forum.push({ key: 'forum-boards', label: '板块管理', labelEn: 'BOARDS' })
@@ -111,6 +105,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       forum.push({ key: 'review', label: '内容审核', labelEn: 'REVIEW' })
     }
     if (forum.length) list.push({ title: '论坛', items: forum })
+
+    if (hasPerm(user, 'guestbook')) {
+      list.push({
+        title: '互动',
+        items: [{ key: 'guestbook', label: '留言板', labelEn: 'GUESTBOOK' }],
+      })
+    }
 
     if (memberAccess) {
       list.push({
@@ -134,12 +135,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       <header className="sticky top-0 z-20 border-b border-rhine-line/70 bg-rhine-abyss/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link to="/" className="group flex shrink-0 items-center gap-3" title="返回前台主页">
-            <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:border-rhine-gold group-hover:bg-rhine-gold/10">
+            <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:border-rhine-gold group-hover:bg-rhine-gold/10 group-hover:shadow-[0_0_18px_rgb(211_178_122/0.25)]">
               <Home className="h-4 w-4 text-rhine-gold" />
             </span>
             <span className="hidden flex-col leading-none sm:flex">
               <span className="whitespace-nowrap font-display text-sm font-medium tracking-[0.18em] text-rhine-ink">
-                {site.title}
+                {brand}
               </span>
               <span className="mt-1 whitespace-nowrap font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
                 CONTENT CONSOLE

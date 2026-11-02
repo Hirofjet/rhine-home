@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { moduleLinks, navItems, site } from '../../content'
 import { useActiveSection } from '../../hooks/useActiveSection'
 import { useClock } from '../../hooks/useClock'
+import { useSiteBrand } from '../../hooks/useSiteBrand'
 import { cx } from '../../lib/cx'
 import { resolveMediaUrl } from '../../lib/api'
 import { useSession } from '../auth/useSession'
@@ -25,6 +26,7 @@ export function NavBar() {
   const onHome = pathname === '/'
   const active = useActiveSection(SECTION_IDS)
   const clock = useClock(site.timezone)
+  const brand = useSiteBrand()
   const { user, staff } = useSession()
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
   const [homeOpenFor, setHomeOpenFor] = useState<string | null>(null)
@@ -47,12 +49,12 @@ export function NavBar() {
       <header className="fixed inset-x-0 top-0 z-40 border-b border-rhine-line/70 bg-rhine-abyss/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link to="/" className="group flex shrink-0 items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:shadow-[0_0_18px_color-mix(in_srgb,var(--color-rhine-gold)_35%,transparent)]">
+            <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:border-rhine-gold group-hover:bg-rhine-gold/10 group-hover:shadow-[0_0_18px_rgb(211_178_122/0.25)]">
               <House className="h-4 w-4 text-rhine-gold" />
             </span>
             <span className="hidden flex-col leading-none sm:flex">
               <span className="whitespace-nowrap font-display text-sm font-medium tracking-[0.18em] text-rhine-ink">
-                {site.title}
+                {brand}
               </span>
               <span className="mt-1 whitespace-nowrap font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
                 {site.titleSub}
@@ -192,7 +194,7 @@ export function NavBar() {
           >
             <div className="flex h-16 items-center justify-between px-4 sm:px-6">
               <span className="font-display text-sm tracking-[0.18em] text-rhine-ink">
-                {site.title}
+                {brand}
               </span>
               <button
                 type="button"

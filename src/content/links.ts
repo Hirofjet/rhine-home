@@ -22,44 +22,7 @@ export interface ContactLink {
   note?: string
 }
 
-export const contactLinks: ContactLink[] = [
-  {
-    id: 'github',
-    label: 'GitHub',
-    labelEn: '代码仓库',
-    value: 'github.com/example',
-    href: 'https://github.com/example',
-    icon: 'github',
-    note: 'CODE',
-  },
-  {
-    id: 'bilibili',
-    label: '哔哩哔哩',
-    labelEn: 'BILIBILI',
-    value: 'UID：432976432',
-    href: 'https://space.bilibili.com/',
-    icon: 'bilibili',
-    note: 'VIDEO',
-  },
-  {
-    id: 'mail',
-    label: '电子邮箱',
-    labelEn: 'E-MAIL',
-    value: 'contact@example.com',
-    href: 'mailto:contact@example.com',
-    icon: 'mail',
-    note: 'DIRECT',
-  },
-  {
-    id: 'music',
-    label: '酷狗音乐',
-    labelEn: 'KUGOU MUSIC',
-    value: 'ID：1278380529',
-    href: 'https://activity.kugou.com/share/v-c7b4da67/index.html?id=93377639e20f539393376f9f012f5f1a',
-    icon: 'music',
-    note: 'MUSIC',
-  },
-]
+export const contactLinks: ContactLink[] = []
 
 /** 直连邮箱（复制按钮使用） */
 export const emailAddress = 'contact@example.com'

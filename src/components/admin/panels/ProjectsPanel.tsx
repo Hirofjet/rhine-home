@@ -1,6 +1,6 @@
 /* oxlint-disable react/set-state-in-effect */
 import { useCallback, useEffect, useState } from 'react'
-import { FolderKanban, Trash2 } from 'lucide-react'
+import { FolderKanban, Plus, Trash2 } from 'lucide-react'
 import { adminApi, errorMessage, type SiteProject } from '../../../lib/api'
 import {
   AdminButton,
@@ -64,6 +64,8 @@ const from = (item: SiteProject): Draft => ({
 export function ProjectsPanel() {
   const [items, setItems] = useState<SiteProject[]>([])
   const [draft, setDraft] = useState<Draft>(empty)
+  const [formOpen, setFormOpen] = useState(false)
+  const [preview, setPreview] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -82,8 +84,8 @@ export function ProjectsPanel() {
   }, [load])
 
   const save = async () => {
-    if (!draft.code.trim() || !draft.name.trim() || !draft.description.trim()) {
-      setError('项目编号、名称、描述不能为空')
+    if (!draft.name.trim() || !draft.description.trim()) {
+      setError('项目名称、描述不能为空')
       return
     }
     setBusy(true)
@@ -107,6 +109,8 @@ export function ProjectsPanel() {
       else await adminApi.createProject(payload)
       setNotice(draft.id ? '项目已更新' : '项目已创建')
       setDraft(empty())
+      setFormOpen(false)
+      setPreview(false)
       await load()
     } catch (err) {
       setError(errorMessage(err))
@@ -130,7 +134,22 @@ export function ProjectsPanel() {
     <div className="space-y-4">
       <AdminError message={error} />
       <AdminNotice message={notice} />
-      <AdminPanel title="项目库" subtitle="PROJECT DATABASE">
+      <AdminPanel
+        title="项目库"
+        subtitle="PROJECT DATABASE"
+        actions={
+          <AdminButton
+            variant="ghost"
+            onClick={() => {
+              setDraft(empty())
+              setPreview(false)
+              setFormOpen(true)
+            }}
+          >
+            <Plus className="h-3 w-3" /> 新建项目
+          </AdminButton>
+        }
+      >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => (
             <article key={item.id} className="border border-rhine-line/70 bg-rhine-abyss/40 p-3">
@@ -145,7 +164,11 @@ export function ProjectsPanel() {
               <div className="mt-3 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => setDraft(from(item))}
+                  onClick={() => {
+                    setDraft(from(item))
+                    setPreview(false)
+                    setFormOpen(true)
+                  }}
                   className="font-mono text-[9px] text-rhine-cyan hover:text-rhine-gold"
                 >
                   编辑
@@ -167,6 +190,7 @@ export function ProjectsPanel() {
         </div>
       </AdminPanel>
 
+      {formOpen && (
       <AdminPanel title={draft.id ? '编辑项目' : '新建项目'} subtitle="PROJECT FORM">
         <div className="grid gap-3 sm:grid-cols-2">
           <AdminField label="项目编号 / CODE">
@@ -219,11 +243,31 @@ export function ProjectsPanel() {
             />
             公开展示
           </label>
+          <AdminButton variant="ghost" onClick={() => setPreview((value) => !value)}>
+            {preview ? '关闭预览' : '预览'}
+          </AdminButton>
+          <AdminButton variant="ghost" onClick={() => setFormOpen(false)}>
+            取消
+          </AdminButton>
           <AdminButton onClick={() => void save()} disabled={busy}>
             <FolderKanban className="h-3 w-3" /> {busy ? '保存中…' : '保存项目'}
           </AdminButton>
         </div>
+        {preview && (
+          <div className="mt-4 border border-rhine-gold/40 bg-rhine-panel/60 p-4">
+            <p className="font-mono text-[9px] tracking-[0.2em] text-rhine-faint">{draft.code || 'RL-PJ-AUTO'}</p>
+            <h3 className="mt-1 text-lg text-rhine-ink">{draft.name || '未命名项目'}</h3>
+            <p className="mt-1 font-mono text-[10px] text-rhine-cyan">{draft.shortName || 'SHORT NAME'}</p>
+            <p className="mt-2 text-xs leading-relaxed text-rhine-dim">{draft.description || '项目描述'}</p>
+            <div className="mt-2 flex flex-wrap gap-2 font-mono text-[9px] text-rhine-faint">
+              <span>{draft.type || 'TYPE'}</span>
+              <span>· {draft.author || 'AUTHOR'}</span>
+              <span>· {draft.version}</span>
+            </div>
+          </div>
+        )}
       </AdminPanel>
+      )}
     </div>
   )
 }

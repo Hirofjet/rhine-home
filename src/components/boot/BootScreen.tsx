@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Diamond } from 'lucide-react'
 import { site } from '../../content'
+import { useSiteBrand } from '../../hooks/useSiteBrand'
 
 interface BootScreenProps {
   onFinished: () => void
@@ -21,6 +22,7 @@ const BOOT_LINES: BootLine[] = [
 
 /** 开机终端动画：逐行打印 + 进度条，点击任意位置跳过（同会话内只播放一次） */
 export function BootScreen({ onFinished }: BootScreenProps) {
+  const brand = useSiteBrand()
   const [lineCount, setLineCount] = useState(0)
   const [progress, setProgress] = useState(0)
   const finishedRef = useRef(false)
@@ -87,7 +89,7 @@ export function BootScreen({ onFinished }: BootScreenProps) {
           </motion.span>
           <div>
             <p className="font-display text-lg font-medium tracking-[0.25em] text-rhine-ink">
-              {site.title}
+              {brand}
             </p>
             <p className="mt-1 font-mono text-[10px] tracking-[0.35em] text-rhine-dim">
               {site.titleSub} · v3.1.7

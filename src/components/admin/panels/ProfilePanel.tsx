@@ -8,7 +8,8 @@ import {
   type SiteContact,
   type SiteLink,
 } from '../../../lib/api'
-import { abilityModules, contactLinks, profile as fallbackProfile } from '../../../content'
+import { profile as fallbackProfile } from '../../../content'
+import { setSiteBrandName } from '../../../hooks/useSiteBrand'
 import {
   AdminButton,
   AdminError,
@@ -43,8 +44,8 @@ const parseList = (value: string) =>
 
 export function ProfilePanel() {
   const [draft, setDraft] = useState<HomeProfile>(FALLBACK)
-  const [abilities, setAbilities] = useState<SiteAbility[]>(abilityModules)
-  const [contacts, setContacts] = useState<SiteContact[]>(contactLinks)
+  const [abilities, setAbilities] = useState<SiteAbility[]>([])
+  const [contacts, setContacts] = useState<SiteContact[]>([])
   const [links, setLinks] = useState<SiteLink[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -94,6 +95,7 @@ export function ProfilePanel() {
         contacts,
         links,
       })
+      setSiteBrandName(normalized.codeName)
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({ profile: normalized, abilities, contacts, links }),

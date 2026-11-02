@@ -19,6 +19,8 @@ export function PhotosPanel() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [descriptions, setDescriptions] = useState<Record<number, string>>({})
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null)
+  const [pendingUrl, setPendingUrl] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const load = useCallback(async () => {
@@ -69,6 +71,8 @@ export function PhotosPanel() {
         })
       }
       setNotice(`已上传 ${files.length} 张照片`)
+      setPendingFiles(null)
+      setPendingUrl('')
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : '上传失败')
@@ -163,10 +167,36 @@ export function PhotosPanel() {
                   multiple
                   className="hidden"
                   onChange={(event) => {
-                    void uploadFiles(event.target.files)
+                    const files = event.target.files
+                    if (files && files[0]) {
+                      setPendingFiles(files)
+                      setPendingUrl(URL.createObjectURL(files[0]))
+                    }
                     event.target.value = ''
                   }}
                 />
+                {pendingUrl && (
+                  <div className="mt-3 border border-rhine-line/70 bg-rhine-abyss/40 p-2">
+                    <p className="mb-2 font-mono text-[9px] tracking-[0.2em] text-rhine-faint">
+                      PREVIEW // 预览
+                    </p>
+                    <img src={pendingUrl} alt="待上传照片预览" className="max-h-56 w-full object-contain" />
+                    <div className="mt-2 flex gap-2">
+                      <AdminButton onClick={() => void uploadFiles(pendingFiles)} disabled={busy}>
+                        <Upload className="h-3 w-3" /> 确认上传
+                      </AdminButton>
+                      <AdminButton
+                        variant="ghost"
+                        onClick={() => {
+                          setPendingFiles(null)
+                          setPendingUrl('')
+                        }}
+                      >
+                        取消
+                      </AdminButton>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </>
