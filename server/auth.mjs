@@ -25,6 +25,7 @@ export const PERMISSION_KEYS = [
   'forum',
   'members.manage',
   'members.grant',
+  'access_logs',
 ]
 
 export const ROLE_KEYS = [
@@ -63,7 +64,7 @@ const ROLE_CLASS = {
 }
 
 const ROLE_BASE_PERMISSIONS = {
-  senior: ['projects', 'logs', 'guestbook', 'forum', 'members.manage', 'members.grant'],
+  senior: ['projects', 'logs', 'guestbook', 'forum', 'members.manage', 'members.grant', 'access_logs'],
   forum_master: ['forum', 'guestbook'],
   core_master: ['guestbook'],
   core_admin: ['guestbook'],

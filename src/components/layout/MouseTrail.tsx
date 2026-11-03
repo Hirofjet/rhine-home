@@ -19,6 +19,11 @@ const THEME_TRAIL: Record<
   { colors: string[]; shape: 'dust' | 'pixel' | 'petal'; halo: string }
 > = {
   rhine: {
+    colors: ['#9a7c3f', '#2b7a83', '#f2e4c6'],
+    shape: 'dust',
+    halo: 'rgba(154, 124, 63, 0.45)',
+  },
+  'rhine-dark': {
     colors: ['#d3b27a', '#63d4dc', '#f2e4c6'],
     shape: 'dust',
     halo: 'rgba(211, 178, 122, 0.45)',

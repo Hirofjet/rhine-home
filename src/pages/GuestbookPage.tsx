@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Send } from 'lucide-react'
+import { Send, ArrowLeft } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { DanmakuWall } from '../components/guestbook/DanmakuWall'
+import { ThemeMenu } from '../components/theme/ThemeMenu'
 import { SectionTitle } from '../components/ui'
 import type { GuestMessage } from '../lib/api'
 import { createMessage, deleteMessage, listMessages } from '../lib/api'
@@ -9,7 +11,7 @@ import { createMessage, deleteMessage, listMessages } from '../lib/api'
  * 留言板：留言以弹幕形式滚动在整个页面上。
  * 数据通过 src/lib/api.ts 访问后端（MySQL），未配置后端时回退到本地存储。
  */
-export function GuestbookPage() {
+export function GuestbookPage({ embedded = false, home = false }: { embedded?: boolean; home?: boolean }) {
   const [messages, setMessages] = useState<GuestMessage[]>([])
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
@@ -65,7 +67,24 @@ export function GuestbookPage() {
   const mine = messages.filter((message) => message.mine)
 
   return (
-    <main className="relative min-h-screen overflow-hidden pt-28">
+    <main className={`relative min-h-[100dvh] overflow-x-hidden pb-64 ${embedded ? 'pt-8' : home ? 'pt-28' : 'pt-32'}`}>
+      {!embedded && !home && (
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-rhine-line/60 bg-rhine-abyss/85 backdrop-blur-md">
+        <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="inline-flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] text-rhine-dim hover:text-rhine-gold">
+              <ArrowLeft className="h-3.5 w-3.5" /> HOME
+            </Link>
+            <span className="h-px w-6 bg-rhine-line" />
+            <span className="font-mono text-[9px] tracking-[0.24em] text-rhine-gold">COMMUNICATION RELAY</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link to="/lab" className="font-mono text-[8px] tracking-[0.16em] text-rhine-faint hover:text-rhine-cyan">LAB SYSTEM</Link>
+            <ThemeMenu compact />
+          </div>
+        </div>
+      </header>
+      )}
       <DanmakuWall messages={messages} />
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6">
@@ -75,7 +94,7 @@ export function GuestbookPage() {
         </p>
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 z-10 p-4 sm:p-6">
+      <div className="fixed inset-x-0 bottom-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
         <div className="mx-auto w-full max-w-2xl border border-rhine-line bg-rhine-panel/90 backdrop-blur-md">
           <div className="flex items-center justify-between border-b border-rhine-line/70 px-4 py-2">
             <p className="font-mono text-[10px] tracking-[0.3em] text-rhine-gold">

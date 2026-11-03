@@ -52,6 +52,12 @@ const MessagesPage = lazy(() =>
 const PublicUserPage = lazy(() =>
   import('./pages/PublicUserPage').then((m) => ({ default: m.PublicUserPage })),
 )
+const LabPage = lazy(() =>
+  import('./pages/LabPage').then((m) => ({ default: m.LabPage })),
+)
+const ForumLabPage = lazy(() =>
+  import('./pages/ForumLabPage').then((m) => ({ default: m.ForumLabPage })),
+)
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
 )
@@ -233,7 +239,7 @@ function AnimatedRoutes() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/u/:id" element={<PublicUserPage />} />
-              <Route path="/guestbook" element={<GuestbookPage />} />
+              <Route path="/guestbook" element={<GuestbookPage home />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
@@ -264,7 +270,25 @@ export default function App() {
           <BootGate>
             <ScrollManager />
             <Routes>
-              {/* 后台：独立入口，不出现在前台导航 */}
+              {/* 测试整合：RHINE LAB 三维档案终端，独立全屏页面 */}
+              <Route
+                path="/lab"
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <LabPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/forum-lab"
+                element={
+                  <RequireUser>
+                    <Suspense fallback={<PageLoading />}>
+                      <ForumLabPage />
+                    </Suspense>
+                  </RequireUser>
+                }
+              />
               <Route
                 path={`${ADMIN_PATH}/*`}
                 element={

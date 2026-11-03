@@ -197,6 +197,25 @@
   --cursor-move: url("/cursors/bluearchive32/move.cur") 15 16, move;
 }
 
+html[data-theme="rhine"] {
+  --color-rhine-abyss: #e8e5e1;
+  --color-rhine-abyss-2: #f1eee9;
+  --color-rhine-panel: #f7f4ef;
+  --color-rhine-panel-2: #fffdf9;
+  --color-rhine-line: #c8c0b4;
+  --color-rhine-line-2: #a89a85;
+  --color-rhine-ink: #171512;
+  --color-rhine-dim: #5b554c;
+  --color-rhine-faint: #8a8175;
+  --color-rhine-gold: #9a7c3f;
+  --color-rhine-gold-deep: #6f5729;
+  --color-rhine-cyan: #2b7a83;
+  --color-rhine-green: #2f7d55;
+  --color-rhine-red: #b34343;
+  --theme-scanline: rgb(0 0 0 / 0.035);
+  --theme-selection: rgb(154 124 63 / 0.22);
+}
+
 html[data-theme="archive"] {
   --color-rhine-abyss: #f4f9ff;
   --color-rhine-abyss-2: #eaf4ff;

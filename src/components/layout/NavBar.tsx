@@ -76,7 +76,7 @@ export function NavBar() {
                   homeActive ? 'text-rhine-gold' : 'text-rhine-dim hover:text-rhine-ink',
                 )}
               >
-                首页
+                主页
                 <ChevronDown className={cx('h-3 w-3 transition-transform', homeOpen && 'rotate-180')} />
               </button>
               <AnimatePresence>
@@ -144,6 +144,14 @@ export function NavBar() {
             </div>
 
             <ThemeMenu />
+
+            <Link
+              to="/lab"
+              className="hidden border border-rhine-gold bg-rhine-gold px-3 py-1.5 font-mono text-[9px] font-bold tracking-[0.18em] text-rhine-abyss shadow-[0_0_18px_rgb(211_178_122/0.3)] transition-all hover:brightness-110 sm:inline-flex"
+              title="切换到 LAB 系统"
+            >
+              LAB SYSTEM
+            </Link>
 
             <NotificationMenu />
 

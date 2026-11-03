@@ -22,6 +22,8 @@ import { ProjectsPanel } from './panels/ProjectsPanel'
 import { ReviewPanel } from './panels/ReviewPanel'
 import { ReviewAccessPanel } from './panels/ReviewAccessPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
+import { AccessLogsPanel } from './panels/AccessLogsPanel'
+import { ThemesPanel } from './panels/ThemesPanel'
 import { VideosPanel } from './panels/VideosPanel'
 
 type PanelKey =
@@ -42,6 +44,8 @@ type PanelKey =
   | 'review-posts'
   | 'members'
   | 'identities'
+  | 'access-logs'
+  | 'themes'
   | 'settings'
 
 interface MenuItem {
@@ -54,10 +58,11 @@ interface MenuItem {
 interface AdminDashboardProps {
   user: ApiUser
   onLogout: () => void
+  embedded?: boolean
 }
 
 /** 管理控制台：按权限显示可管理模块 */
-export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
+export function AdminDashboard({ user, onLogout, embedded = false }: AdminDashboardProps) {
   const [panel, setPanel] = useState<PanelKey>('overview')
   const brand = useSiteBrand()
 
@@ -68,6 +73,11 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     user.isSuper ||
     user.permissions.includes('members.manage') ||
     user.permissions.includes('members.grant')
+  const accessLogsAccess =
+    user.isSuper ||
+    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
+    user.permissions.includes('access_logs') ||
+    user.permissions.includes('members.manage')
 
   const groups = useMemo(() => {
     const list: Array<{ title: string; items: MenuItem[] }> = [
@@ -138,21 +148,33 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       })
     }
 
-    list.push({
-      title: '设置',
-      items: [{ key: 'settings', label: '设置', labelEn: 'SETTINGS' }],
-    })
+    const settingsItems: MenuItem[] = []
+    if (accessLogsAccess) {
+      settingsItems.push({ key: 'access-logs', label: '访问记录', labelEn: 'ACCESS LOGS' })
+      settingsItems.push({ key: 'themes', label: '主题颜色', labelEn: 'THEMES' })
+    }
+    settingsItems.push({ key: 'settings', label: '设置', labelEn: 'SETTINGS' })
+    list.push({ title: '设置', items: settingsItems })
     return list
-  }, [user, forumAccess, memberAccess])
+  }, [user, forumAccess, memberAccess, accessLogsAccess])
 
   const allowedKeys = groups.flatMap((group) => group.items.map((item) => item.key))
   const current = allowedKeys.includes(panel) ? panel : 'overview'
 
   return (
     <div className="min-h-screen bg-rhine-abyss text-rhine-ink">
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[60] opacity-[0.035]"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(0deg, transparent 0 3px, currentColor 3px 4px)',
+          mixBlendMode: 'overlay',
+        }}
+      />
       <header className="sticky top-0 z-20 border-b border-rhine-line/70 bg-rhine-abyss/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
-          <Link to="/" className="group flex shrink-0 items-center gap-3" title="返回前台主页">
+          <Link to={embedded ? '#' : '/'} onClick={(event) => embedded && event.preventDefault()} className="group flex shrink-0 items-center gap-3" title={embedded ? 'LAB CONTENT CONSOLE' : '返回前台主页'}>
             <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:border-rhine-gold group-hover:bg-rhine-gold/10 group-hover:shadow-[0_0_18px_rgb(211_178_122/0.25)]">
               <Home className="h-4 w-4 text-rhine-gold" />
             </span>
@@ -167,6 +189,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           </Link>
           <div className="flex shrink-0 flex-wrap items-center gap-3 font-mono text-[10px] tracking-wider text-rhine-dim">
             <ThemeMenu compact />
+            <Link
+              to="/lab"
+              className="border border-rhine-gold/40 px-2 py-1.5 font-mono text-[9px] tracking-[0.12em] text-rhine-gold hover:bg-rhine-gold/10"
+            >
+              LAB SYSTEM
+            </Link>
             <ShieldCheck className="h-3.5 w-3.5 text-rhine-cyan" />
             <span>{user.username}</span>
             <AdminBadge tone={user.isSuper ? 'gold' : 'cyan'}>
@@ -272,6 +300,24 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               {current === 'review-posts' && <ReviewPanel postsOnly />}
               {current === 'members' && <MembersPanel user={user} />}
               {current === 'identities' && <IdentityPanel actor={user} />}
+              {current === 'access-logs' && (
+                <AccessLogsPanel
+                  canDelete={
+                    user.isSuper ||
+                    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
+                    user.permissions.includes('access_logs')
+                  }
+                />
+              )}
+              {current === 'themes' && (
+                <ThemesPanel
+                  canDelete={
+                    user.isSuper ||
+                    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
+                    user.permissions.includes('members.manage')
+                  }
+                />
+              )}
               {current === 'settings' && <SettingsPanel user={user} />}
             </motion.div>
           </AnimatePresence>

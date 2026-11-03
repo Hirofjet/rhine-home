@@ -8,7 +8,7 @@ import { ROLE_LABELS } from '../lib/api'
  * 管理后台页面（独立于前台布局，不出现在导航中）。
  * 入口路径由 VITE_ADMIN_PATH 控制，默认 /admin。
  */
-export function AdminPage() {
+export function AdminPage({ embedded = false }: { embedded?: boolean }) {
   const { user, loading, staff, logout } = useSession()
   const navigate = useNavigate()
 
@@ -59,6 +59,7 @@ export function AdminPage() {
 
   return (
     <AdminDashboard
+      embedded={embedded}
       user={user}
       onLogout={() => {
         void logout().then(() => navigate('/'))

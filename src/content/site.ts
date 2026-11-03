@@ -36,7 +36,7 @@ export interface NavItem {
 
 /** 主导航（首页区块锚点） */
 export const navItems: NavItem[] = [
-  { id: 'home', label: '首页', labelEn: 'HOME', href: '/#hero', section: 'hero' },
+  { id: 'home', label: '主页', labelEn: 'HOME', href: '/#hero', section: 'hero' },
   {
     id: 'dossier',
     label: '档案',

@@ -22,8 +22,16 @@
       ;(() => {
         try {
           const theme = localStorage.getItem('rhine:theme')
-          if (theme === 'rhine' || theme === 'archive' || theme === 'sakura' || theme === 'noctis') {
+          if (
+            theme === 'rhine' ||
+            theme === 'rhine-dark' ||
+            theme === 'archive' ||
+            theme === 'sakura' ||
+            theme === 'noctis'
+          ) {
             document.documentElement.dataset.theme = theme
+          } else {
+            document.documentElement.dataset.theme = 'rhine'
           }
           const brand = localStorage.getItem('rhine:brand')
           if (brand && !/sample/i.test(brand)) document.title = `${brand} · 个人主页`

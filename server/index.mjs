@@ -3068,6 +3068,102 @@ app.use(
   }),
 )
 
+// ---------- 自定义主题 ----------
+app.get('/api/themes', async (_req, res) => {
+  const rows = await query(
+    'SELECT id, name, primary_color, secondary_color, tertiary_color, created_at FROM site_themes ORDER BY id ASC',
+  )
+  res.json({ themes: rows })
+})
+
+function canManageThemes(user) {
+  return Boolean(
+    user?.isSuper ||
+      ['super', 'senior', 'admin'].includes(user?.identity) ||
+      user?.permissions?.includes('members.manage') ||
+      user?.permissions?.includes('access_logs'),
+  )
+}
+
+app.post('/api/admin/themes', requireAuth, async (req, res) => {
+  if (!canManageThemes(req.user)) return res.status(403).json({ error: 'forbidden' })
+  const name = asString(req.body?.name, 80)
+  const color = (value) => (/^#[0-9a-f]{6}$/i.test(String(value)) ? String(value) : '')
+  const primary = color(req.body?.primaryColor)
+  const secondary = color(req.body?.secondaryColor)
+  const tertiary = color(req.body?.tertiaryColor)
+  if (!name || !primary || !secondary || !tertiary) {
+    return res.status(400).json({ error: 'invalid_theme' })
+  }
+  const result = await execute(
+    'INSERT INTO site_themes (name, primary_color, secondary_color, tertiary_color, created_by) VALUES (?, ?, ?, ?, ?)',
+    [name, primary, secondary, tertiary, req.user.id],
+  )
+  res.status(201).json({ id: Number(result.insertId) })
+})
+
+app.delete('/api/admin/themes/:id', requireAuth, async (req, res) => {
+  if (!canManageThemes(req.user)) return res.status(403).json({ error: 'forbidden' })
+  await execute('DELETE FROM site_themes WHERE id = ?', [Number(req.params.id)])
+  res.json({ ok: true })
+})
+
+// ---------- 访问日志 ----------
+function canManageAccessLogs(user) {
+  return Boolean(
+    user?.isSuper ||
+      ['super', 'senior', 'admin'].includes(user?.identity) ||
+      user?.permissions?.includes('access_logs') ||
+      user?.permissions?.includes('members.manage'),
+  )
+}
+
+app.post('/api/access-logs', requireAuth, async (req, res) => {
+  const moduleType = asString(req.body?.moduleType, 32)
+  if (!moduleType) return res.status(400).json({ error: 'module_required' })
+  const targetType = asString(req.body?.targetType, 32)
+  const targetId = asString(req.body?.targetId, 64)
+  const targetTitle = asString(req.body?.targetTitle, 200)
+  const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '')
+    .split(',')[0]
+    .trim()
+    .slice(0, 64)
+  await execute(
+    `INSERT INTO access_logs
+      (user_id, username, module_type, target_type, target_id, target_title, ip, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))`,
+    [req.user.id, req.user.username, moduleType, targetType, targetId, targetTitle, ip],
+  )
+  res.status(201).json({ ok: true })
+})
+
+app.get('/api/admin/access-logs', requireAuth, async (req, res) => {
+  if (!canManageAccessLogs(req.user)) return res.status(403).json({ error: 'forbidden' })
+  await execute('DELETE FROM access_logs WHERE expires_at <= NOW()')
+  const rows = await query(
+    `SELECT id, username, module_type, target_type, target_id, target_title, ip,
+            created_at, expires_at, TIMESTAMPDIFF(SECOND, NOW(), expires_at) AS remaining_seconds
+     FROM access_logs ORDER BY created_at DESC LIMIT 500`,
+  )
+  res.json({ logs: rows, canDelete: true })
+})
+
+app.delete('/api/admin/access-logs/:id', requireAuth, async (req, res) => {
+  if (!canManageAccessLogs(req.user)) return res.status(403).json({ error: 'forbidden' })
+  await execute('DELETE FROM access_logs WHERE id = ?', [Number(req.params.id)])
+  res.json({ ok: true })
+})
+
+app.delete('/api/admin/access-logs', requireAuth, async (req, res) => {
+  if (!canManageAccessLogs(req.user)) return res.status(403).json({ error: 'forbidden' })
+  if (req.query.scope === 'expired') {
+    await execute('DELETE FROM access_logs WHERE expires_at <= NOW()')
+  } else {
+    await execute('DELETE FROM access_logs')
+  }
+  res.json({ ok: true })
+})
+
 if (fs.existsSync(DIST_DIR)) {
   app.use(
     express.static(DIST_DIR, {

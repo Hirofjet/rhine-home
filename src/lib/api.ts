@@ -707,6 +707,61 @@ export const forumApi = {
   },
 }
 
+// ---------- 自定义主题 ----------
+export interface CustomTheme {
+  id: number
+  name: string
+  primary_color: string
+  secondary_color: string
+  tertiary_color: string
+}
+
+export const themeApi = {
+  list() {
+    return api<{ themes: CustomTheme[] }>('/api/themes', { auth: false })
+  },
+  create(input: { name: string; primaryColor: string; secondaryColor: string; tertiaryColor: string }) {
+    return api<{ id: number }>('/api/admin/themes', { method: 'POST', body: input })
+  },
+  remove(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/themes/${id}`, { method: 'DELETE' })
+  },
+}
+
+// ---------- 访问日志 ----------
+export interface AccessLogEntry {
+  id: number
+  username: string | null
+  module_type: string
+  target_type: string | null
+  target_id: string | null
+  target_title: string | null
+  ip: string | null
+  created_at: string
+  expires_at: string
+  remaining_seconds: number
+}
+
+export const accessLogApi = {
+  write(input: {
+    moduleType: string
+    targetType?: string
+    targetId?: string | number
+    targetTitle?: string
+  }) {
+    return api<{ ok: boolean }>('/api/access-logs', { method: 'POST', body: input })
+  },
+  list() {
+    return api<{ logs: AccessLogEntry[]; canDelete: boolean }>('/api/admin/access-logs')
+  },
+  remove(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/access-logs/${id}`, { method: 'DELETE' })
+  },
+  clear(scope: 'all' | 'expired' = 'all') {
+    return api<{ ok: boolean }>(`/api/admin/access-logs?scope=${scope}`, { method: 'DELETE' })
+  },
+}
+
 // ---------- 上传 ----------
 export async function uploadFile(
   file: File,

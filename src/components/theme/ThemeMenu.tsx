@@ -4,7 +4,7 @@ import { Check, Palette } from 'lucide-react'
 import { cx } from '../../lib/cx'
 import { THEMES, useTheme } from './ThemeProvider'
 
-/** 主题切换器：桌面从右上角展开，手机显示为贴边面板 */
+/** Home 系统的主题切换：保持原版的调色板弹层，不使用下拉列表。 */
 export function ThemeMenu({ compact = false }: { compact?: boolean }) {
   const { theme, definition, setTheme } = useTheme()
   const [open, setOpen] = useState(false)
@@ -41,7 +41,7 @@ export function ThemeMenu({ compact = false }: { compact?: boolean }) {
         <Palette className="h-4 w-4" />
         <span
           aria-hidden
-          className="hidden h-1.5 w-1.5 rounded-full transition-transform duration-300 group-hover:scale-125 sm:block"
+          className="h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: definition.colors[1] }}
         />
         {!compact && (
@@ -85,9 +85,7 @@ export function ThemeMenu({ compact = false }: { compact?: boolean }) {
                     style={{
                       background: `linear-gradient(135deg, ${item.colors[0]} 0%, ${item.colors[1]} 58%, ${item.colors[2]} 100%)`,
                     }}
-                  >
-                    <span className="absolute inset-x-0 bottom-0 h-1/3 bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.25),transparent)]" />
-                  </span>
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-xs text-rhine-ink">
                       {item.label}

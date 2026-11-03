@@ -316,6 +316,33 @@ const TABLES = [
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (email)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS access_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NULL,
+    username VARCHAR(64) NULL,
+    module_type VARCHAR(32) NOT NULL,
+    target_type VARCHAR(32) NULL,
+    target_id VARCHAR(64) NULL,
+    target_title VARCHAR(200) NULL,
+    ip VARCHAR(64) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_access_module (module_type, created_at),
+    KEY idx_access_expires (expires_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS site_themes (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(80) NOT NULL,
+    primary_color CHAR(7) NOT NULL,
+    secondary_color CHAR(7) NOT NULL,
+    tertiary_color CHAR(7) NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ]
 
 async function ensureColumn(table, column, definition) {
