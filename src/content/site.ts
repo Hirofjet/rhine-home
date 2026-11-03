@@ -5,11 +5,11 @@
 
 export const site = {
   /** 站点名（导航 Logo 大字） */
-  title: 'SAMPLE//HOME',
+  title: 'Hirofjet//HOME',
   /** 站点名小字 */
   titleSub: 'PERSONAL TERMINAL',
   /** 中文标语 */
-  slogan: '示例用户的个人主页',
+  slogan: '个人主页',
   /** 干员编号（会出现在开机画面、Hero 状态栏等处） */
   operatorId: 'RL-0001',
   /** 时区（用于页内时钟显示） */

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { siteApi, type SiteHomeContent } from '../lib/api'
 
-let cached: SiteHomeContent | null = null
+const STORAGE_KEY = 'rhine:site-home-cache'
 
 const EMPTY: SiteHomeContent = {
   profile: null,
@@ -10,6 +10,22 @@ const EMPTY: SiteHomeContent = {
   links: [],
   updatedAt: null,
 }
+
+const isRealProfile = (data: SiteHomeContent | null): data is SiteHomeContent =>
+  Boolean(data?.profile && !/sample|示例/i.test(data.profile.codeName))
+
+const readCache = (): SiteHomeContent | null => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SiteHomeContent
+    return isRealProfile(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+let cached: SiteHomeContent | null = readCache()
 
 /** 主页统一内容：资料 / 能力 / 联系方式 / 链接，一次请求多处复用。 */
 export function useSiteHomeContent(): SiteHomeContent {
@@ -21,8 +37,17 @@ export function useSiteHomeContent(): SiteHomeContent {
       siteApi
         .home()
         .then((data) => {
-          cached = data
-          if (alive) setContent(data)
+          if (isRealProfile(data)) {
+            cached = data
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+            } catch {
+              /* ignore */
+            }
+            if (alive) setContent(data)
+          } else if (alive) {
+            setContent(cached ?? EMPTY)
+          }
         })
         .catch(() => undefined)
     }

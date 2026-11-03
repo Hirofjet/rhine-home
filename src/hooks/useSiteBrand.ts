@@ -6,7 +6,9 @@ const listeners = new Set<(brand: string) => void>()
 const STORAGE_KEY = 'rhine:brand'
 let currentBrand = (() => {
   try {
-    return localStorage.getItem(STORAGE_KEY) || site.title
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored && !/sample|示例/i.test(stored)) return stored
+    return site.title
   } catch {
     return site.title
   }
@@ -15,7 +17,8 @@ let initialized = false
 
 const brandFromCodeName = (codeName: string | null | undefined) => {
   const clean = String(codeName ?? '').trim().replace(/\/\/HOME$/i, '')
-  return clean ? `${clean}//HOME` : site.title
+  if (!clean || /sample|示例/i.test(clean)) return site.title
+  return `${clean}//HOME`
 }
 
 export function setSiteBrandName(codeName: string | null | undefined) {

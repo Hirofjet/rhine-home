@@ -1,0 +1,26 @@
+{
+  "name": "Hirofjet//HOME",
+  "short_name": "Hirofjet",
+  "description": "Hirofjet 的个人主页：档案、项目、日志、论坛与留言板。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05070b",
+  "theme_color": "#05070b",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

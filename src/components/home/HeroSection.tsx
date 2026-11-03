@@ -1,19 +1,35 @@
 import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useEffect, useState, type PointerEvent } from 'react'
-import { profile, site } from '../../content'
+import { site } from '../../content'
 import type { OperatorProfile } from '../../content/profile'
 import { useClock } from '../../hooks/useClock'
+import { useSiteHomeContent } from '../../hooks/useSiteHomeContent'
 import { resolveMediaUrl, siteApi } from '../../lib/api'
 import { fadeUp, stagger } from '../../lib/motion'
 import { CornerFrame, GlowButton, StatusDot, Tag, TypingText } from '../ui'
 import type { DotColor } from '../ui/StatusDot'
 
+const EMPTY_PROFILE: OperatorProfile = {
+  codeName: 'OPERATOR',
+  realName: '资料同步中',
+  roles: ['CONNECTING'],
+  intro: '正在同步个人档案，请稍候…',
+  dossier: [],
+  occupation: '—',
+  affiliation: '—',
+  status: 'OFFLINE',
+  location: '—',
+  specialties: [],
+  traits: [],
+  trust: { value: 0, label: 'TRUST' },
+}
+
 export function HeroSection() {
   const clock = useClock(site.timezone)
   const reduce = useReducedMotion()
+  const content = useSiteHomeContent()
   const [ownerAvatar, setOwnerAvatar] = useState('')
-  const [remoteProfile, setRemoteProfile] = useState<OperatorProfile | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -23,20 +39,14 @@ export function HeroSection() {
         if (alive && data.profile.avatarUrl) setOwnerAvatar(data.profile.avatarUrl)
       })
       .catch(() => undefined)
-    siteApi
-      .home()
-      .then((data) => {
-        if (alive && data.profile) {
-          setRemoteProfile({ ...profile, ...data.profile, trust: profile.trust })
-        }
-      })
-      .catch(() => undefined)
     return () => {
       alive = false
     }
   }, [])
 
-  const current = remoteProfile ?? profile
+  const current = content.profile
+    ? { ...EMPTY_PROFILE, ...content.profile, trust: EMPTY_PROFILE.trust }
+    : EMPTY_PROFILE
 
   const avatarSrc = ownerAvatar
     ? resolveMediaUrl(ownerAvatar)
