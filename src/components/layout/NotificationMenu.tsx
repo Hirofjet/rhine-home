@@ -53,6 +53,21 @@ export function NotificationMenu() {
     }
   }, [user])
 
+  useEffect(() => {
+    if (!open || !user) return undefined
+    let alive = true
+    Promise.all([userApi.notifications(), userApi.conversations()])
+      .then(([notificationData, conversationData]) => {
+        if (!alive) return
+        setNotifications(notificationData.notifications)
+        setConversations(conversationData.conversations)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [open, user])
+
   if (!user) return null
 
   const unreadNotifications = notifications.filter((item) => !item.read).length
@@ -62,9 +77,16 @@ export function NotificationMenu() {
     (item) => !item.read && IMPORTANT_TYPES.has(item.type),
   )
   const recentNotifications = notifications
-    .filter((item) => item.type !== 'dm')
+    .filter((item) => item.type !== 'dm' && !item.read)
     .slice(0, 4)
-  const recentConversations = conversations.slice(0, 3)
+  const recentConversations = conversations.filter((item) => item.unread > 0).slice(0, 3)
+
+  const markRead = (id: number) => {
+    setNotifications((current) =>
+      current.map((item) => (item.id === id ? { ...item, read: true } : item)),
+    )
+    void userApi.readNotifications(id).catch(() => undefined)
+  }
 
   return (
     <div className="relative" ref={menuRef}>
@@ -109,7 +131,10 @@ export function NotificationMenu() {
                 <Link
                   key={item.id}
                   to={item.link || '/messages'}
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    markRead(item.id)
+                    setOpen(false)
+                  }}
                   className="mt-1 block truncate text-xs text-rhine-gold/90"
                 >
                   {item.title}
@@ -126,7 +151,10 @@ export function NotificationMenu() {
               <Link
                 key={`n-${item.id}`}
                 to={item.link || '/messages'}
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  markRead(item.id)
+                  setOpen(false)
+                }}
                 className={`block border-b border-rhine-line/40 px-3 py-2 hover:bg-rhine-gold/5 ${
                   item.read ? 'opacity-60' : ''
                 }`}

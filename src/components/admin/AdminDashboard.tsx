@@ -179,8 +179,31 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         </div>
       </header>
 
+      <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:hidden">
+        <label className="block">
+          <span className="mb-1 block font-mono text-[8px] tracking-[0.25em] text-rhine-faint">
+            当前栏目
+          </span>
+          <select
+            value={current}
+            onChange={(event) => setPanel(event.target.value as PanelKey)}
+            className="w-full border border-rhine-line bg-rhine-panel px-3 py-2.5 font-mono text-xs text-rhine-ink outline-none focus:border-rhine-gold/60"
+          >
+            {groups.map((group) => (
+              <optgroup key={group.title} label={group.title}>
+                {group.items.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.subgroup ? `${item.subgroup} / ${item.label}` : item.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row">
-        <aside className="lg:w-56 lg:shrink-0">
+        <aside className="hidden lg:block lg:w-56 lg:shrink-0">
           <div className="border border-rhine-line/60 bg-rhine-panel/30 p-2 lg:sticky lg:top-20">
             <nav className="flex gap-4 overflow-x-auto pb-1 lg:flex-col lg:gap-5">
               {groups.map((group) => (
