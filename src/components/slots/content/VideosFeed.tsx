@@ -48,7 +48,15 @@ export function VideosFeed({ fallback }: VideosFeedProps) {
   }
 
   if (state === 'offline' || videos.length === 0) {
-    return <>{fallback}</>
+    return (
+      <>
+        {fallback ?? (
+          <p className="border border-dashed border-rhine-line/70 px-4 py-10 text-center font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+            暂无已发布视频
+          </p>
+        )}
+      </>
+    )
   }
 
   return (

@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Home, LogOut, ShieldCheck } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { cx } from '../../lib/cx'
-import { hasPerm, ROLE_LABELS, type ApiUser } from '../../lib/api'
-import { useSiteBrand } from '../../hooks/useSiteBrand'
-import { ThemeMenu } from '../theme/ThemeMenu'
-import { AdminBadge, AdminButton } from './AdminUi'
+import { hasPerm, type ApiUser } from '../../lib/api'
 import { ArticlesPanel } from './panels/ArticlesPanel'
 import { ForumAnnouncementsPanel } from './panels/ForumAnnouncementsPanel'
 import { ForumClassPanel } from './panels/ForumClassPanel'
@@ -57,14 +52,11 @@ interface MenuItem {
 
 interface AdminDashboardProps {
   user: ApiUser
-  onLogout: () => void
-  embedded?: boolean
 }
 
 /** 管理控制台：按权限显示可管理模块 */
-export function AdminDashboard({ user, onLogout, embedded = false }: AdminDashboardProps) {
+export function AdminDashboard({ user }: AdminDashboardProps) {
   const [panel, setPanel] = useState<PanelKey>('overview')
-  const brand = useSiteBrand()
 
   const forumAccess =
     user.isSuper ||
@@ -172,42 +164,8 @@ export function AdminDashboard({ user, onLogout, embedded = false }: AdminDashbo
           mixBlendMode: 'overlay',
         }}
       />
-      <header className="sticky top-0 z-20 border-b border-rhine-line/70 bg-rhine-abyss/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
-          <Link to={embedded ? '#' : '/'} onClick={(event) => embedded && event.preventDefault()} className="group flex shrink-0 items-center gap-3" title={embedded ? 'LAB CONTENT CONSOLE' : '返回前台主页'}>
-            <span className="flex h-9 w-9 items-center justify-center border border-rhine-gold/60 bg-rhine-gold/5 transition-all duration-300 group-hover:border-rhine-gold group-hover:bg-rhine-gold/10 group-hover:shadow-[0_0_18px_rgb(211_178_122/0.25)]">
-              <Home className="h-4 w-4 text-rhine-gold" />
-            </span>
-            <span className="hidden flex-col leading-none sm:flex">
-              <span className="whitespace-nowrap font-display text-sm font-medium tracking-[0.18em] text-rhine-ink">
-                {brand}
-              </span>
-              <span className="mt-1 whitespace-nowrap font-mono text-[9px] tracking-[0.3em] text-rhine-faint">
-                CONTENT CONSOLE
-              </span>
-            </span>
-          </Link>
-          <div className="flex shrink-0 flex-wrap items-center gap-3 font-mono text-[10px] tracking-wider text-rhine-dim">
-            <ThemeMenu compact />
-            <Link
-              to="/lab"
-              className="border border-rhine-gold/40 px-2 py-1.5 font-mono text-[9px] tracking-[0.12em] text-rhine-gold hover:bg-rhine-gold/10"
-            >
-              LAB SYSTEM
-            </Link>
-            <ShieldCheck className="h-3.5 w-3.5 text-rhine-cyan" />
-            <span>{user.username}</span>
-            <AdminBadge tone={user.isSuper ? 'gold' : 'cyan'}>
-              {ROLE_LABELS[user.role]}
-            </AdminBadge>
-            <AdminButton variant="ghost" onClick={onLogout}>
-              <LogOut className="h-3 w-3" /> 退出
-            </AdminButton>
-          </div>
-        </div>
-      </header>
 
-      <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:hidden">
+      <div className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:hidden">
         <label className="block">
           <span className="mb-1 block font-mono text-[8px] tracking-[0.25em] text-rhine-faint">
             当前栏目

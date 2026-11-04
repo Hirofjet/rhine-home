@@ -337,8 +337,11 @@ const TABLES = [
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(80) NOT NULL,
     primary_color CHAR(7) NOT NULL,
+    primary_name VARCHAR(40) NULL,
     secondary_color CHAR(7) NOT NULL,
+    secondary_name VARCHAR(40) NULL,
     tertiary_color CHAR(7) NOT NULL,
+    tertiary_name VARCHAR(40) NULL,
     created_by BIGINT UNSIGNED NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
@@ -359,6 +362,9 @@ async function ensureColumn(table, column, definition) {
 /** 兼容已部署的旧表：缺少的列与状态枚举自动补齐 */
 async function ensureSchemaUpgrades() {
   await ensureColumn('users', 'avatar_url', 'avatar_url VARCHAR(500) NULL')
+  await ensureColumn('site_themes', 'primary_name', 'primary_name VARCHAR(40) NULL')
+  await ensureColumn('site_themes', 'secondary_name', 'secondary_name VARCHAR(40) NULL')
+  await ensureColumn('site_themes', 'tertiary_name', 'tertiary_name VARCHAR(40) NULL')
   await ensureColumn(
     'users',
     'role_code',

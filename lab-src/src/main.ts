@@ -18,7 +18,6 @@ import "./quality-settings.css";
 import "./responsive.css";
 import { viewportLayout, openingLayout } from "./viewport-layout";
 import { assetUrl } from "./asset-url";
-import { initPwa, pwaSettingsMarkup } from "./pwa";
 import {
   createRollingNumber,
   createRollingText,
@@ -64,7 +63,9 @@ import { Workbench } from "./workbench";
 let workbench: Workbench | undefined;
 import { ArchivePlayground } from "./archive-playground";
 import { ARRAY_OPENING_END, openingShowsDetail } from "./wallpaper-opening";
-import { paintTheme, themeSettingsMarkup, currentLabTheme, setLabTheme, setLabCustomTheme } from "./theme-ui";
+import { paintTheme, currentLabTheme, setLabTheme, setLabCustomTheme } from "./theme-ui";
+import { getRefreshRate, startRefreshRateDetection } from "./refresh-rate";
+import { initOffline, offlineSettingsMarkup, refreshOfflinePanel } from "./pwa";
 let playground: ArchivePlayground | undefined;
 import { WallpaperEffects } from "./wallpaper-effects";
 import { WallpaperBackground } from "./wallpaper-background";
@@ -85,6 +86,9 @@ $("#stage").innerHTML = `
     <button data-action="saved" aria-label="查看收藏档案" title="收藏档案">＋ SAVED <span id="saved-count">00</span></button>
     <button class="settings-button" data-action="settings" aria-label="系统设置" title="系统设置"><span class="settings-glyph" aria-hidden="true">◷</span><span class="settings-label">设置</span></button>
   </nav>
+  <div id="perf-hud" class="perf-hud" aria-label="渲染性能" hidden>
+    <b id="perf-fps">--</b><span>FPS</span><i>/</i><span id="perf-hz">-- HZ</span><i>/</i><span id="perf-res">--</span><i>/</i><span id="perf-scale">100%</span>
+  </div>
   <button id="skip" class="skip" data-action="skip">ENTER SYSTEM <span>↗</span></button>
   <section id="boot" class="boot" aria-label="系统启动">
     <div class="access-text">ACCESS</div>
@@ -96,7 +100,16 @@ $("#stage").innerHTML = `
   <svg id="inspection-marks" viewBox="0 0 1920 1080" aria-hidden="true"><path id="inspection-lines"/><g id="inspection-corners"></g><circle id="inspection-point" r="1.8"/></svg>
   <div id="inspection-text" aria-hidden="true">CONFIDENTIALITY:<strong>GENERAL BUSINESS USE</strong></div>
   <section id="archive-ui" class="archive-ui" aria-label="档案选择">
-    <div class="archive-callout"><div class="eyebrow">PERSONAL ARCHIVE <span>／</span> <span id="archive-category">个人档案</span></div><button class="file-title" data-action="open">FILE NUMBER: <span id="selected-id">X-<span id="selected-code">001</span></span><span class="file-open">↗</span></button><div class="callout-rule"><i></i></div><div class="file-summary"><span id="selected-title">莱茵生命</span><span id="selected-clearance">BUSINESS AREA</span></div><button class="read-file" data-action="open">READ RECORD <span>→</span></button></div>
+    <div class="archive-callout">
+      <div class="eyebrow">PERSONAL ARCHIVE <span>／</span> <span id="archive-category">个人档案</span></div>
+      <div class="callout-module"><span id="selected-module" class="module-name">日志</span><span id="selected-count" class="module-count">08 RECORDS</span></div>
+      <button class="file-title" data-action="open"><span class="file-label">FILE</span><span id="selected-id">X-<span id="selected-code">001</span></span><span class="file-open">↗</span></button>
+      <div class="callout-rule"><i></i></div>
+      <div class="file-summary"><span id="selected-title">莱茵生命</span><span id="selected-clearance">BUSINESS AREA</span></div>
+      <p id="selected-excerpt" class="file-excerpt"></p>
+      <div class="callout-meta"><span>MODULE <b id="selected-module-name">日志</b></span><span>DATE <b id="selected-date">—</b></span></div>
+      <button class="read-file" data-action="open">OPEN MODULE <span>→</span></button>
+    </div>
     <div id="hover-label" class="hover-label" hidden>X-<span id="hover-code">001</span> / <span id="hover-title"></span></div>
     <div class="archive-counter"><span class="tiny-label">ARCHIVE / SELECT</span><div><span id="selected-number">01</span><i>/</i><span class="count-total">12</span></div></div>
     <div class="archive-navigation"><button data-action="prev" aria-label="上一个档案">↑</button><div id="file-ticks" class="file-ticks"></div><button data-action="next" aria-label="下一个档案">↓</button></div>
@@ -109,8 +122,7 @@ $("#stage").innerHTML = `
     <article id="detail-content" class="detail-content"></article>
   </section>
   <div class="powered">POWERED BY <b>RHINE LAB</b><i></i></div>
-  <footer class="system-footer"><span><i class="status-light"></i> SESSION AUTHORIZED${isWallpaper ? '<button type="button" class="three-toggle" data-action="toggle-three" aria-pressed="true" title="卸载三维模型，保留 2D 界面">3D 开启</button>' : ""}</span><span>HIROFJET <i>／</i> <span id="clock">00:00:00</span></span><button data-action="replay" title="重播启动流程">REINITIALIZE ↗</button></footer>
-  <div id="pwa-update-notice" class="pwa-update-notice" role="status" hidden><span>新版本已就绪</span><button data-pwa-action="update">更新并重启 ↻</button></div>
+  <footer class="system-footer"><span><i class="status-light"></i> SESSION AUTHORIZED</span><span>HIROFJET <i>／</i> <span id="clock">00:00:00</span></span><button data-action="replay" title="重播启动流程">REINITIALIZE ↗</button></footer>
   <div id="modal-root"></div><div id="toast" class="toast" role="status"></div>
   <div id="loading" class="loading"><div class="loading-mark">${logo}</div><span>CONNECTING TO PERSONAL ARCHIVE</span><i></i></div>
 `;
@@ -187,7 +199,9 @@ const storedPrefs = readLocal<
     quality: boolean;
     rendering: RenderQuality;
     superPerformance: boolean;
+    showFps: boolean;
     colorTheme: "light" | "dark";
+    uiTheme: "light" | "dark";
     motion: StoredMotion;
     motionPreset: MotionPreset;
   }>
@@ -209,21 +223,25 @@ const prefs = {
   motionPreset: initialMotionPreset,
   quality: storedPrefs.quality ?? true,
   superPerformance: storedPrefs.superPerformance ?? false,
+  showFps: storedPrefs.showFps ?? false,
   rendering: normalizeQuality(
     storedPrefs.rendering,
     storedPrefs.quality !== false,
   ),
   colorTheme: storedPrefs.colorTheme === "dark" ? "dark" : "light",
+  uiTheme: (storedPrefs.uiTheme ?? storedPrefs.colorTheme) === "dark" ? "dark" : "light",
 };
 const motionActive = (key: MotionKey) => motionEnabled(prefs.motion, key);
 const motionIsReduced = () =>
   Object.values(prefs.motion).every((value) => !value);
 const initialLabTheme = currentLabTheme();
 prefs.colorTheme = initialLabTheme === "dark" || initialLabTheme === "noctis" ? "dark" : "light";
+prefs.uiTheme = prefs.colorTheme;
 const queryTheme = new URLSearchParams(location.search).get("theme");
 const customQuery = new URLSearchParams(location.search).get("custom");
 if (queryTheme && ["light", "dark", "archive", "sakura", "noctis"].includes(queryTheme)) {
   prefs.colorTheme = queryTheme === "dark" || queryTheme === "noctis" ? "dark" : "light";
+  prefs.uiTheme = prefs.colorTheme;
   setLabTheme(queryTheme as "light" | "dark" | "archive" | "sakura" | "noctis");
 } else {
   setLabTheme(initialLabTheme);
@@ -550,7 +568,7 @@ function setMode(next: Mode) {
   scene?.setMode(next === "boot" ? "hidden" : next);
   if (next !== "boot") {
     bootSequence.reset();
-    $(".file-title").firstChild!.textContent = "FILE NUMBER: ";
+    $(".file-title").firstChild!.textContent = "FILE ";
     $("#stage").dataset.boot = "done";
   }
   if (next === "detail" && previousMode !== "detail") {
@@ -617,6 +635,13 @@ function updateSelection(navigation?: ArchiveNavigation) {
     text: r.category,
     animated: motionActive("rollingText") && mode === "archive",
   });
+  const moduleLabel = archiveColumns[lane] ?? r.department;
+  const moduleCount = String(files.length).padStart(2, "0");
+  $("#selected-module").textContent = moduleLabel;
+  $("#selected-module-name").textContent = moduleLabel;
+  $("#selected-count").textContent = `${moduleCount} RECORDS`;
+  $("#selected-excerpt").textContent = r.abstract || "该模块暂无摘要内容。";
+  $("#selected-date").textContent = r.date || "—";
   const direction =
     navigation && "axis" in navigation
       ? navigation.direction > 0
@@ -711,13 +736,22 @@ function toggleSaved() {
 function renderDetail() {
   tabTransition.cancel();
   const r = records[selected];
+  const moduleLabel = r.department || r.category;
+  const moduleCount = records.filter((record) => record.category === r.category).length;
+  const replies = r.replies ?? [];
+  const isForum = r.clearance.includes("BOARD") || r.findings.some((item) => item.includes("论坛"));
+  const secondTab = isForum
+    ? `<button id="tab-replies" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="replies">02 <span>回复 ${replies.length}</span></button>`
+    : `<button id="tab-notes" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="notes">02 <span>研究记录</span></button>`;
   $("#object-id").textContent = "NO." + String(selected + 1).padStart(3, "0");
   $("#detail-content").innerHTML = `
-  <div class="detail-kicker"><span>FILE ${r.id}</span><span>${escapeHtml(r.clearance)}</span></div>
-  <h2>${escapeHtml(r.en)}</h2><div class="detail-title-cn">${escapeHtml(r.title)}<span>${escapeHtml(r.category)}</span></div>
+  <div class="detail-kicker"><span>${escapeHtml(moduleLabel)} / MODULE</span><span>FILE ${r.id} · ${escapeHtml(r.clearance)}</span></div>
+  <div class="detail-module-row"><span class="detail-module">${escapeHtml(moduleLabel)}</span><span class="detail-count">${String(moduleCount).padStart(2, "0")} RECORDS IN MODULE</span></div>
+  <h2>${escapeHtml(r.title)}</h2><div class="detail-title-cn">${escapeHtml(r.en)}<span>${escapeHtml(r.category)}</span></div>
+  <p class="detail-lede">${escapeHtml(r.abstract)}</p>
   <div class="detail-rule"></div>
   <dl class="metadata"><div><dt>MODULE / 模块</dt><dd>${escapeHtml(r.department)}</dd></div><div><dt>DATE / 日期</dt><dd>${escapeHtml(r.date)}</dd></div><div><dt>AUTHOR / 作者</dt><dd>${escapeHtml(r.lead)}</dd></div><div><dt>STATUS / 状态</dt><dd><i></i>${r.clearance === "RESTRICTED" ? "目录访问" : "已归档 · 可读取"}</dd></div></dl>
-  <div class="detail-tabs" role="tablist"><button id="tab-overview" class="active" role="tab" aria-controls="tab-panel" aria-selected="true" data-tab="overview">01 <span>概述</span></button><button id="tab-notes" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="notes">02 <span>研究记录</span></button><button id="tab-history" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="history">03 <span>访问日志</span></button><i class="tab-indicator" aria-hidden="true"></i></div>
+  <div class="detail-tabs" role="tablist"><button id="tab-overview" class="active" role="tab" aria-controls="tab-panel" aria-selected="true" data-tab="overview">01 <span>模块重点</span></button>${secondTab}<button id="tab-history" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="history">03 <span>访问日志</span></button><i class="tab-indicator" aria-hidden="true"></i></div>
   <div id="tab-panel" class="tab-panel" role="tabpanel">${overview()}</div>
   <div class="detail-actions"><button class="solid-button" data-action="bookmark">${saved.has(r.id) ? "REMOVE FROM SAVED" : "SAVE ARCHIVE"}<span>${saved.has(r.id) ? "已收藏" : "收藏档案"}</span></button></div>
   <div class="detail-footnote"><span>PERSONAL ARCHIVE · RUNTIME SYNCED</span><span>${String(selected + 1).padStart(3, "0")} / ${String(records.length).padStart(3, "0")}</span></div>`;
@@ -732,10 +766,15 @@ function renderDetail() {
       !scene ||
       scene.decryptionFrame.phase === "clear",
   );
+  // Readability guard: the redaction is decorative. If the physical reveal
+  // never reaches its clarity cue, never leave the record text covered.
+  window.setTimeout(() => documentDecryption.finish(), 1200);
   setTab(activeTab, false);
 }
 function overview() {
-  return `<div class="panel-label">ABSTRACT / 摘要</div><p>${escapeHtml(records[selected].abstract)}</p>`;
+  const r = records[selected];
+  const highlights = r.findings.slice(0, 3);
+  return `<div class="panel-label">MODULE FOCUS / 模块重点</div><p class="detail-abstract">${escapeHtml(r.abstract)}</p><ul class="focus-points">${highlights.map((item, index) => `<li><span>${String(index + 1).padStart(2, "0")}</span>${escapeHtml(item)}</li>`).join("")}</ul>`;
 }
 function setTab(tab: string, sound = true) {
   if (sound && tab === activeTab) return;
@@ -748,6 +787,7 @@ function setTab(tab: string, sound = true) {
   });
   const r = records[selected];
   const tabButton = $<HTMLButtonElement>(`[data-tab="${tab}"]`);
+  if (!tabButton) return;
   const indicator = $(".tab-indicator");
   indicator.style.transition =
     sound && motionActive("surfaceTransitions") ? "" : "none";
@@ -756,6 +796,10 @@ function setTab(tab: string, sound = true) {
   $("#tab-panel").innerHTML =
     tab === "overview"
       ? overview()
+      : tab === "replies"
+        ? `<div class="panel-label">REPLIES / 帖子回复 ${r.replies?.length ?? 0}</div>${r.replies?.length
+            ? `<ol class="reply-list">${r.replies.map((reply, index) => `<li><span class="reply-index">${String(index + 1).padStart(2, "0")}</span><div><b>${escapeHtml(reply.author)}</b><small>${escapeHtml(reply.createdAt ?? "")}</small><p>${escapeHtml(reply.content)}</p></div></li>`).join("")}</ol>`
+            : `<p class="log-note">该帖子暂无回复。</p>`}`
       : tab === "notes"
         ? `<div class="panel-label">RESEARCH NOTES / 研究记录</div><ol class="research-notes">${r.findings.map((f, i) => `<li><span>${String(i + 1).padStart(2, "0")}</span>${escapeHtml(f)}</li>`).join("")}</ol>`
         : `<div class="panel-label">ACCESS LOG / 本次访问</div>${accessLog
@@ -826,12 +870,13 @@ function renderModal() {
   if (!modal) return;
   modalTransition?.dispose();
   $("#modal-root").innerHTML =
-    `<div class="modal-backdrop"><section class="terminal-modal ${modal === "settings" ? "settings-modal" : ""}" role="dialog" aria-modal="true" aria-label="${modal === "settings" ? "系统设置" : modal === "saved" ? "收藏档案" : "档案检索"}"><div class="modal-top"><span>RHINE LAB / ${modal === "settings" ? "SYSTEM PREFERENCES" : "ARCHIVE DIRECTORY"}</span><button data-action="close-modal" aria-label="关闭窗口">CLOSE <span>×</span></button></div>${modal === "settings" ? settingsMarkup() : `<h2>${modal === "saved" ? "SAVED ARCHIVES" : "ARCHIVE INDEX"}<small>${modal === "saved" ? "收藏档案" : "内部档案检索"}</small></h2><div class="search-field"><span>⌕</span><input id="archive-search" type="search" autocomplete="off" placeholder="输入档案编号、名称或模块" aria-label="检索档案"/><span class="key">ESC</span></div><div class="category-filters">${categories.map((c, i) => `<button data-filter="${escapeHtml(c)}" class="${i === 0 ? "active" : ""}">${escapeHtml(c)}</button>`).join("")}</div><div class="result-header"><span>FILE / 档案</span><span>MODULE / 模块</span><span>ACCESS</span></div><div id="search-results" class="search-results"></div><div class="modal-bottom"><span id="result-count"></span><span>PERSONAL ARCHIVE <i>●</i> CONNECTED</span></div>`}</section></div>`;
+    `<div class="modal-backdrop${modal === "settings" ? " settings-backdrop" : ""}"><section class="terminal-modal ${modal === "settings" ? "settings-modal" : ""}" role="dialog" aria-modal="true" aria-label="${modal === "settings" ? "系统设置" : modal === "saved" ? "收藏档案" : "档案检索"}"><div class="modal-top"><span>RHINE LAB / ${modal === "settings" ? "SYSTEM PREFERENCES" : "ARCHIVE DIRECTORY"}</span><button data-action="close-modal" aria-label="关闭窗口">CLOSE <span>×</span></button></div>${modal === "settings" ? settingsMarkup() : `<h2>${modal === "saved" ? "SAVED ARCHIVES" : "ARCHIVE INDEX"}<small>${modal === "saved" ? "收藏档案" : "内部档案检索"}</small></h2><div class="search-field"><span>⌕</span><input id="archive-search" type="search" autocomplete="off" placeholder="输入档案编号、名称或模块" aria-label="检索档案"/><span class="key">ESC</span></div><div class="category-filters">${categories.map((c, i) => `<button data-filter="${escapeHtml(c)}" class="${i === 0 ? "active" : ""}">${escapeHtml(c)}</button>`).join("")}</div><div class="result-header"><span>FILE / 档案</span><span>MODULE / 模块</span><span>ACCESS</span></div><div id="search-results" class="search-results"></div><div class="modal-bottom"><span id="result-count"></span><span>PERSONAL ARCHIVE <i>●</i> CONNECTED</span></div>`}</section></div>`;
   const backdrop = $(".modal-backdrop");
   backdrop.hidden = true;
   modalTransition = new SurfaceTransition(backdrop, $(".terminal-modal"));
   modalTransition.show(!motionActive("surfaceTransitions"));
   if (modal === "settings") updateQualitySummary();
+  if (modal === "settings") refreshOfflinePanel();
   if (modal !== "settings") {
     renderResults();
     requestAnimationFrame(() => {
@@ -888,8 +933,29 @@ function motionPreferenceNoteMarkup() {
   const allEnabled = Object.values(prefs.motion).every(Boolean);
   return `<div id="motion-preference-note" class="motion-preference-note"><p>${motionSummary(prefs.motion)}</p><span>预设：${preset === "full" ? "完整动画" : preset === "reduced" ? "减少动画" : "自定义"} · 选择会保存在本站</span>${allEnabled ? "" : '<button data-action="enable-motion">启用完整动画并重播 ↻</button>'}</div>`;
 }
+function themeSettingsSplitMarkup() {
+  const ui = currentLabTheme();
+  const three = prefs.colorTheme === "dark" ? "dark" : "light";
+  return `<div class="theme-settings theme-settings-split">
+    <label><strong>页面主题</strong><span>界面、面板和文字的色彩协议</span>
+      <select id="lab-page-theme" aria-label="页面主题" class="lab-theme-select">
+        <option value="light"${ui === "light" ? " selected" : ""}>莱茵生命（亮）</option>
+        <option value="dark"${ui === "dark" ? " selected" : ""}>莱茵生命（暗）</option>
+        <option value="archive"${ui === "archive" ? " selected" : ""}>碧蓝档案</option>
+        <option value="sakura"${ui === "sakura" ? " selected" : ""}>樱色协议</option>
+        <option value="noctis"${ui === "noctis" ? " selected" : ""}>深空协议</option>
+      </select>
+    </label>
+    <label><strong>3D 档案主题</strong><span>只控制三维档案场景的明暗</span>
+      <select id="lab-3d-theme-select" aria-label="3D 档案主题" class="lab-theme-select">
+        <option value="light"${three === "light" ? " selected" : ""}>亮色</option>
+        <option value="dark"${three === "dark" ? " selected" : ""}>暗色</option>
+      </select>
+    </label>
+  </div>`;
+}
 function settingsMarkup() {
-  return `<h2>SYSTEM SETTINGS<small>终端偏好设置</small></h2><p class="settings-intro">HIROFJET <span>·</span> SESSION AUTHORIZED</p>${isWallpaper ? '<p class="wallpaper-settings-note">每次启动都会读取 Wallpaper Engine 中的设置。在此修改仅对当前运行生效，无法持久保存；如需保留，请在 Wallpaper Engine 的壁纸属性中调整。</p>' : ""}<div class="settings-list">${themeSettingsMarkup(prefs.colorTheme === "dark")}${!isWallpaper ? `<label><div><strong>SUPER PERFORMANCE</strong><span>降低三维画质和渲染分辨率，保留完整动效；关闭后恢复原画质</span></div><input type="checkbox" data-pref="superPerformance" ${prefs.superPerformance ? "checked" : ""}/><i class="toggle"></i></label>` : ""}${workbench?.settingsMarkup() ?? ""}${audioSettingsMarkup(prefs)}</div>${motionPreferenceNoteMarkup()}${motionSettingsMarkup(prefs.motion, prefs.motionPreset)}${qualityMarkup(prefs.rendering)}${pwaSettingsMarkup()}<div class="settings-shortcuts">${isWallpaper ? "<span>DESKTOP CONTROLS</span><p>拖动阵列或点击界面按钮浏览档案。桌面模式下，方向键与滚轮可能无法传入壁纸。</p>" : "<span>KEYBOARD CONTROLS</span><p><kbd>←</kbd><kbd>→</kbd> 切列 <kbd>↑</kbd><kbd>↓</kbd> 选档 <kbd>ENTER</kbd> 读取 <kbd>/</kbd> 检索 <kbd>ESC</kbd> 返回</p>"}</div><div class="settings-bottom">${!isWallpaper && document.fullscreenEnabled ? '<button data-action="fullscreen">FULLSCREEN <span>↗</span></button>' : ""}<button data-action="restart">REINITIALIZE SYSTEM <span>↻</span></button></div><div class="modal-bottom"><span>ANALYSIS OS / 1.0 · 使用 MiSans 字体（小米） <a href="${assetUrl("fonts/MiSans-license.pdf")}" target="_blank" rel="noopener">字体许可</a></span><span>POWERED BY RHINE LAB</span></div>`;
+  return `<h2>SYSTEM SETTINGS<small>终端偏好设置</small></h2><p class="settings-intro">HIROFJET <span>·</span> SESSION AUTHORIZED</p>${isWallpaper ? '<p class="wallpaper-settings-note">每次启动都会读取 Wallpaper Engine 中的设置。在此修改仅对当前运行生效，无法持久保存；如需保留，请在 Wallpaper Engine 的壁纸属性中调整。</p>' : ""}<div class="settings-list">${themeSettingsSplitMarkup()}<label><div><strong>PERFORMANCE HUD</strong><span>显示当前 FPS、刷新率与渲染分辨率</span></div><input type="checkbox" data-pref="showFps" ${prefs.showFps ? "checked" : ""}/><i class="toggle"></i></label>${!isWallpaper ? `<label><div><strong>SUPER PERFORMANCE</strong><span>降低三维画质和渲染分辨率，保留完整动效；关闭后恢复原画质</span></div><input type="checkbox" data-pref="superPerformance" ${prefs.superPerformance ? "checked" : ""}/><i class="toggle"></i></label>` : ""}${workbench?.settingsMarkup() ?? ""}${audioSettingsMarkup(prefs)}</div>${motionPreferenceNoteMarkup()}${motionSettingsMarkup(prefs.motion, prefs.motionPreset)}${qualityMarkup(prefs.rendering)}${!isWallpaper ? offlineSettingsMarkup() : ""}<div class="settings-shortcuts">${isWallpaper ? "<span>DESKTOP CONTROLS</span><p>拖动阵列或点击界面按钮浏览档案。桌面模式下，方向键与滚轮可能无法传入壁纸。</p>" : "<span>KEYBOARD CONTROLS</span><p class='shortcut-grid'><span><kbd>←</kbd><kbd>→</kbd> 切列</span><span><kbd>↑</kbd><kbd>↓</kbd> 选档</span><span><kbd>ENTER</kbd> 读取</span><span><kbd>/</kbd> 检索</span><span><kbd>ESC</kbd> 返回</span></p>"}</div><div class="settings-bottom">${!isWallpaper && document.fullscreenEnabled ? '<button data-action="fullscreen">FULLSCREEN <span>↗</span></button>' : ""}<button data-action="restart">REINITIALIZE SYSTEM <span>↻</span></button></div><div class="modal-bottom"><span>ANALYSIS OS / 1.0 · 使用 MiSans 字体（小米） <a href="${assetUrl("fonts/MiSans-license.pdf")}" target="_blank" rel="noopener">字体许可</a></span><span>POWERED BY RHINE LAB</span></div>`;
 }
 
 document.addEventListener("input", (e) => {
@@ -936,9 +1002,14 @@ document.addEventListener("change", (e) => {
       key === "sound" ||
       key === "music" ||
       key === "quality" ||
-      key === "superPerformance"
+      key === "superPerformance" ||
+      key === "showFps"
     )
       prefs[key] = el.checked;
+    if (key === "showFps") {
+      const hud = $("#perf-hud");
+      hud.hidden = !el.checked;
+    }
     if (key === "sound" || key === "music") saveAudioPrefs();
     else savePrefs();
     audio.play("confirm");
@@ -980,6 +1051,28 @@ document.addEventListener("change", (e) => {
 });
 document.addEventListener("change", (e) => {
   const select = e.target as HTMLSelectElement;
+  if (select?.id === "lab-page-theme") {
+    const value = select.value;
+    if (!["light", "dark", "archive", "sakura", "noctis"].includes(value)) return;
+    setLabTheme(value as "light" | "dark" | "archive" | "sakura" | "noctis");
+    prefs.uiTheme = value === "dark" || value === "noctis" ? "dark" : "light";
+    savePrefs();
+    window.parent.postMessage({ type: "rhine:page-theme", theme: value }, location.origin);
+    return;
+  }
+  if (select?.id === "lab-3d-theme-select") {
+    const value = select.value === "dark" ? "dark" : "light";
+    prefs.colorTheme = value;
+    scene?.setTheme(value === "dark", !motionActive("surfaceTransitions"));
+    try {
+      localStorage.setItem("rhine:lab3d-theme", value);
+    } catch {
+      /* ignore */
+    }
+    savePrefs();
+    window.parent.postMessage({ type: "rhine:lab3d-theme", theme: value }, location.origin);
+    return;
+  }
   if (select?.id !== "lab-theme-select") return;
   const value = select.value;
   if (!["light", "dark", "archive", "sakura", "noctis"].includes(value)) return;
@@ -999,6 +1092,11 @@ document.addEventListener("change", (e) => {
 
 window.addEventListener("message", (event) => {
   if (event.origin !== location.origin) return;
+  if (event.data?.type === "rhine:set-quality") {
+    prefs.superPerformance = event.data.quality === "low";
+    savePrefs();
+    return;
+  }
   if (event.data?.type === "rhine:set-custom-theme") {
     const colors = event.data.colors;
     if (Array.isArray(colors) && colors.length === 3) {
@@ -1009,8 +1107,9 @@ window.addEventListener("message", (event) => {
   const theme = event.data?.theme;
   if (event.data?.type !== "rhine:set-lab-theme") return;
   if (!["light", "dark", "archive", "sakura", "noctis"].includes(theme)) return;
-  setLabTheme(theme);
   prefs.colorTheme = theme === "dark" || theme === "noctis" ? "dark" : "light";
+  scene?.setTheme(prefs.colorTheme === "dark", !motionActive("surfaceTransitions"));
+  savePrefs();
 });
 
 document.addEventListener("click", (e) => {
@@ -1210,9 +1309,11 @@ document.addEventListener("keydown", (e) => {
     ["ArrowLeft", "ArrowRight"].includes(e.key)
   ) {
     e.preventDefault();
-    const tabs = ["overview", "notes", "history"];
+    const tabs = [...document.querySelectorAll<HTMLElement>("[data-tab]")].map(
+      (button) => button.dataset.tab ?? "",
+    );
     setTab(
-      tabs[(tabs.indexOf(activeTab) + (e.key === "ArrowRight" ? 1 : 2)) % 3],
+      tabs[(tabs.indexOf(activeTab) + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length],
     );
     $<HTMLButtonElement>(`[data-tab="${activeTab}"]`).focus();
     return;
@@ -1303,7 +1404,7 @@ function bootFrame(t: number) {
   $(".file-title").firstChild!.textContent =
     step === "array"
       ? "SELECTING FILES...".slice(0, Math.max(0, Math.floor((t - 21.94) * 18)))
-      : "FILE NUMBER: ";
+      : "FILE ";
   $("#stage").style.setProperty(
     "--entry-opacity",
     String(ease((t - 21.9) / 0.13)),
@@ -1328,6 +1429,8 @@ document.fonts.addEventListener("loadingdone", () =>
 );
 
 let lastTime = 0,
+  lastVsync = 0,
+  adaptiveScale = 1,
   frameCount = 0,
   frameStart = performance.now(),
   fps = 0;
@@ -1336,6 +1439,12 @@ function frame(ms: number) {
     requestAnimationFrame(frame);
     return;
   }
+  const refresh = getRefreshRate();
+  if (refresh && ms - lastVsync < 1000 / refresh - 1) {
+    requestAnimationFrame(frame);
+    return;
+  }
+  lastVsync = ms;
   if (document.hidden) {
     requestAnimationFrame(frame);
     return;
@@ -1343,7 +1452,7 @@ function frame(ms: number) {
   workbench?.tick();
   const time = ms / 1000;
   const theme = scene?.themeAmount ?? (prefs.colorTheme === "dark" ? 1 : 0);
-  paintTheme(theme);
+  paintTheme(prefs.uiTheme === "dark" ? 1 : 0);
   viewer?.setTheme(theme);
   playground?.tick(time);
   const cinema =
@@ -1402,6 +1511,25 @@ function frame(ms: number) {
     fps = (frameCount * 1000) / (ms - frameStart);
     frameStart = ms;
     frameCount = 0;
+    const refresh = getRefreshRate();
+    if (scene && refresh && mode !== "boot") {
+      if (fps < refresh * 0.8) adaptiveScale = Math.max(0.7, adaptiveScale - 0.08);
+      else if (fps > refresh * 0.93) adaptiveScale = Math.min(1, adaptiveScale + 0.04);
+      scene.setAdaptiveScale(adaptiveScale);
+    }
+    const hud = $("#perf-hud");
+    if (hud) {
+      hud.hidden = !prefs.showFps;
+      const canvas = scene?.renderer.domElement;
+      const fpsLabel = $("#perf-fps");
+      const hzLabel = $("#perf-hz");
+      const resolution = $("#perf-res");
+      const scale = $("#perf-scale");
+      if (fpsLabel) fpsLabel.textContent = String(Math.round(fps));
+      if (hzLabel) hzLabel.textContent = `${refresh || "--"} HZ`;
+      if (resolution) resolution.textContent = canvas ? `${canvas.width}×${canvas.height}` : "--";
+      if (scale) scale.textContent = `${Math.round(adaptiveScale * 100)}%`;
+    }
     $("#three-scene").dataset.fps = String(Math.round(fps));
     $("#three-scene").dataset.renderStats = JSON.stringify(
       scene?.getStats() ?? { loaded: false, drawCalls: 0, triangles: 0 },
@@ -1605,6 +1733,21 @@ async function start() {
     }
   } catch (error) {
     console.error(error);
+    // A stale or partially deleted local cache can leave the entry page
+    // pointing at resources that no longer exist. Rebuild it once instead of
+    // leaving the archive on a dead loader.
+    if (
+      "caches" in window &&
+      sessionStorage.getItem("rhine:3d-recovery") !== "1"
+    ) {
+      sessionStorage.setItem("rhine:3d-recovery", "1");
+      localStorage.removeItem("rhine:lab-offline-autosaved");
+      void Promise.all([
+        caches.delete("rhine-lab-3d-v2"),
+        caches.delete("rhine-lab-3d-v1"),
+      ]).finally(() => location.reload());
+      return;
+    }
     $("#loading").innerHTML =
       '<div class="error-state"><strong>CONNECTION INTERRUPTED</strong><p>三维档案资源未能载入。请确认浏览器已启用硬件加速，然后重新连接。</p><button onclick="location.reload()">RECONNECT →</button></div>';
   }
@@ -1612,6 +1755,7 @@ async function start() {
 function completeStartup(silent: boolean) {
   if (started || !ready) return;
   started = true;
+  sessionStorage.removeItem("rhine:3d-recovery");
   if (silent) {
     prefs.sound = false;
     prefs.music = false;
@@ -1653,10 +1797,9 @@ function completeStartup(silent: boolean) {
       target.focus({ preventScroll: true });
     }
   }, fade);
+  startRefreshRateDetection();
+  $("#perf-hud").hidden = !prefs.showFps;
   requestAnimationFrame(frame);
-  // Do not compete with entry audio/font downloads. Full offline installation
-  // begins after startup is complete and remains atomic.
-  setTimeout(() => void initPwa(notify), 1500);
 }
 updateSelection();
 const customBackground = isWallpaper
@@ -1801,6 +1944,7 @@ if (isWallpaper) {
 }
 void start();
 enableGamepad();
+setTimeout(() => void initOffline(notify), 2600);
 const ARCHIVE_HINT: Record<"keyboard" | "gamepad", string> = {
   keyboard: `<kbd>←</kbd> <kbd>→</kbd> 切换列 <span>／</span> <kbd>↑</kbd> <kbd>↓</kbd> 前后档案 <span>／</span> <kbd>ENTER</kbd> 读取`,
   gamepad: `<kbd>LS</kbd> <kbd>DP</kbd> 切换列 / 前后档案 <span>／</span> <kbd>A</kbd> 读取`,

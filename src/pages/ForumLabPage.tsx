@@ -3,24 +3,24 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, Lock } from 'lucide-react'
 import { forumApi, accessLogApi, type Board } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
-import { useTheme, type ThemeId } from '../components/theme/ThemeProvider'
+import { useTheme } from '../components/theme/ThemeProvider'
 import { ThemeMenu } from '../components/theme/ThemeMenu'
 
 /** 论坛专属 Lab：列 = 有权限访问的论坛，前后 = 帖子。 */
 export function ForumLabPage({ embedded = false, active = true }: { embedded?: boolean; active?: boolean }) {
-  const { theme, setTheme } = useTheme()
+  const { theme } = useTheme()
   const { user, loading } = useSession()
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const [boards, setBoards] = useState<Board[] | null>(null)
   const [iframeSrc, setIframeSrc] = useState('')
+  const [lab3dTheme, setLab3dTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      return localStorage.getItem('rhine:lab3d-theme') === 'dark' ? 'dark' : 'light'
+    } catch {
+      return 'light'
+    }
+  })
   const dark = theme === 'rhine-dark' || theme === 'noctis'
-  const labTheme: Record<ThemeId, string> = {
-    rhine: 'light',
-    'rhine-dark': 'dark',
-    archive: 'archive',
-    sakura: 'sakura',
-    noctis: 'noctis',
-  }
 
   useEffect(() => {
     let live = true
@@ -45,7 +45,7 @@ export function ForumLabPage({ embedded = false, active = true }: { embedded?: b
   useEffect(() => {
     if (loading || !boards || iframeSrc) return
     setIframeSrc(
-      `/rhine-lab/index.html?mode=forum&theme=${labTheme[theme]}&user=${encodeURIComponent(user?.nickname || user?.username || 'Unknown Visitor')}`,
+      `/rhine-lab/index.html?mode=forum&theme=${lab3dTheme}&user=${encodeURIComponent(user?.nickname || user?.username || 'Unknown Visitor')}`,
     )
     // The src is intentionally frozen after the first resolution. Session and
     // theme refreshes must not reload the 3D scene and replay its boot.
@@ -53,22 +53,37 @@ export function ForumLabPage({ embedded = false, active = true }: { embedded?: b
   }, [boards, loading, iframeSrc])
 
   useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
-      if (event.data?.type !== 'rhine:theme-change') return
-      const map: Record<string, ThemeId> = {
-        light: 'rhine',
-        dark: 'rhine-dark',
-        archive: 'archive',
-        sakura: 'sakura',
-        noctis: 'noctis',
-      }
-      const next = map[String(event.data.theme)]
-      if (next) setTheme(next)
+    const handler = (event: Event) => {
+      const next = (event as CustomEvent<'light' | 'dark'>).detail
+      if (next !== 'light' && next !== 'dark') return
+      setLab3dTheme(next)
     }
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
-  }, [setTheme])
+    window.addEventListener('rhine:lab3d-theme', handler)
+    return () => window.removeEventListener('rhine:lab3d-theme', handler)
+  }, [])
+
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'rhine:set-lab-theme', theme: lab3dTheme },
+      window.location.origin,
+    )
+  }, [lab3dTheme, iframeSrc])
+
+  useEffect(() => {
+    if (!active) return undefined
+    window.dispatchEvent(new Event('rhine:lab-boot-start'))
+    const timer = window.setInterval(() => {
+      const doc = iframeRef.current?.contentDocument
+      const button = doc?.querySelector<HTMLElement>('[data-action="column-next"]')
+      if (button && button.getBoundingClientRect().width > 0) {
+        window.dispatchEvent(new Event('rhine:lab-ready'))
+        window.clearInterval(timer)
+      }
+    }, 700)
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [active])
 
   useEffect(() => {
     if (!active) return undefined
@@ -107,6 +122,12 @@ export function ForumLabPage({ embedded = false, active = true }: { embedded?: b
         title="RHINE LAB // FORUM ARCHIVE"
         ref={iframeRef}
         src={iframeSrc}
+        onLoad={() => {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'rhine:set-lab-theme', theme: lab3dTheme },
+            window.location.origin,
+          )
+        }}
         className="absolute inset-0 h-full w-full border-0"
       />
       <div

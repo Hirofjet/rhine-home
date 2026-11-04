@@ -11,6 +11,7 @@ export interface ArchiveRecord {
   clearance: string;
   abstract: string;
   findings: string[];
+  replies?: { author: string; content: string; createdAt?: string }[];
   source: string;
 }
 

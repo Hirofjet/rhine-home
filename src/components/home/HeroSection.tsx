@@ -11,10 +11,10 @@ import { CornerFrame, GlowButton, StatusDot, Tag, TypingText } from '../ui'
 import type { DotColor } from '../ui/StatusDot'
 
 const EMPTY_PROFILE: OperatorProfile = {
-  codeName: 'OPERATOR',
-  realName: '资料同步中',
-  roles: ['CONNECTING'],
-  intro: '正在同步个人档案，请稍候…',
+  codeName: 'HIROFJET',
+  realName: 'HIROFJET',
+  roles: ['OPERATOR'],
+  intro: '个人主页正在等待后台资料同步。',
   dossier: [],
   occupation: '—',
   affiliation: '—',

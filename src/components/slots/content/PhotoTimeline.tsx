@@ -140,7 +140,11 @@ export function PhotoTimeline({ className }: { className?: string }) {
   }
 
   if (photos.length === 0) {
-    return null
+    return (
+      <p className="border border-dashed border-rhine-line/70 px-4 py-10 text-center font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+        暂无已发布照片
+      </p>
+    )
   }
 
   // 按年份分组（未识别时间的放最后）

@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/* Shared responsive sidebar labels: mobile drawer and wide desktop show text,
+   the 76px rail uses icons only. */
+.site-nav-label { display: inline; }
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .site-nav-label { display: none; }
+}
+@keyframes rhine-bell-swing {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(18deg); }
+  30% { transform: rotate(-15deg); }
+  45% { transform: rotate(11deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(5deg); }
+}
+.bell-swing {
+  color: var(--color-rhine-gold);
+  transform-origin: 50% 8%;
+  animation: rhine-bell-swing 0.9s ease-in-out 2;
+  filter: drop-shadow(0 0 6px rgb(211 178 122 / 0.7));
+}
+
 /* ============================================================
    RHINE//HOME 设计系统
    莱茵生命风格设计令牌：在这里修改颜色 / 字体即可全局换肤

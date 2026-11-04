@@ -26,6 +26,8 @@ import {
   type OverviewTimelinePoint,
 } from '../../../lib/api'
 import { AdminBadge, AdminError } from '../AdminUi'
+import { AdminChart } from '../AdminChart'
+import type { EChartsOption } from 'echarts'
 
 interface OverviewPanelProps {
   user: ApiUser
@@ -145,6 +147,135 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
   const roleEntries = Object.entries(data?.usersByRole ?? {})
   const roleTotal = roleEntries.reduce((sum, [, value]) => sum + value, 0)
 
+  const activityOption = useMemo<EChartsOption>(() => {
+    const metricLabel = METRICS.find((item) => item.key === metric)?.label ?? ''
+    return {
+      tooltip: { trigger: 'axis' },
+      grid: { left: 34, right: 12, top: 20, bottom: 26 },
+      xAxis: {
+        type: 'category',
+        data: timeline.map((point) => point.date),
+        axisLine: { lineStyle: { color: 'rgba(140,135,124,.35)' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#8d887c', fontSize: 9 },
+      },
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        splitLine: { lineStyle: { color: 'rgba(140,135,124,.16)' } },
+        axisLabel: { color: '#8d887c', fontSize: 9 },
+      },
+      series: [
+        {
+          name: metricLabel,
+          type: 'line',
+          smooth: true,
+          symbolSize: 5,
+          data: timeline.map((point) => point[metric]),
+          lineStyle: { width: 2 },
+          areaStyle: { opacity: 0.14 },
+        },
+      ],
+    }
+  }, [metric, timeline])
+
+  const archiveOption = useMemo<EChartsOption>(() => {
+    const items = CONTENT_ITEMS.map((item) => ({
+      name: item.label,
+      value: counts[item.key] ?? 0,
+    })).filter((item) => item.value > 0)
+    return {
+      title: {
+        text: String(contentTotal),
+        subtext: 'TOTAL',
+        left: 'center',
+        top: '38%',
+        textStyle: { color: '#d8d3c8', fontSize: 22, fontWeight: 500 },
+        subtextStyle: { color: '#77736a', fontSize: 8, letterSpacing: 2 },
+      },
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      series: [
+        {
+          type: 'pie',
+          radius: ['58%', '80%'],
+          center: ['50%', '50%'],
+          label: { show: false },
+          labelLine: { show: false },
+          data: items,
+        },
+      ],
+    }
+  }, [contentTotal, counts])
+
+  const statusOption = useMemo<EChartsOption>(() => ({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 36, right: 12, top: 16, bottom: 26 },
+    xAxis: {
+      type: 'category',
+      data: STATUS_ITEMS.map((item) => item.label),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: 'rgba(140,135,124,.35)' } },
+      axisLabel: { color: '#8d887c', fontSize: 8 },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: 'rgba(140,135,124,.16)' } },
+      axisLabel: { color: '#8d887c', fontSize: 9 },
+    },
+    series: [
+      {
+        type: 'bar',
+        barMaxWidth: 24,
+        data: STATUS_ITEMS.map((item) => postStatus[item.key] ?? 0),
+        itemStyle: { borderRadius: [2, 2, 0, 0] },
+      },
+    ],
+  }), [postStatus])
+
+  const boardsOption = useMemo<EChartsOption>(() => ({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 74, right: 20, top: 10, bottom: 20 },
+    xAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: 'rgba(140,135,124,.16)' } },
+      axisLabel: { color: '#8d887c', fontSize: 9 },
+    },
+    yAxis: {
+      type: 'category',
+      data: [...topBoards].reverse().map((board) => board.name),
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: { color: '#8d887c', fontSize: 10 },
+    },
+    series: [
+      {
+        type: 'bar',
+        barMaxWidth: 16,
+        data: [...topBoards].reverse().map((board) => board.count),
+        itemStyle: { borderRadius: [0, 2, 2, 0] },
+      },
+    ],
+  }), [topBoards])
+
+  const rolesOption = useMemo<EChartsOption>(() => ({
+    tooltip: { trigger: 'item' },
+    series: [
+      {
+        type: 'pie',
+        radius: ['45%', '72%'],
+        center: ['50%', '50%'],
+        label: { color: '#8d887c', fontSize: 9, formatter: '{b} {c}' },
+        labelLine: { lineStyle: { color: 'rgba(140,135,124,.4)' } },
+        data: roleEntries.map(([role, value]) => ({
+          name: ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role,
+          value,
+        })),
+      },
+    ],
+  }), [roleEntries])
+
   const kpis = [
     {
       key: 'users',
@@ -162,7 +293,7 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
       en: 'THREADS',
       value: counts.posts,
       icon: MessageSquare,
-      target: 'forum-posts',
+      target: 'forum-public',
       tone: 'text-rhine-cyan',
       line: 'from-rhine-cyan/70',
     },
@@ -182,39 +313,11 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
       en: 'PENDING',
       value: pending,
       icon: Clock3,
-      target: 'review',
+      target: 'review-posts',
       tone: 'text-rhine-red',
       line: 'from-rhine-red/70',
     },
   ]
-
-  const chart = useMemo(() => {
-    const values = timeline.map((point) => point[metric])
-    return { values, max: Math.max(...values, 1) }
-  }, [metric, timeline])
-
-  const donut = useMemo(() => {
-    const items = CONTENT_ITEMS.map((item) => ({
-      ...item,
-      value: counts[item.key] ?? 0,
-    })).filter((item) => item.value > 0)
-    const total = items.reduce((sum, item) => sum + item.value, 0)
-    const stops = items.map((item, index) => {
-      const before = items
-        .slice(0, index)
-        .reduce((sum, previous) => sum + previous.value, 0)
-      const start = (before / Math.max(total, 1)) * 100
-      const end = start + (item.value / Math.max(total, 1)) * 100
-      return `${item.color} ${start}% ${end}%`
-    })
-    return {
-      items,
-      total,
-      background: stops.length
-        ? `conic-gradient(${stops.join(', ')})`
-        : 'transparent',
-    }
-  }, [counts])
 
   return (
     <div className="space-y-4">
@@ -314,47 +417,11 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
           </div>
 
           <div className="px-5 pb-5">
-            <div className="relative h-44 border-b border-l border-rhine-line/50 px-2">
-              <div className="pointer-events-none absolute inset-0 flex flex-col justify-between py-1">
-                {[0, 1, 2, 3].map((line) => (
-                  <span key={line} className="h-px w-full bg-rhine-line/25" />
-                ))}
-              </div>
-              <div className="relative flex h-full items-end gap-2 pb-1 pt-4">
-                {timeline.map((point, index) => {
-                  const value = point[metric]
-                  const height = Math.max((value / chart.max) * 100, value > 0 ? 6 : 1.5)
-                  return (
-                    <div key={point.date} className="group flex h-full flex-1 flex-col justify-end">
-                      <span className="mb-1 text-center font-mono text-[8px] text-rhine-faint opacity-0 transition-opacity group-hover:opacity-100">
-                        {value}
-                      </span>
-                      <motion.div
-                        initial={{ height: 0, opacity: 0.4 }}
-                        animate={{ height: `${height}%`, opacity: 1 }}
-                        transition={{ duration: 0.6, delay: index * 0.05, ease: 'easeOut' }}
-                        className={`relative min-h-[2px] w-full ${
-                          METRICS.find((item) => item.key === metric)?.className ?? 'text-rhine-gold'
-                        }`}
-                      >
-                        <span className="absolute inset-0 bg-current opacity-30" />
-                        <span className="absolute inset-x-0 top-0 h-1/2 bg-current opacity-70" />
-                      </motion.div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-            <div className="mt-2 flex gap-2">
-              {timeline.map((point) => (
-                <span
-                  key={point.date}
-                  className="flex-1 text-center font-mono text-[8px] tracking-wider text-rhine-faint"
-                >
-                  {point.date}
-                </span>
-              ))}
-            </div>
+            <AdminChart
+              option={activityOption}
+              height={210}
+              empty={timeline.every((point) => point[metric] === 0)}
+            />
           </div>
         </PanelShell>
 
@@ -365,33 +432,22 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
             </p>
             <p className="mt-1 font-mono text-[10px] text-rhine-dim">档案内容分布</p>
           </div>
-          <div className="flex flex-col items-center gap-4 px-5 py-5 sm:flex-row">
-            <div className="relative h-32 w-32 shrink-0">
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{ background: donut.background }}
-              />
-              <div className="absolute inset-[13px] flex flex-col items-center justify-center rounded-full border border-rhine-line/60 bg-rhine-panel">
-                <span className="font-display text-xl text-rhine-ink">
-                  <CountUp value={donut.total} />
-                </span>
-                <span className="font-mono text-[8px] tracking-[0.2em] text-rhine-faint">TOTAL</span>
-              </div>
-            </div>
+          <div className="grid gap-3 px-5 py-4 sm:grid-cols-[170px_1fr] sm:items-center">
+            <AdminChart option={archiveOption} height={170} empty={contentTotal === 0} />
             <div className="w-full space-y-2">
-              {donut.items.length === 0 && (
-                <p className="font-mono text-[10px] text-rhine-faint">暂无档案内容</p>
-              )}
-              {donut.items.map((item) => (
-                <div key={item.key} className="flex items-center gap-2">
-                  <span className="h-2 w-2" style={{ backgroundColor: item.color }} />
-                  <span className="flex-1 font-mono text-[10px] text-rhine-dim">{item.label}</span>
-                  <span className="font-mono text-[10px] text-rhine-ink">{item.value}</span>
-                  <span className="w-9 text-right font-mono text-[9px] text-rhine-faint">
-                    {Math.round((item.value / Math.max(donut.total, 1)) * 100)}%
-                  </span>
-                </div>
-              ))}
+              {CONTENT_ITEMS.map((item) => {
+                const value = counts[item.key] ?? 0
+                return (
+                  <div key={item.key} className="flex items-center gap-2">
+                    <span className="h-2 w-2" style={{ backgroundColor: item.color }} />
+                    <span className="flex-1 font-mono text-[10px] text-rhine-dim">{item.label}</span>
+                    <span className="font-mono text-[10px] text-rhine-ink">{value}</span>
+                    <span className="w-9 text-right font-mono text-[9px] text-rhine-faint">
+                      {Math.round((value / Math.max(contentTotal, 1)) * 100)}%
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
           <div className="border-t border-rhine-line/50 px-5 py-3">
@@ -403,7 +459,7 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
             </div>
             <button
               type="button"
-              onClick={() => onNavigate?.('review')}
+              onClick={() => onNavigate?.('review-posts')}
               className="mt-2 flex w-full items-center justify-between border border-rhine-gold/25 bg-rhine-gold/[0.05] px-3 py-2 text-left font-mono text-[10px] text-rhine-gold transition-colors hover:bg-rhine-gold/10"
             >
               进入内容审核
@@ -424,21 +480,9 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
             </div>
             <span className="font-mono text-[9px] text-rhine-faint">{statusTotal} POSTS</span>
           </div>
-          <div className="space-y-3 px-5 py-4">
-            <div className="flex h-2.5 w-full overflow-hidden bg-rhine-abyss">
-              {STATUS_ITEMS.map((item) => {
-                const value = postStatus[item.key] ?? 0
-                return (
-                  <span
-                    key={item.key}
-                    className={item.className}
-                    style={{ width: `${(value / Math.max(statusTotal, 1)) * 100}%` }}
-                    title={`${item.label}: ${value}`}
-                  />
-                )
-              })}
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="px-5 py-4">
+            <AdminChart option={statusOption} height={190} empty={statusTotal === 0} />
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {STATUS_ITEMS.map((item) => (
                 <div key={item.key} className="flex items-center gap-2">
                   <span className={`h-1.5 w-1.5 ${item.className}`} />
@@ -459,57 +503,20 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
             </p>
             <p className="mt-1 font-mono text-[10px] text-rhine-dim">板块发帖量</p>
           </div>
-          <div className="space-y-2.5 px-5 py-4">
-            {topBoards.length === 0 && (
-              <p className="font-mono text-[10px] text-rhine-faint">暂无板块数据</p>
-            )}
-            {topBoards.map((board, index) => {
-              const max = Math.max(...topBoards.map((item) => item.count), 1)
-              return (
-                <div key={board.name} className="flex items-center gap-3">
-                  <span className="w-4 font-mono text-[9px] text-rhine-faint">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <span className="w-20 truncate font-mono text-[10px] text-rhine-dim">
-                    {board.name}
-                  </span>
-                  <div className="h-1.5 flex-1 bg-rhine-abyss">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(board.count / max) * 100}%` }}
-                      transition={{ duration: 0.7, delay: index * 0.06 }}
-                      className="h-full bg-rhine-cyan/70"
-                    />
-                  </div>
-                  <span className="w-6 text-right font-mono text-[9px] text-rhine-cyan">
-                    {board.count}
-                  </span>
-                </div>
-              )
-            })}
+          <div className="px-5 py-4">
+            <AdminChart
+              option={boardsOption}
+              height={Math.max(170, topBoards.length * 32)}
+              empty={topBoards.length === 0}
+            />
           </div>
           {roleTotal > 0 && (
             <div className="border-t border-rhine-line/50 px-5 py-3">
-              <div className="mb-2 flex items-center justify-between font-mono text-[9px] tracking-wider text-rhine-faint">
+              <div className="mb-1 flex items-center justify-between font-mono text-[9px] tracking-wider text-rhine-faint">
                 <span>成员角色</span>
                 <span>{roleTotal}</span>
               </div>
-              <div className="flex h-1.5 w-full overflow-hidden bg-rhine-abyss">
-                {roleEntries.map(([role, count], index) => (
-                  <span
-                    key={role}
-                    className={
-                      index % 3 === 0
-                        ? 'bg-rhine-gold'
-                        : index % 3 === 1
-                          ? 'bg-rhine-cyan'
-                          : 'bg-rhine-green'
-                    }
-                    style={{ width: `${(count / Math.max(roleTotal, 1)) * 100}%` }}
-                    title={`${ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role}: ${count}`}
-                  />
-                ))}
-              </div>
+              <AdminChart option={rolesOption} height={150} />
             </div>
           )}
         </PanelShell>

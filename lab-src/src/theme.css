@@ -2,6 +2,10 @@
 .theme-settings strong { display: block; font-size: 14px; }
 .theme-settings span { display: block; margin-top: 6px; font-size: 12px; color: #77756d; }
 .lab-theme-select { min-width: 190px; min-height: 42px; border: 1px solid #a6a49c; background: var(--theme-panel); color: var(--theme-ink); padding: 0 12px; font: inherit; }
+.theme-settings-split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.theme-settings-split label { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.theme-settings-split .lab-theme-select { width: 100%; min-width: 0; }
+@media (max-width: 700px) { .theme-settings-split { grid-template-columns: 1fr; gap: 12px; } }
 .theme-choices { display: flex; gap: 6px; }
 .theme-choices button { min-width: 76px; min-height: 42px; border: 1px solid #a6a49c; font-size: 13px; }
 .theme-choices button[aria-pressed="true"] { background: #171713; color: #ece9e4; }

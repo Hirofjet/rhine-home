@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useSession } from '../components/auth/useSession'
 import { AdminDashboard } from '../components/admin/AdminDashboard'
 import { NotFoundPage } from './NotFoundPage'
@@ -8,9 +8,8 @@ import { ROLE_LABELS } from '../lib/api'
  * 管理后台页面（独立于前台布局，不出现在导航中）。
  * 入口路径由 VITE_ADMIN_PATH 控制，默认 /admin。
  */
-export function AdminPage({ embedded = false }: { embedded?: boolean }) {
+export function AdminPage() {
   const { user, loading, staff, logout } = useSession()
-  const navigate = useNavigate()
 
   if (loading) {
     return (
@@ -57,13 +56,5 @@ export function AdminPage({ embedded = false }: { embedded?: boolean }) {
     )
   }
 
-  return (
-    <AdminDashboard
-      embedded={embedded}
-      user={user}
-      onLogout={() => {
-        void logout().then(() => navigate('/'))
-      }}
-    />
-  )
+  return <AdminDashboard user={user} />
 }

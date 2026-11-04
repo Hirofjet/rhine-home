@@ -17,6 +17,11 @@ export class DocumentDecryption {
     this.refresh();
   }
 
+  finish() {
+    this.progress = 1;
+    this.remove();
+  }
+
   refresh() {
     this.remove();
     if (!this.root || this.progress === 1) return;

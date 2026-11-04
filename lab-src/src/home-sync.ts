@@ -9,15 +9,16 @@ type HomeRecord = {
   clearance: string;
   abstract: string;
   findings: string[];
+  replies?: { author: string; content: string; createdAt?: string }[];
   source: string;
 };
 
 const modules = [
+  { key: "logs", label: "日志", en: "LOGS" },
   { key: "articles", label: "文章", en: "ARTICLES" },
   { key: "photos", label: "照片", en: "PHOTOS" },
   { key: "videos", label: "视频", en: "VIDEOS" },
   { key: "projects", label: "项目库", en: "PROJECTS" },
-  { key: "logs", label: "日志", en: "LOGS" },
 ];
 
 const api = (path: string) => `${location.origin}${path}?t=${Date.now()}`;
@@ -125,8 +126,9 @@ export async function syncHomeArchives() {
     modules.map(async (module) => ({ module, items: await readModule(module.key) })),
   );
   const homeRecords = await homeArchiveRecords();
+  void homeRecords;
 
-  const next: HomeRecord[] = [...homeRecords];
+  const next: HomeRecord[] = [];
   for (const { module, items } of moduleItems) {
     const existing = records.filter((record) => record.category === module.label);
     const list = items.length
@@ -136,7 +138,7 @@ export async function syncHomeArchives() {
   }
 
   records.splice(0, records.length, ...next);
-  const labels = ["主页", ...modules.map((module) => module.label)];
+  const labels = modules.map((module) => module.label);
   archiveColumns.splice(0, archiveColumns.length, ...labels);
   categories.splice(1, categories.length - 1, ...labels);
   return true;
@@ -192,7 +194,23 @@ async function readForum() {
         const res = await fetch(`${location.origin}/api/forum/boards/${encodeURIComponent(board.slug)}?page=1&t=${Date.now()}`, { headers });
         if (!res.ok) return;
         const body = await res.json();
-        posts.set(board.slug, Array.isArray(body.posts) ? body.posts : []);
+        const visible = (Array.isArray(body.posts) ? body.posts : []).slice(0, 8);
+        await Promise.all(visible.map(async (post: any) => {
+          if (!post?.id) return;
+          if (Number(post.replyCount ?? 0) === 0) {
+            post.replies = [];
+            return;
+          }
+          try {
+            const detail = await fetch(`${location.origin}/api/forum/posts/${post.id}?t=${Date.now()}`, { headers });
+            if (!detail.ok) return;
+            const payload = await detail.json();
+            post.replies = Array.isArray(payload.replies) ? payload.replies : [];
+          } catch {
+            post.replies = [];
+          }
+        }));
+        posts.set(board.slug, visible);
       } catch {
         /* ignore */
       }
@@ -210,7 +228,7 @@ export async function syncForumArchives() {
   const next: HomeRecord[] = [];
   for (const [boardIndex, board] of boards.slice(0, 8).entries()) {
     const list = (posts.get(board.slug) ?? []).slice(0, 8);
-    const mapped = list.length
+    const mapped: HomeRecord[] = list.length
       ? list.map((post: any, index: number) => ({
           id: `${String(boardIndex + 1).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
           title: post.title ?? "无标题帖子",
@@ -225,7 +243,15 @@ export async function syncForumArchives() {
             `论坛：${board.name}`,
             `作者：${post.author ?? "—"}`,
             `帖子编号：${post.id ?? "—"}`,
+            `回复：${Array.isArray(post.replies) ? post.replies.length : 0} 条`,
           ],
+          replies: (Array.isArray(post.replies) ? post.replies : [])
+            .slice(0, 24)
+            .map((reply: any) => ({
+              author: reply.author ?? "—",
+              content: String(reply.content ?? "").replace(/[#>*_`[\]]/g, ""),
+              createdAt: reply.createdAt ?? "",
+            })),
           source: "",
         }))
       : [{

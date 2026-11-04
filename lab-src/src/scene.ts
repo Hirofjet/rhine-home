@@ -217,6 +217,7 @@ export class ArchiveScene {
   private selectedSlot = 76;
   private detail = 0;
   private targetDetail = 0;
+  private adaptiveScale = 1;
   private reveal = 0;
   private targetReveal = 0;
   private last = 0;
@@ -332,6 +333,7 @@ export class ArchiveScene {
       aperture: 0.0018,
       maxblur: 0.011,
     }, () => this.ao);
+    this.bokeh.enabled = false;
     this.composer.addPass(this.bokeh);
     this.smaa.enabled = false;
     this.composer.addPass(this.smaa);
@@ -593,6 +595,9 @@ export class ArchiveScene {
     this.lastInteraction = this.clock;
     this.targetReveal = mode === "hidden" ? 0 : 1;
     this.targetDetail = mode === "detail" ? 1 : 0;
+    // Depth of field only matters in the close document view. Skipping it in
+    // archive browsing is the largest single GPU saving for the 60fps target.
+    this.bokeh.enabled = mode === "detail";
     this.dragging = false;
     if (mode !== "detail") {
       this.targetRotation = 0;
@@ -821,6 +826,12 @@ export class ArchiveScene {
     this.themeUpdates = new InstanceUpdates(this.themeAttribute);
     this.instanceCapacity = capacity;
   }
+  setAdaptiveScale(scale: number) {
+    const next = Math.max(0.65, Math.min(1, scale));
+    if (Math.abs(next - this.adaptiveScale) < 0.01) return;
+    this.adaptiveScale = next;
+    this.resize();
+  }
   resize() {
     this.renderState.invalidate();
     const w = this.container.clientWidth,
@@ -843,6 +854,16 @@ export class ArchiveScene {
       this.quality,
       this.superPerformance,
     );
+    if (this.adaptiveScale < 0.999) {
+      const ratio = dimensions.ratio * this.adaptiveScale;
+      this.renderer.setPixelRatio(ratio);
+      this.renderer.setSize(w, h);
+      this.composer.setPixelRatio(ratio);
+      this.composer.setSize(w, h);
+      dimensions.ratio = ratio;
+      dimensions.width = Math.max(1, Math.floor(w * ratio));
+      dimensions.height = Math.max(1, Math.floor(h * ratio));
+    }
     this.ao.setSize(
       Math.max(1, Math.floor(dimensions.width * this.quality.aoResolution)),
       Math.max(1, Math.floor(dimensions.height * this.quality.aoResolution)),

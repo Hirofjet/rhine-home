@@ -147,17 +147,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const ink = dark ? '#f2eee5' : '#171512'
       const dim = dark ? '#b8b2a6' : '#5b554c'
       const faint = dark ? '#8a8378' : '#8a8175'
+      const mix = (a: string, b: string, amount: number) => {
+        const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16))
+        const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16))
+        return `#${pa
+          .map((value, index) =>
+            Math.round(value + (pb[index] - value) * amount)
+              .toString(16)
+              .padStart(2, '0'),
+          )
+          .join('')}`
+      }
+      const lift = dark ? '#ffffff' : '#000000'
       root.style.setProperty('--color-rhine-abyss', primary)
-      root.style.setProperty('--color-rhine-abyss-2', primary)
-      root.style.setProperty('--color-rhine-panel', primary)
-      root.style.setProperty('--color-rhine-panel-2', primary)
-      root.style.setProperty('--color-rhine-line', secondary)
-      root.style.setProperty('--color-rhine-line-2', secondary)
+      root.style.setProperty('--color-rhine-abyss-2', mix(primary, lift, 0.04))
+      root.style.setProperty('--color-rhine-panel', mix(primary, lift, 0.07))
+      root.style.setProperty('--color-rhine-panel-2', mix(primary, lift, 0.11))
+      root.style.setProperty('--color-rhine-line', mix(primary, secondary, 0.35))
+      root.style.setProperty('--color-rhine-line-2', mix(primary, secondary, 0.6))
       root.style.setProperty('--color-rhine-ink', ink)
       root.style.setProperty('--color-rhine-dim', dim)
       root.style.setProperty('--color-rhine-faint', faint)
       root.style.setProperty('--color-rhine-gold', secondary)
-      root.style.setProperty('--color-rhine-gold-deep', secondary)
+      root.style.setProperty('--color-rhine-gold-deep', mix(secondary, '#000000', 0.2))
       root.style.setProperty('--color-rhine-cyan', tertiary)
       root.style.setProperty('--theme-selection', `${secondary}33`)
     } else {

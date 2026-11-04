@@ -712,15 +712,26 @@ export interface CustomTheme {
   id: number
   name: string
   primary_color: string
+  primary_name: string | null
   secondary_color: string
+  secondary_name: string | null
   tertiary_color: string
+  tertiary_name: string | null
 }
 
 export const themeApi = {
   list() {
     return api<{ themes: CustomTheme[] }>('/api/themes', { auth: false })
   },
-  create(input: { name: string; primaryColor: string; secondaryColor: string; tertiaryColor: string }) {
+  create(input: {
+    name: string
+    primaryColor: string
+    primaryName?: string
+    secondaryColor: string
+    secondaryName?: string
+    tertiaryColor: string
+    tertiaryName?: string
+  }) {
     return api<{ id: number }>('/api/admin/themes', { method: 'POST', body: input })
   },
   remove(id: number) {

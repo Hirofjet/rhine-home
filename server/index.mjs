@@ -3071,7 +3071,7 @@ app.use(
 // ---------- 自定义主题 ----------
 app.get('/api/themes', async (_req, res) => {
   const rows = await query(
-    'SELECT id, name, primary_color, secondary_color, tertiary_color, created_at FROM site_themes ORDER BY id ASC',
+    'SELECT id, name, primary_color, primary_name, secondary_color, secondary_name, tertiary_color, tertiary_name, created_at FROM site_themes ORDER BY id ASC',
   )
   res.json({ themes: rows })
 })
@@ -3096,8 +3096,19 @@ app.post('/api/admin/themes', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'invalid_theme' })
   }
   const result = await execute(
-    'INSERT INTO site_themes (name, primary_color, secondary_color, tertiary_color, created_by) VALUES (?, ?, ?, ?, ?)',
-    [name, primary, secondary, tertiary, req.user.id],
+    `INSERT INTO site_themes
+      (name, primary_color, primary_name, secondary_color, secondary_name, tertiary_color, tertiary_name, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      name,
+      primary,
+      asString(req.body?.primaryName, 40),
+      secondary,
+      asString(req.body?.secondaryName, 40),
+      tertiary,
+      asString(req.body?.tertiaryName, 40),
+      req.user.id,
+    ],
   )
   res.status(201).json({ id: Number(result.insertId) })
 })

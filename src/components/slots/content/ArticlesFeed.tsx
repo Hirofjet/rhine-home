@@ -51,7 +51,15 @@ export function ArticlesFeed({ fallback }: ArticlesFeedProps) {
   }
 
   if (state === 'offline' || articles.length === 0) {
-    return <>{fallback}</>
+    return (
+      <>
+        {fallback ?? (
+          <p className="border border-dashed border-rhine-line/70 px-4 py-10 text-center font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+            暂无已发布文章
+          </p>
+        )}
+      </>
+    )
   }
 
   return (

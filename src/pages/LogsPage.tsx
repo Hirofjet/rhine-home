@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { SlotGrid } from '../components/slots/SlotGrid'
 import { ArticleBlock } from '../components/slots/content/ArticleBlock'
-import { GlowButton, SectionTitle } from '../components/ui'
 import { logSlots } from '../content/logs'
 import type { SlotModule } from '../content/slots'
 import { contentApi, type ContentLog } from '../lib/api'
@@ -71,33 +69,18 @@ export function LogsPage() {
   const loading = serverLogs === null
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 pb-24 pt-28 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <SectionTitle index="LOG" en="JOURNAL" zh="日志" className="flex-1" />
-        <span className="font-mono text-[10px] tracking-[0.25em] text-rhine-faint">
-          TOTAL: {loading ? '--' : String(slots.length).padStart(2, '0')}
-        </span>
-      </div>
-
-      <div className="mt-8">
-        {loading ? (
-          <p className="animate-pulse-soft font-mono text-xs tracking-[0.3em] text-rhine-faint">
-            LOADING LOGS …
-          </p>
-        ) : slots.length === 0 ? (
-          <p className="border border-dashed border-rhine-line/70 px-4 py-8 text-center font-mono text-[10px] tracking-wider text-rhine-faint">
-            暂无已发布日志
-          </p>
-        ) : (
-          <SlotGrid slots={slots} />
-        )}
-      </div>
-
-      <div className="mt-10 flex justify-center">
-        <GlowButton to="/" variant="ghost">
-          <ArrowLeft className="h-3.5 w-3.5" /> 返回首页 RETURN
-        </GlowButton>
-      </div>
+    <main className="w-full pb-16">
+      {loading ? (
+        <p className="animate-pulse-soft font-mono text-xs tracking-[0.3em] text-rhine-faint">
+          LOADING LOGS …
+        </p>
+      ) : slots.length === 0 ? (
+        <p className="border border-dashed border-rhine-line/70 px-4 py-8 text-center font-mono text-[10px] tracking-wider text-rhine-faint">
+          暂无已发布日志
+        </p>
+      ) : (
+        <SlotGrid slots={slots} />
+      )}
     </main>
   )
 }

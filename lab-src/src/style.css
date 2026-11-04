@@ -1,4 +1,31 @@
 @import "./fonts.css";
+.perf-hud {
+  position: absolute;
+  top: 62px;
+  right: 28px;
+  z-index: 80;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid rgba(80, 75, 65, 0.22);
+  background: rgba(234, 229, 225, 0.68);
+  backdrop-filter: blur(10px);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #5e5a50;
+  pointer-events: none;
+}
+.perf-hud b { font-size: 14px; color: #1d201a; font-weight: 600; }
+.perf-hud i { opacity: 0.35; font-style: normal; }
+.perf-hud[hidden] { display: none; }
+[data-dark-surface="true"] .perf-hud {
+  background: rgba(17, 24, 27, 0.72);
+  border-color: rgba(166, 176, 177, 0.2);
+  color: var(--theme-muted);
+}
+[data-dark-surface="true"] .perf-hud b { color: var(--theme-ink); }
 * {
   box-sizing: border-box;
 }
@@ -417,10 +444,31 @@ button {
   font-size: 28px;
   font-weight: 750;
   display: flex;
-  gap: 10px;
-  align-items: center;
+  gap: 12px;
+  align-items: baseline;
   position: relative;
   letter-spacing: 0.2px;
+}
+.file-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #807b70;
+}
+.callout-module {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0 0 14px 58px;
+}
+.callout-module .module-name {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.callout-module .module-count {
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  color: #777268;
 }
 .file-open {
   font-size: 25px;
@@ -438,7 +486,7 @@ button {
   height: 1px;
   background: #504b41;
   margin-left: 57px;
-  margin-top: 55px;
+  margin-top: 28px;
   position: relative;
   transform-origin: right;
   transform: scaleX(0);
@@ -455,7 +503,7 @@ button {
 }
 .file-summary {
   margin-left: 58px;
-  margin-top: 22px;
+  margin-top: 16px;
   width: 652px;
   display: flex;
   align-items: center;
@@ -472,14 +520,39 @@ button {
   letter-spacing: 1px;
   color: #666257;
 }
+.file-excerpt {
+  width: 652px;
+  margin: 12px 0 0 58px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #6b675e;
+  text-align: justify;
+}
+.callout-meta {
+  display: flex;
+  gap: 28px;
+  margin: 13px 0 0 58px;
+  font-size: 9px;
+  letter-spacing: 1.3px;
+  color: #8a857a;
+}
+.callout-meta b {
+  color: #3d3b34;
+  font-weight: 600;
+  margin-left: 6px;
+}
 .read-file {
   display: flex;
   align-items: center;
-  gap: 70px;
+  gap: 36px;
   margin-left: 58px;
-  margin-top: 58px;
-  font-size: 14px;
-  letter-spacing: 1px;
+  margin-top: 22px;
+  font-size: 12px;
+  letter-spacing: 1.4px;
   opacity: 0;
   transition: opacity 0.7s 0.4s;
 }
@@ -753,33 +826,60 @@ button {
   color: #77756b;
 }
 .detail-content h2 {
-  font-size: 40px;
-  line-height: 1.12;
-  letter-spacing: -1.3px;
-  margin: 30px 0 13px;
+  font-size: 34px;
+  line-height: 1.16;
+  letter-spacing: -0.9px;
+  margin: 14px 0 9px;
   max-width: 620px;
 }
+.detail-module-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-top: 16px;
+}
+.detail-module {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.detail-count {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: #817b6f;
+}
+.detail-lede {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #5c584e;
+  text-align: justify;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .detail-title-cn {
-  font-size: 23px;
+  font-size: 14px;
   display: flex;
   align-items: center;
-  gap: 23px;
+  gap: 14px;
 }
 .detail-title-cn > span {
-  font-size: 11px;
+  font-size: 10px;
   color: #77756a;
   letter-spacing: 1px;
 }
 .detail-rule {
   height: 2px;
   background: #20221d;
-  margin-top: 28px;
+  margin-top: 18px;
 }
 .metadata {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 25px 42px;
-  margin: 28px 0 34px;
+  gap: 14px 30px;
+  margin: 18px 0 20px;
 }
 .metadata dt {
   font-size: 9px;
@@ -832,8 +932,8 @@ button {
   transition: none;
 }
 .tab-panel {
-  height: 189px;
-  padding-top: 22px;
+  height: 160px;
+  padding-top: 16px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -843,6 +943,33 @@ button {
   font-size: 9px;
   letter-spacing: 1px;
   color: #888074;
+}
+.detail-abstract {
+  margin: 8px 0 10px !important;
+  font-size: 12px !important;
+  line-height: 1.7 !important;
+  color: #5a584e;
+}
+.focus-points {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.focus-points li {
+  display: flex;
+  gap: 9px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #676257;
+}
+.focus-points li span {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: #9b9485;
+  padding-top: 2px;
 }
 .tab-panel p {
   font-size: 15px;
@@ -868,6 +995,47 @@ button {
   font-size: 10px;
   color: #a38e72;
   line-height: 22px;
+}
+.reply-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.reply-list li {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(170, 165, 154, 0.35);
+}
+.reply-list .reply-index {
+  flex: 0 0 auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  color: #9b9485;
+  padding-top: 2px;
+}
+.reply-list li > div {
+  min-width: 0;
+}
+.reply-list b {
+  font-size: 11px;
+  color: #35362f;
+  font-weight: 600;
+}
+.reply-list small {
+  margin-left: 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  color: #8a857a;
+}
+.reply-list p {
+  margin: 3px 0 0 !important;
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+  color: #5a584e;
+  text-align: left !important;
 }
 .log-row {
   display: flex;
@@ -2228,4 +2396,117 @@ button {
 [data-mode="archive"] .boot,
 [data-mode="detail"] .boot {
   visibility: hidden;
+}
+/* Settings is a navigation-aligned utility panel, not a centered dialog. */
+.settings-backdrop {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 94px 28px 22px;
+  background: rgba(227, 224, 215, 0.1);
+  backdrop-filter: none;
+}
+.settings-backdrop .settings-modal {
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  height: auto;
+  max-height: 100%;
+  margin: 0;
+  padding: 0 24px 26px;
+  overflow-y: auto;
+  background: var(--theme-panel, #edebe4);
+  border: 1px solid var(--theme-line, #aaa59a);
+  box-shadow: 0 18px 55px rgba(40, 34, 24, 0.16);
+}
+.settings-backdrop .settings-modal > .modal-top {
+  padding: 16px 0 12px;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  background: var(--theme-panel, #edebe4);
+}
+.settings-backdrop .settings-modal > .modal-top button {
+  font-size: 8px;
+  gap: 12px;
+}
+.settings-backdrop .settings-modal h2 {
+  font-size: 21px;
+  letter-spacing: 0.03em;
+  margin: 16px 0 9px;
+}
+.settings-backdrop .settings-modal h2 small {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.settings-backdrop .settings-intro {
+  margin: 0 0 16px;
+  font-size: 8px;
+}
+.settings-backdrop .settings-list label {
+  padding: 13px 0;
+}
+.settings-backdrop .settings-list strong {
+  font-size: 10px;
+}
+.settings-backdrop .settings-list label span {
+  font-size: 9px;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.settings-backdrop .theme-settings {
+  padding: 12px 0;
+  gap: 14px;
+}
+.settings-backdrop .theme-settings strong {
+  font-size: 10px;
+}
+.settings-backdrop .theme-settings span {
+  font-size: 9px;
+  margin-top: 4px;
+}
+.settings-backdrop .lab-theme-select {
+  min-width: 0;
+  min-height: 34px;
+  font-size: 10px;
+}
+.settings-backdrop .theme-settings-split {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.settings-backdrop .settings-shortcuts p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 0;
+  line-height: 1.9;
+}
+.settings-backdrop .settings-shortcuts kbd {
+  display: inline-flex;
+  align-items: center;
+  margin: 4px 6px 0 0;
+}
+.settings-backdrop .settings-shortcuts kbd:first-child {
+  margin-left: 0;
+}
+.settings-backdrop .settings-shortcuts .shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+.settings-backdrop .settings-shortcuts .shortcut-grid span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.settings-backdrop .settings-shortcuts .shortcut-grid kbd {
+  margin: 0;
+  flex: 0 0 auto;
+}
+@media (max-width: 700px) {
+  .settings-backdrop {
+    padding: 64px 12px 12px;
+  }
+  .settings-backdrop .settings-modal {
+    width: 100%;
+  }
 }

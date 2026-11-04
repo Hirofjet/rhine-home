@@ -1,108 +1,171 @@
 import { assetUrl } from "./asset-url";
-import { isWallpaper } from "./wallpaper";
 
-interface InstallPrompt extends Event {
-  prompt(): Promise<void>;
+const CACHE = "rhine-lab-3d-v2";
+const AUTOSAVED = "rhine:lab-offline-autosaved";
+let installPrompt: BeforeInstallPromptEvent | null = null;
+let busy = false;
+let lastStatus = "首次加载后会自动缓存 3D 资源。";
+let notifier: ((message: string) => void) | null = null;
+
+function announce(message: string) {
+  lastStatus = message;
+  notifier?.(message);
+  refreshOfflinePanel();
+}
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-let installPrompt: InstallPrompt | undefined;
-let registration: ServiceWorkerRegistration | undefined;
-let ready = false, failed = false, reloading = false, started = false;
-let tell: (message: string) => void = () => {};
-const installed = () => matchMedia("(display-mode: standalone)").matches ||
-  Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-const ios = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+};
 
-window.addEventListener("beforeinstallprompt", event => {
-  event.preventDefault();
-  installPrompt = event as InstallPrompt;
-  refresh();
-});
-window.addEventListener("appinstalled", () => { installPrompt = undefined; refresh(); });
-matchMedia("(display-mode: standalone)").addEventListener("change", refresh);
-
-export function pwaSettingsMarkup() {
-  if (isWallpaper) return "";
-  const status = !import.meta.env.PROD ? "开发预览不保存离线副本。"
-    : !window.isSecureContext ? "使用 HTTPS 地址后可保存离线副本。"
-    : !("serviceWorker" in navigator) ? "当前浏览器支持在线使用。"
-    : failed ? "离线副本未能保存，可联网后重试。"
-    : ready ? "离线资源已就绪，可离线浏览档案与模型。"
-    : "正在准备离线资源，首次需要保持联网。";
-  const guidance = installed() ? "已从主屏幕打开。"
-    : ios() ? "在 Safari 中轻点“分享”→“添加到主屏幕”，然后从主屏幕图标打开。"
-    : installPrompt ? "安装后可在独立窗口中打开档案。"
-    : "可通过浏览器菜单安装或添加到主屏幕。";
-  return `<section id="pwa-settings" class="pwa-settings" aria-label="主屏幕与离线使用"><h3>APP / 主屏幕与离线</h3><p>${guidance}</p><p class="pwa-status" role="status">${status}</p><div class="pwa-actions">${installPrompt && !installed() ? '<button data-pwa-action="install">安装到设备 ↗</button>' : ""}${registration?.waiting ? '<span>新版本已准备好</span><button data-pwa-action="update">更新并重启 ↻</button>' : ""}${failed ? '<button data-pwa-action="retry">重试保存离线资源 ↻</button>' : ""}</div></section>`;
-}
-function refresh() {
-  const current = document.querySelector("#pwa-settings");
-  if (current) current.outerHTML = pwaSettingsMarkup();
-  document.documentElement.dataset.offlineReady = String(ready);
-  const notice = document.querySelector<HTMLElement>("#pwa-update-notice");
-  const waiting = Boolean(registration?.waiting);
-  if (notice) notice.hidden = !waiting;
-  const stage = document.querySelector<HTMLElement>("#stage");
-  if (stage) stage.dataset.pwaUpdate = String(waiting);
+function statusText() {
+  if (!("caches" in window)) return "当前浏览器不支持离线缓存。";
+  if (!navigator.onLine) return "当前离线，将优先读取本地资源。";
+  return lastStatus;
 }
 
-export async function initPwa(notify: (message: string) => void) {
-  if (isWallpaper) return;
-  tell = notify;
-  if (started || !import.meta.env.PROD || !window.isSecureContext || !("serviceWorker" in navigator)) return;
-  started = true;
-  try {
-    registration = await navigator.serviceWorker.register(assetUrl("sw.js"), {
-      scope: import.meta.env.BASE_URL, updateViaCache: "none",
-    });
-    const watch = () => {
-      const worker = registration?.installing;
-      if (!worker) return;
-      worker.addEventListener("statechange", () => {
-        if (worker.state === "installed") {
-          failed = false;
-          refresh();
-        } else if (worker.state === "redundant" && !registration?.active) {
-          failed = true; refresh();
+export function offlineSettingsMarkup() {
+  return `<section id="offline-settings" class="pwa-settings" aria-label="主屏幕与离线使用">
+    <h3>APP / 主屏幕与离线</h3>
+    <p>首次加载后自动保存一次 3D 资源。后续进入时优先使用本地资源；版本更新后如出现不兼容，可清除后重新保存。</p>
+    <p class="pwa-status" role="status">${statusText()}</p>
+    <div class="pwa-actions">
+      <button type="button" data-offline-action="save">保存 3D 资源 ↗</button>
+      <button type="button" data-offline-action="clear">清除本地资源 ×</button>
+      ${installPrompt ? '<button type="button" data-offline-action="install">安装到主屏幕 ↗</button>' : ""}
+    </div>
+  </section>`;
+}
+
+export function refreshOfflinePanel() {
+  const panel = document.querySelector<HTMLElement>("#offline-settings");
+  if (panel) panel.outerHTML = offlineSettingsMarkup();
+}
+
+async function cacheLoadedResources(announceResult = false) {
+  if (!("caches" in window)) throw new Error("cache unsupported");
+  const cache = await caches.open(CACHE);
+  const indexUrl = new URL("index.html", location.href).href;
+  const urls = new Set<string>([indexUrl]);
+  for (const entry of performance.getEntriesByType("resource")) {
+    try {
+      const url = new URL(entry.name);
+      if (url.origin !== location.origin) continue;
+      if (!url.pathname.startsWith("/rhine-lab/")) continue;
+      if (url.pathname.endsWith("/sw.js")) continue;
+      if (!/\.(?:js|css|glb|gltf|json|webmanifest|html|svg|png|webp|jpe?g)$/i.test(url.pathname)) continue;
+      urls.add(url.href);
+    } catch {
+      /* ignore */
+    }
+  }
+  let saved = 0;
+  const list = [...urls];
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < list.length) {
+      const url = list[cursor++];
+      try {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 3000);
+        const response = await fetch(url, { cache: "reload", signal: controller.signal });
+        window.clearTimeout(timeout);
+        if (!response.ok) continue;
+        await cache.put(url, response.clone());
+        if (url === indexUrl) {
+          // The manifest starts at ./?source=pwa. Keep a directory-keyed
+          // copy so that launch URL is served locally as well.
+          await cache.put(new URL("./", location.href).href, response.clone());
         }
-      });
-    };
-    registration.addEventListener("updatefound", watch);
-    watch();
-    refresh();
-    void navigator.serviceWorker.ready.then(() => { ready = true; failed = false; refresh(); });
-    let lastCheck = Date.now();
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && Date.now() - lastCheck > 3_600_000) {
-        lastCheck = Date.now(); void registration?.update().catch(() => {});
+        saved++;
+      } catch {
+        /* keep saving the rest */
       }
-    });
-  } catch { failed = true; }
-  refresh();
+    }
+  };
+  await Promise.all(Array.from({ length: 10 }, () => worker()));
+  localStorage.setItem(AUTOSAVED, "1");
+  const message = `已保存 ${saved} 个 3D 资源，可在下次加载时优先使用本地缓存。`;
+  lastStatus = message;
+  if (announceResult) announce(message);
+  else refreshOfflinePanel();
+  return saved;
 }
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("controllerchange", () => {
-  if (reloading) location.reload();
-  else refresh();
+export async function clearOfflineResources(reload = true, announceResult = false) {
+  if (!("caches" in window)) return;
+  await caches.delete(CACHE);
+  const registrations = await navigator.serviceWorker?.getRegistrations?.() ?? [];
+  await Promise.all(registrations.map((registration) => registration.unregister()));
+  localStorage.removeItem(AUTOSAVED);
+  const message = "本地 3D 资源已清除，下次加载会重新从网络获取。";
+  lastStatus = message;
+  if (announceResult) announce(message);
+  else refreshOfflinePanel();
+  if (reload) window.setTimeout(() => location.reload(), 900);
+}
+
+export async function initOffline(notify?: (message: string) => void) {
+  if (notify) notifier = notify;
+  if (!("serviceWorker" in navigator)) {
+    lastStatus = "当前环境不支持 Service Worker，无法离线缓存。";
+    return;
+  }
+  try {
+    await navigator.serviceWorker.register(assetUrl("sw.js"), { scope: "/rhine-lab/" });
+    await navigator.serviceWorker.ready;
+    const cache = await caches.open(CACHE);
+    if ((await cache.keys()).length === 0) localStorage.removeItem(AUTOSAVED);
+    if (localStorage.getItem(AUTOSAVED) !== "1") {
+      // Let the first frame settle before competing for network/GPU.
+      setTimeout(() => {
+        void cacheLoadedResources(true).catch(() => {
+          announce("自动保存 3D 资源未完成，可在设置中手动保存。");
+        });
+      }, 1600);
+    } else {
+      lastStatus = "本地 3D 资源已就绪，后续加载优先使用缓存。";
+    }
+  } catch {
+    lastStatus = "离线模块初始化失败，可在设置中手动保存。";
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>("[data-offline-action]");
+  if (!button || busy) return;
+  const action = button.dataset.offlineAction;
+  if (action === "install" && installPrompt) {
+    void installPrompt.prompt();
+    void installPrompt.userChoice.finally(() => {
+      installPrompt = null;
+      refreshOfflinePanel();
+    });
+    return;
+  }
+  busy = true;
+  button.disabled = true;
+  const started =
+    action === "clear" ? "正在清除本地 3D 资源…" : "正在保存 3D 资源…";
+  notifier?.(started);
+  const status = document.querySelector<HTMLElement>("#offline-settings .pwa-status");
+  if (status) status.textContent = started;
+  button.textContent = action === "clear" ? "正在清除…" : "正在保存…";
+  const done = () => {
+    busy = false;
+    refreshOfflinePanel();
+  };
+  if (action === "clear") void clearOfflineResources(true, true).finally(done);
+  else
+    void cacheLoadedResources(true)
+      .catch(() => {
+        announce("保存失败，请保持联网后重试。");
+      })
+      .finally(done);
 });
-document.addEventListener("click", async event => {
-  const button = (event.target as Element).closest<HTMLButtonElement>("[data-pwa-action]");
-  if (!button) return;
-  if (button.dataset.pwaAction === "install" && installPrompt) {
-    const prompt = installPrompt; installPrompt = undefined;
-    try { await prompt.prompt(); await prompt.userChoice; } catch { tell("请通过浏览器菜单添加到主屏幕"); }
-    refresh();
-  }
-  if (button.dataset.pwaAction === "update" && registration?.waiting) {
-    reloading = true;
-    button.disabled = true;
-    registration.waiting.postMessage({ type: "RHINE_APPLY_UPDATE" });
-  }
-  if (button.dataset.pwaAction === "retry") {
-    failed = false;
-    refresh();
-    if (registration) {
-      try { await registration.update(); } catch { failed = true; refresh(); }
-    } else { started = false; void initPwa(tell); }
-  }
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event as BeforeInstallPromptEvent;
+  refreshOfflinePanel();
 });

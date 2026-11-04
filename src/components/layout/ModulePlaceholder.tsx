@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft } from 'lucide-react'
 import type { SlotModule } from '../../content/slots'
 import { fadeUp, viewportOnce } from '../../lib/motion'
 import { SlotGrid } from '../slots/SlotGrid'
-import { GlowButton, SectionTitle } from '../ui'
+import { SectionTitle } from '../ui'
 
 interface ModulePlaceholderProps {
   /** 模块编号，如 RL-EXT-01 */
@@ -30,7 +29,7 @@ export function ModulePlaceholder({
   slots = [],
 }: ModulePlaceholderProps) {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 pb-24 pt-28 sm:px-6">
+    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 pb-16 pt-8 sm:px-6">
       <SectionTitle index={code} en={titleEn} zh={titleZh} />
 
       {description && (
@@ -71,12 +70,6 @@ export function ModulePlaceholder({
           <SlotGrid slots={slots} />
         </motion.div>
       )}
-
-      <div className="mt-10 flex justify-center">
-        <GlowButton to="/" variant="ghost">
-          <ArrowLeft className="h-3.5 w-3.5" /> 返回首页 RETURN
-        </GlowButton>
-      </div>
     </main>
   )
 }

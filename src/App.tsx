@@ -1,47 +1,33 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { BootScreen } from './components/boot/BootScreen'
 import { SessionProvider } from './components/auth/SessionProvider'
 import { useSession } from './components/auth/useSession'
 import { ThemeProvider } from './components/theme/ThemeProvider'
-import { BackgroundFX } from './components/layout/BackgroundFX'
-import { MouseTrail } from './components/layout/MouseTrail'
-import { Footer } from './components/layout/Footer'
-import { NavBar } from './components/layout/NavBar'
+import { SiteSidebar } from './components/layout/SiteSidebar'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
-/** 后台入口路径（可用 VITE_ADMIN_PATH 自定义，前台导航中不出现） */
 const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin'
 
-// 非首页路由按需加载：markdown 解析、EXIF 等依赖只在进入对应页面时才下载
-const ArchivePage = lazy(() =>
-  import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage })),
+const ArchiveHubPage = lazy(() =>
+  import('./pages/ArchiveHubPage').then((m) => ({ default: m.ArchiveHubPage })),
 )
-const GuestbookPage = lazy(() =>
-  import('./pages/GuestbookPage').then((m) => ({ default: m.GuestbookPage })),
+const ForumHubPage = lazy(() =>
+  import('./pages/ForumHubPage').then((m) => ({ default: m.ForumHubPage })),
 )
-const LogsPage = lazy(() =>
-  import('./pages/LogsPage').then((m) => ({ default: m.LogsPage })),
-)
-const ProjectsPage = lazy(() =>
-  import('./pages/ProjectsPage').then((m) => ({ default: m.ProjectsPage })),
-)
-const ForumPage = lazy(() =>
-  import('./pages/ForumPage').then((m) => ({ default: m.ForumPage })),
-)
-const ForumBoardPage = lazy(() =>
-  import('./pages/ForumBoardPage').then((m) => ({ default: m.ForumBoardPage })),
+const ForumComposePage = lazy(() =>
+  import('./pages/ForumComposePage').then((m) => ({ default: m.ForumComposePage })),
 )
 const ForumPostPage = lazy(() =>
   import('./pages/ForumPostPage').then((m) => ({ default: m.ForumPostPage })),
 )
-const ForumComposePage = lazy(() =>
-  import('./pages/ForumComposePage').then((m) => ({
-    default: m.ForumComposePage,
-  })),
+const ForumBoardPage = lazy(() =>
+  import('./pages/ForumBoardPage').then((m) => ({ default: m.ForumBoardPage })),
+)
+const GuestbookPage = lazy(() =>
+  import('./pages/GuestbookPage').then((m) => ({ default: m.GuestbookPage })),
 )
 const ProfilePage = lazy(() =>
   import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
@@ -52,54 +38,42 @@ const MessagesPage = lazy(() =>
 const PublicUserPage = lazy(() =>
   import('./pages/PublicUserPage').then((m) => ({ default: m.PublicUserPage })),
 )
-const LabPage = lazy(() =>
-  import('./pages/LabPage').then((m) => ({ default: m.LabPage })),
-)
-const ForumLabPage = lazy(() =>
-  import('./pages/ForumLabPage').then((m) => ({ default: m.ForumLabPage })),
-)
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
 )
+const LoginPage = lazy(() =>
+  import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })),
+)
 
-/** 懒加载页面的加载态 */
 function PageLoading() {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center pt-24">
+    <div className="flex min-h-[60vh] items-center justify-center">
       <p className="animate-pulse-soft font-mono text-xs tracking-[0.35em] text-rhine-faint">
-        LOADING MODULE …
+        LOADING MODULE
       </p>
     </div>
   )
 }
 
-/** 路由变化时处理滚动：带 hash 平滑滚到锚点，否则回到顶部 */
 function ScrollManager() {
   const { pathname, hash } = useLocation()
-
   useEffect(() => {
     if (hash) {
       const id = hash.slice(1)
-      const t = setTimeout(() => {
-        document.getElementById(id)?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        })
+      const timer = window.setTimeout(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 80)
-      return () => clearTimeout(t)
+      return () => window.clearTimeout(timer)
     }
     window.scrollTo({ top: 0 })
     return undefined
   }, [pathname, hash])
-
   return null
 }
 
-/** 开机门：同会话内只播放一次开机动画；后台入口不播放 */
 function BootGate({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const isAdmin = pathname.startsWith(ADMIN_PATH)
-
   const [booted, setBooted] = useState(() => {
     if (isAdmin) return true
     try {
@@ -108,97 +82,20 @@ function BootGate({ children }: { children: ReactNode }) {
       return false
     }
   })
-
   const finish = useCallback(() => {
     try {
       sessionStorage.setItem('rhine:booted', '1')
     } catch {
-      /* 忽略存储异常 */
+      /* ignore */
     }
     setBooted(true)
   }, [])
-
   return (
     <>
-      <AnimatePresence>
-        {!booted && <BootScreen key="boot" onFinished={finish} />}
-      </AnimatePresence>
-      {booted && children}
+      {!booted && <BootScreen onFinished={finish} />}
+      {children}
     </>
   )
-}
-
-/** 每个版块有自己的入场方式：档案=开柜、项目=抬升、日志=翻页、论坛=叠层 */
-function routeMotion(pathname: string, reduce: boolean) {
-  if (reduce) {
-    return {
-      initial: { opacity: 0 },
-      animate: { opacity: 1 },
-      exit: { opacity: 0 },
-    }
-  }
-
-  if (pathname === '/') {
-    return {
-      initial: { opacity: 0, scale: 1.015, clipPath: 'inset(0 0 10% 0)' },
-      animate: { opacity: 1, scale: 1, clipPath: 'inset(0 0 0% 0)' },
-      exit: { opacity: 0, scale: 0.995, filter: 'blur(5px)' },
-    }
-  }
-
-  if (pathname.startsWith('/archive')) {
-    return {
-      initial: { opacity: 0, y: 18, clipPath: 'inset(0 0 100% 0)' },
-      animate: { opacity: 1, y: 0, clipPath: 'inset(0 0 0% 0)' },
-      exit: { opacity: 0, y: -10, clipPath: 'inset(0 0 8% 0)' },
-    }
-  }
-
-  if (pathname.startsWith('/projects')) {
-    return {
-      initial: { opacity: 0, y: 26, rotateX: 3, transformPerspective: 900 },
-      animate: { opacity: 1, y: 0, rotateX: 0 },
-      exit: { opacity: 0, y: -12, rotateX: -2 },
-    }
-  }
-
-  if (pathname.startsWith('/logs')) {
-    return {
-      initial: { opacity: 0, x: 24, filter: 'blur(4px)' },
-      animate: { opacity: 1, x: 0, filter: 'blur(0px)' },
-      exit: { opacity: 0, x: -18, filter: 'blur(3px)' },
-    }
-  }
-
-  if (pathname.startsWith('/forum')) {
-    return {
-      initial: { opacity: 0, y: 18, scale: 0.997 },
-      animate: { opacity: 1, y: 0, scale: 1 },
-      exit: { opacity: 0, y: -8, scale: 0.998 },
-    }
-  }
-
-  if (pathname.startsWith('/guestbook')) {
-    return {
-      initial: { opacity: 0, scale: 0.975 },
-      animate: { opacity: 1, scale: 1 },
-      exit: { opacity: 0, scale: 1.01 },
-    }
-  }
-
-  if (pathname.startsWith('/profile')) {
-    return {
-      initial: { opacity: 0, clipPath: 'inset(0 0 100% 0)' },
-      animate: { opacity: 1, clipPath: 'inset(0 0 0% 0)' },
-      exit: { opacity: 0, clipPath: 'inset(0 0 6% 0)' },
-    }
-  }
-
-  return {
-    initial: { opacity: 0, x: -22 },
-    animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: 16 },
-  }
 }
 
 function RequireUser({ children }: { children: ReactNode }) {
@@ -207,58 +104,18 @@ function RequireUser({ children }: { children: ReactNode }) {
   return user ? <>{children}</> : <NotFoundPage />
 }
 
-/** 前台页面切换动画 */
-function AnimatedRoutes() {
-  const location = useLocation()
-  const reduce = useReducedMotion()
-  const variant = routeMotion(location.pathname, Boolean(reduce))
-
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location.pathname}
-        initial={variant.initial}
-        animate={variant.animate}
-        exit={variant.exit}
-        transition={{ duration: reduce ? 0.1 : 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative"
-      >
-        <span className="page-enter-scan" aria-hidden />
-        <div className="route-content">
-          <Suspense fallback={<PageLoading />}>
-            <Routes location={location}>
-              <Route path="/" element={<HomePage />} />
-              {/* ==== 扩展模块页面：新增页面时在这里注册路由 ==== */}
-              <Route path="/archive" element={<ArchivePage />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/logs" element={<LogsPage />} />
-              <Route path="/forum" element={<RequireUser><ForumPage /></RequireUser>} />
-              <Route path="/forum/new" element={<RequireUser><ForumComposePage /></RequireUser>} />
-              <Route path="/forum/post/:id" element={<RequireUser><ForumPostPage /></RequireUser>} />
-              <Route path="/forum/:slug" element={<RequireUser><ForumBoardPage /></RequireUser>} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/u/:id" element={<PublicUserPage />} />
-              <Route path="/guestbook" element={<GuestbookPage home />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  )
+function Shell({ children }: { children: ReactNode }) {
+  return <SiteSidebar>{children}</SiteSidebar>
 }
 
-/** 前台站点布局（后台页面不套用这套布局） */
-function PublicSite() {
+function Page({ children }: { children: ReactNode }) {
+  const { pathname, search } = useLocation()
   return (
-    <>
-      <BackgroundFX />
-      <MouseTrail />
-      <NavBar />
-      <AnimatedRoutes />
-      <Footer />
-    </>
+    <Suspense fallback={<PageLoading />}>
+      <Shell>
+        <div key={`${pathname}${search}`}>{children}</div>
+      </Shell>
+    </Suspense>
   )
 }
 
@@ -270,34 +127,31 @@ export default function App() {
           <BootGate>
             <ScrollManager />
             <Routes>
-              {/* 测试整合：RHINE LAB 三维档案终端，独立全屏页面 */}
+              <Route path="/" element={<Shell><HomePage /></Shell>} />
+              <Route path="/archive/*" element={<Page><ArchiveHubPage /></Page>} />
               <Route
-                path="/lab"
-                element={
-                  <Suspense fallback={<PageLoading />}>
-                    <LabPage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/forum-lab"
+                path="/forum"
                 element={
                   <RequireUser>
-                    <Suspense fallback={<PageLoading />}>
-                      <ForumLabPage />
-                    </Suspense>
+                    <Page><ForumHubPage /></Page>
                   </RequireUser>
                 }
               />
-              <Route
-                path={`${ADMIN_PATH}/*`}
-                element={
-                  <Suspense fallback={<PageLoading />}>
-                    <AdminPage />
-                  </Suspense>
-                }
-              />
-              <Route path="*" element={<PublicSite />} />
+              <Route path="/forum/new" element={<RequireUser><Page><ForumComposePage /></Page></RequireUser>} />
+              <Route path="/forum/post/:id" element={<RequireUser><Page><ForumPostPage /></Page></RequireUser>} />
+              <Route path="/forum/:slug" element={<RequireUser><Page><ForumBoardPage /></Page></RequireUser>} />
+              <Route path="/guestbook" element={<Page><GuestbookPage home /></Page>} />
+              <Route path="/profile" element={<Page><ProfilePage /></Page>} />
+              <Route path="/messages" element={<Page><MessagesPage /></Page>} />
+              <Route path="/u/:id" element={<Page><PublicUserPage /></Page>} />
+              <Route path="/login" element={<Page><LoginPage /></Page>} />
+              <Route path={`${ADMIN_PATH}/*`} element={<Page><AdminPage /></Page>} />
+              <Route path="/lab" element={<Navigate to="/archive?mode=lab" replace />} />
+              <Route path="/forum-lab" element={<Navigate to="/forum?mode=lab" replace />} />
+              <Route path="/projects" element={<Navigate to="/archive/projects?mode=archive" replace />} />
+              <Route path="/logs" element={<Navigate to="/archive/logs?mode=archive" replace />} />
+              <Route path="/forum-lab/*" element={<Navigate to="/forum?mode=lab" replace />} />
+              <Route path="*" element={<Shell><NotFoundPage /></Shell>} />
             </Routes>
           </BootGate>
         </SessionProvider>
