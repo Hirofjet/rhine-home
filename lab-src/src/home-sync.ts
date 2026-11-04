@@ -34,25 +34,29 @@ async function readModule(key: string) {
   }
 }
 
+function asText(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
 function recordFor(module: (typeof modules)[number], item: any, index: number): HomeRecord {
   return {
     id: `${String(modules.indexOf(module) + 1).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
-    title: item.title ?? item.name ?? item.code ?? `${module.label}档案`,
+    title: asText(item.title ?? item.name ?? item.code, `${module.label}档案`).slice(0, 80),
     en: module.en,
     department: module.label,
     category: module.label,
-    date: item.date ?? item.createdAt ?? "PERSONAL ARCHIVE",
+    date: asText(item.date ?? item.createdAt, "PERSONAL ARCHIVE"),
     lead: "HIROFJET",
     clearance: "PERSONAL ARCHIVE",
-    abstract:
-      item.description ??
-      String(item.markdown ?? "")
-        .replace(/[#>*_`[\]]/g, "")
-        .slice(0, 260) ??
-      "",
+    abstract: asText(
+      item.description,
+      asText(item.markdown).replace(/[#>*_`[\]]/g, "").slice(0, 260),
+    ).slice(0, 420),
     findings: [
       `模块：${module.label}`,
-      `编号：${item.id ?? item.code ?? "—"}`,
+      `编号：${asText(item.id ?? item.code, "—")}`,
       "内容来自 RHINE//HOME 个人档案接口。",
     ],
     source: "",
@@ -134,6 +138,18 @@ export async function syncHomeArchives() {
     const list = items.length
       ? items.slice(0, 8).map((item: any, index: number) => recordFor(module, item, index))
       : existing.slice(0, 8);
+    while (list.length < 8) {
+      list.push(
+        recordFor(
+          module,
+          {
+            title: `${module.label}档案位 ${String(list.length + 1).padStart(2, "0")}`,
+            description: "等待发布内容后，这里会同步显示。",
+          },
+          list.length,
+        ),
+      );
+    }
     next.push(...list);
   }
 

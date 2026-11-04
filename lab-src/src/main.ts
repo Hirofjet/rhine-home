@@ -36,7 +36,7 @@ import {
   fileLocation,
 } from "./data";
 import { TerminalAudio } from "./audio";
-import { syncHomeArchives, watchHomeArchives, syncForumArchives, syncLabIdentity } from "./home-sync";
+import { syncHomeArchives, syncForumArchives, syncLabIdentity } from "./home-sync";
 import { audioSettingsMarkup } from "./audio-settings";
 import {
   createMotionPreferences,
@@ -1666,7 +1666,13 @@ async function toggleThree() {
 async function start() {
   try {
     const forumMode = new URLSearchParams(location.search).get("mode") === "forum";
-    const synced = forumMode ? await syncForumArchives() : await syncHomeArchives();
+    let synced = false;
+    try {
+      synced = forumMode ? await syncForumArchives() : await syncHomeArchives();
+    } catch (error) {
+      // A malformed content row must never prevent the archive from opening.
+      console.error("archive sync failed", error);
+    }
     if (forumMode && !synced) document.title = "FORUM ACCESS REQUIRED";
     if (forumMode) {
       const database = document.querySelector(".welcome-database");
@@ -1719,7 +1725,6 @@ async function start() {
     savePrefs();
     ready = true;
     select(0);
-    if (new URLSearchParams(location.search).get("mode") !== "forum") watchHomeArchives();
     if (entry) entry.ready();
     else {
       if (isWallpaper) {
