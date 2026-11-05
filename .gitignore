@@ -44,3 +44,6 @@ server/uploads
 *.njsproj
 *.sln
 *.sw?
+
+# 本地版本日志（不提交）
+logs/

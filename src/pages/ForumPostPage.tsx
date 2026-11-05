@@ -184,18 +184,25 @@ export function ForumPostPage() {
           variants={fadeUp}
           className="mt-3 flex flex-wrap items-center gap-3 border-b border-rhine-line/60 pb-3 font-mono text-[10px] tracking-wider text-rhine-faint"
         >
-          {post.authorAvatar ? (
-            <img
-              src={resolveMediaUrl(post.authorAvatar)}
-              alt={post.author}
-              className="h-7 w-7 rounded-full border border-rhine-line object-cover"
-            />
-          ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-rhine-line bg-rhine-abyss text-rhine-gold">
-              <User className="h-3 w-3" />
-            </span>
-          )}
-          <span className="text-rhine-cyan">{post.author}</span>
+          <Link
+            to={`/u/${post.authorId}`}
+            title="查看作者资料并关注"
+            className="flex items-center gap-2 text-rhine-cyan hover:text-rhine-gold"
+          >
+            {post.authorAvatar ? (
+              <img
+                src={resolveMediaUrl(post.authorAvatar)}
+                alt={post.author}
+                className="h-7 w-7 rounded-full border border-rhine-line object-cover"
+              />
+            ) : (
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-rhine-line bg-rhine-abyss text-rhine-gold">
+                <User className="h-3 w-3" />
+              </span>
+            )}
+            <span>{post.author}</span>
+            <span className="border border-rhine-line px-1 py-0.5 text-[8px] text-rhine-faint">资料</span>
+          </Link>
           <span>{formatDateTime(post.createdAt)}</span>
           {post.pinned && (
             <span className="flex items-center gap-1 border border-rhine-gold/40 px-1.5 py-0.5 text-rhine-gold">

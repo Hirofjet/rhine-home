@@ -149,7 +149,7 @@ export function PublicUserPage() {
                 </button>
               ) : (
                 <Link
-                  to="/profile"
+                  to="/login"
                   className="border border-rhine-line px-3 py-1.5 text-[10px] text-rhine-cyan"
                 >
                   登录后关注

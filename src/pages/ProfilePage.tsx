@@ -754,6 +754,9 @@ export function ProfilePage() {
 
       {tab === 'follows' && (
         <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <p className="border border-rhine-line/60 bg-rhine-panel/20 px-4 py-3 font-mono text-[10px] leading-relaxed tracking-wider text-rhine-dim md:col-span-2">
+            在论坛帖子中点击作者头像或「资料」即可查看公开资料并关注。互相关注后会成为好友，可开启私信。
+          </p>
           {(
             [
               ['关注', following, true],

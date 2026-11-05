@@ -1,5 +1,6 @@
 /* oxlint-disable react/set-state-in-effect */
 import { useCallback, useEffect, useState } from 'react'
+import * as exifr from 'exifr'
 import { ImagePlus, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { adminApi, type ContentPhoto } from '../../../lib/api'
 import {
@@ -17,6 +18,7 @@ interface PhotoDraft {
   url: string
   name: string
   date: string
+  dateMode: 'exif' | 'manual'
   description: string
   file: File | null
   preview: string
@@ -27,6 +29,7 @@ const emptyDraft = (): PhotoDraft => ({
   url: '',
   name: '',
   date: new Date().toISOString().slice(0, 10),
+  dateMode: 'exif',
   description: '',
   file: null,
   preview: '',
@@ -37,6 +40,7 @@ const toDraft = (item: ContentPhoto): PhotoDraft => ({
   url: item.url,
   name: item.name,
   date: item.date ?? '',
+  dateMode: 'manual',
   description: item.description ?? '',
   file: null,
   preview: item.url,
@@ -78,13 +82,37 @@ export function PhotosPanel() {
     setError('')
   }
 
-  const chooseFile = (file: File | undefined) => {
+  const chooseFile = async (file: File | undefined) => {
     if (!file) return
-    updateDraft({
-      file,
-      name: file.name,
-      preview: URL.createObjectURL(file),
-    })
+    let date = ''
+    try {
+      const exif = (await exifr.parse(file, ['DateTimeOriginal', 'CreateDate'])) as
+        | { DateTimeOriginal?: Date; CreateDate?: Date }
+        | undefined
+      const captured = exif?.DateTimeOriginal ?? exif?.CreateDate
+      if (captured instanceof Date && !Number.isNaN(captured.getTime())) {
+        date = captured.toISOString().slice(0, 10)
+      }
+    } catch {
+      /* EXIF unavailable */
+    }
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            file,
+            name: file.name,
+            preview: URL.createObjectURL(file),
+            date: date || current.date,
+            dateMode: date ? 'exif' : 'manual',
+          }
+        : current,
+    )
+    setNotice(
+      date
+        ? `已读取照片拍摄时间：${date}`
+        : '未读取到照片时间戳，请手动设置发布时间。',
+    )
   }
 
   const save = async () => {
@@ -103,7 +131,9 @@ export function PhotosPanel() {
         const uploaded = await adminApi.upload(draft.file, 'photo')
         url = uploaded.url
         name = name || uploaded.name
-        if (!date) date = uploaded.date ?? ''
+        if (draft.dateMode === 'exif') {
+          date = uploaded.date || draft.date
+        }
       }
       const payload = {
         url,
@@ -156,7 +186,23 @@ export function PhotosPanel() {
           }
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <AdminField label="日期 / DATE">
+            <label className="block font-mono text-[10px] tracking-wider text-rhine-dim">
+              发布日期来源 / DATE SOURCE
+              <select
+                value={draft.dateMode}
+                onChange={(event) =>
+                  updateDraft({ dateMode: event.target.value as PhotoDraft['dateMode'] })
+                }
+                className="mt-1 h-9 w-full border border-rhine-line bg-rhine-abyss/70 px-2 font-mono text-xs text-rhine-ink outline-none focus:border-rhine-gold/60"
+              >
+                <option value="exif">读取照片时间戳</option>
+                <option value="manual">手动设置发布时间</option>
+              </select>
+            </label>
+            <AdminField
+              label="日期 / DATE"
+              hint={draft.dateMode === 'exif' ? '优先读取 EXIF 拍摄时间' : '手动发布时间'}
+            >
               <AdminInput
                 type="date"
                 value={draft.date}

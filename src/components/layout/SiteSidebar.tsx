@@ -363,13 +363,13 @@ export function SiteSidebar({ children }: { children: ReactNode }) {
           </Link>
         )}
         {settingsOpen && (
-          <div className="mb-2 w-[188px] max-w-[calc(100vw-1rem)] space-y-3 border-t border-rhine-line/50 pt-3">
+          <div className="mb-2 w-full min-w-0 space-y-3 border-t border-rhine-line/50 pt-3">
             <div className="sidebar-settings">
               <p className="mb-1 font-mono text-[8px] tracking-[0.2em] text-rhine-faint">页面主题</p>
               <select
                 value={theme}
                 onChange={(event) => setTheme(event.target.value as typeof theme)}
-                className="h-8 w-[158px] max-w-full border border-rhine-line bg-rhine-abyss px-2 font-mono text-[9px] text-rhine-ink"
+                className="h-8 w-full min-w-0 border border-rhine-line bg-rhine-abyss px-1.5 font-mono text-[9px] text-rhine-ink"
               >
                 {THEMES.map((item) => (
                   <option key={item.id} value={item.id}>{item.label}</option>
@@ -381,7 +381,7 @@ export function SiteSidebar({ children }: { children: ReactNode }) {
               <select
                 value={labTheme}
                 onChange={(event) => setTheme3d(event.target.value as 'light' | 'dark')}
-                className="h-8 w-[158px] max-w-full border border-rhine-line bg-rhine-abyss px-2 font-mono text-[9px] text-rhine-ink"
+                className="h-8 w-full min-w-0 border border-rhine-line bg-rhine-abyss px-1.5 font-mono text-[9px] text-rhine-ink"
               >
                 <option value="light">亮色</option>
                 <option value="dark">暗色</option>
