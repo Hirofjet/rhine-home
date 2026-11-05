@@ -1,0 +1,81 @@
+RHINE//HOME
+Copyright (c) 2026 Hirofjet
+
+This product includes software, fonts, models, scenes, audio and other
+materials developed by third parties. Their rights remain with the original
+authors and rightsholders.
+
+======================================================================
+3D LAB / RHINE LABUI
+======================================================================
+
+Original visuals, scenes, models, animations and original ambient audio:
+LBEILC / RhineLabUI
+https://github.com/LBEILC/RhineLabUI
+License: MIT (see licenses/RhineLabUI-MIT.txt)
+
+Web performance extraction reference:
+PR #15, contributor PacificSauryMan
+Adaptation, performance work and PR preparation assisted by OpenAI Codex,
+as credited in the original pull request.
+https://github.com/LBEILC/RhineLabUI/pull/15
+
+The original RhineLabUI copyright notice and MIT license are retained in
+lab-src/LICENSE, public/rhine-lab/LICENSE and licenses/RhineLabUI-MIT.txt.
+
+======================================================================
+FONTS
+======================================================================
+
+MiSans
+Copyright belongs to Xiaomi / the original font authors.
+License: see licenses/MiSans-LICENSE.pdf
+
+Orbitron, Rajdhani, Share Tech Mono (via Fontsource)
+License: SIL Open Font License 1.1
+See licenses/OFL-1.1.txt
+
+======================================================================
+OPEN SOURCE DEPENDENCIES
+======================================================================
+
+This project uses open source packages including React, Vite, TypeScript,
+Tailwind CSS, Express, ECharts, Three.js, marked, DOMPurify, Framer Motion,
+Lucide, exifr, react-markdown, remark-gfm, MySQL2, Nodemailer and Multer.
+
+Each package is used under its own license. See:
+- THIRD_PARTY_LICENSES.md
+- licenses/
+- the package metadata in package-lock.json, server/package.json and
+  lab-src/package.json
+
+Key licenses:
+- Apache License 2.0: ECharts, TypeScript
+- MPL-2.0: DOMPurify (also available under Apache-2.0)
+- ISC: Lucide
+- MIT: React, Vite, Express, Three.js, marked, Framer Motion, exifr and others
+- OFL-1.1: Fontsource font packages
+
+======================================================================
+NON-OPEN-SOURCE / FAN MATERIAL
+======================================================================
+
+Blue Archive cursors, icons and reference assets are used for personal,
+non-commercial display only. Rights belong to their respective owners.
+
+Arknights / 明日方舟 and Blue Archive / 蔚蓝档案 names, characters, settings
+and related art are the property of their respective rightsholders.
+RHINE//HOME is an unofficial personal fan project and is not affiliated
+with, sponsored by, or endorsed by Hypergryph, Yostar, Nexon or any related
+rightsholder.
+
+======================================================================
+ORIGINAL PROJECT CODE
+======================================================================
+
+Original code in this repository is licensed under the MIT License.
+See LICENSE.
+
+Original site text, personal content, photos, videos and original visual
+compositions are excluded from the MIT code license unless explicitly stated.
+See COPYRIGHT.md.

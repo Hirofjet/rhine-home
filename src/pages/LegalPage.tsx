@@ -52,6 +52,19 @@ export function LegalPage() {
               <strong className="text-rhine-ink">{legal.owner}</strong> 所有。
             </p>
             <p>
+              本站原创代码以 <strong className="text-rhine-ink">MIT License</strong> 发布；站点原创文字、照片、视频与个人内容不自动适用 MIT，除非另有说明。
+            </p>
+            <p>
+              完整的项目法律文件：
+              <a href={`${legal.repository}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer" className="ml-1 text-rhine-cyan underline underline-offset-2">LICENSE</a>
+              <span className="mx-1">·</span>
+              <a href={`${legal.repository}/blob/main/COPYRIGHT.md`} target="_blank" rel="noopener noreferrer" className="text-rhine-cyan underline underline-offset-2">COPYRIGHT</a>
+              <span className="mx-1">·</span>
+              <a href={`${legal.repository}/blob/main/NOTICE`} target="_blank" rel="noopener noreferrer" className="text-rhine-cyan underline underline-offset-2">NOTICE</a>
+              <span className="mx-1">·</span>
+              <a href={`${legal.repository}/blob/main/THIRD_PARTY_LICENSES.md`} target="_blank" rel="noopener noreferrer" className="text-rhine-cyan underline underline-offset-2">THIRD-PARTY</a>
+            </p>
+            <p>
               未经权利人书面许可，不得将本站原创部分用于商业再发布、批量抓取、售卖或以其他方式侵犯著作权。个人学习、研究和非商业引用请保留出处与本站链接。
             </p>
             <p>

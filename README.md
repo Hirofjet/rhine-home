@@ -1,7 +1,7 @@
 # RHINE//HOME
 
 > 莱茵生命风格的个人主页、档案库、论坛、留言板与管理系统。  
-> 当前版本：**v2.4.0**
+> 当前版本：**v2.4.1**
 
 RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它把「个人档案」「内容发布」「论坛社交」「3D 档案库」和「后台治理」放在同一套视觉与权限体系中，既保留二次元终端风格的界面，也提供可长期维护的数据与权限结构。
 
@@ -233,12 +233,23 @@ npm start
 | v2.3.2 | 3D Markdown 渲染与档案阅读区自适应 |
 | v2.3.3 | 3D 档案库/论坛主题与导航双向同步 |
 | v2.4.0 | 法律声明、备案占位与 logs 入库 |
+| v2.4.1 | 根目录许可证、NOTICE、版权与安全文件 |
 
 每个版本的详细日志位于 `logs/`，自 v2.4.0 起随仓库一起维护。
 
 ---
 
 ## 法律与备案
+
+项目根目录已提供完整的授权与合规定义文件：
+
+- `LICENSE`：原创代码 MIT；
+- `COPYRIGHT.md`：版权主体、范围与内容例外；
+- `NOTICE`：RhineLabUI、PR #15、字体与第三方素材署名；
+- `THIRD_PARTY_LICENSES.md`：第三方许可清单；
+- `licenses/`：MIT、Apache-2.0、MPL-2.0、ISC、OFL-1.1、RhineLabUI MIT、MiSans 许可；
+- `SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`。
+
 
 - 站内法律声明页：`/legal`；
 - 版权主体：Hirofjet；
@@ -260,4 +271,17 @@ npm start
 
 ## 许可证
 
-本项目原创代码用于个人站点与学习交流。第三方代码与素材遵循其各自许可证；尤其是 `lab-src/` 与 `public/rhine-lab/` 下的 RhineLabUI 资源，再分发时必须保留原作者署名与 MIT 许可文本。
+本项目**原创代码**以 [MIT License](LICENSE) 发布；站点原创文字、照片、视频、个人内容与第三方素材不自动适用 MIT。
+
+项目法律文件：
+
+- [LICENSE](LICENSE) — 原创代码 MIT 许可
+- [COPYRIGHT.md](COPYRIGHT.md) — 版权范围与权利人
+- [NOTICE](NOTICE) — 第三方署名与素材声明
+- [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) — 第三方许可清单
+- [licenses/](licenses/) — MIT、Apache-2.0、MPL-2.0、ISC、OFL-1.1、RhineLabUI MIT、MiSans 许可全文
+- [SECURITY.md](SECURITY.md) — 安全报告
+- [CONTRIBUTING.md](CONTRIBUTING.md) — 贡献与贡献许可
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — 行为规范
+
+尤其是 `lab-src/` 与 `public/rhine-lab/` 下的 RhineLabUI 资源，再分发时必须保留原作者署名与 MIT 许可文本；详见 [NOTICE](NOTICE)。

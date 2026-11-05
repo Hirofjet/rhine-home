@@ -127,3 +127,12 @@
 - 备案号、公安备案、接入商、备案日期在 `src/content/legal.ts` 预留。
 - README 与 guide 更新法律、备案和日志说明。
 - `logs/` 从忽略列表移除，版本日志正式纳入 Git。
+
+## v2.4.1 — 2026-11-05
+
+- 根目录新增 MIT `LICENSE`。
+- 新增 `COPYRIGHT.md`、`NOTICE`、`THIRD_PARTY_LICENSES.md`。
+- 新增 `licenses/`：MIT、Apache-2.0、MPL-2.0、ISC、OFL-1.1、RhineLabUI MIT、MiSans、marked。
+- 新增 `SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`。
+- `/legal` 页面增加项目法律文件入口与 MIT 代码许可说明。
+- `package.json` 增加作者与 MIT 许可字段。
