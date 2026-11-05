@@ -91,7 +91,7 @@ export function PhotosPanel() {
         | undefined
       const captured = exif?.DateTimeOriginal ?? exif?.CreateDate
       if (captured instanceof Date && !Number.isNaN(captured.getTime())) {
-        date = captured.toISOString().slice(0, 10)
+        date = `${captured.getFullYear()}-${String(captured.getMonth() + 1).padStart(2, "0")}-${String(captured.getDate()).padStart(2, "0")}`
       }
     } catch {
       /* EXIF unavailable */
