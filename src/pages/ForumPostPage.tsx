@@ -10,6 +10,7 @@ import {
   forumApi,
   hasPerm,
   resolveMediaUrl,
+  userApi,
   type ForumPost,
   type ForumReply,
 } from '../lib/api'
@@ -34,6 +35,8 @@ export function ForumPostPage() {
   const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState('')
   const [parent, setParent] = useState<ForumReply | null>(null)
+  const [followingAuthor, setFollowingAuthor] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
 
   const loadPost = async () => {
     const data = await forumApi.post(postId)
@@ -61,6 +64,38 @@ export function ForumPostPage() {
       alive = false
     }
   }, [postId])
+
+  useEffect(() => {
+    if (!user || !post || user.id === post.authorId) {
+      setFollowingAuthor(false)
+      return
+    }
+    let alive = true
+    userApi
+      .profile(post.authorId)
+      .then((data) => {
+        if (alive) setFollowingAuthor(Boolean(data.user.isFollowing))
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [post?.authorId, user?.id])
+
+  const toggleFollowAuthor = async () => {
+    if (!post || !user || followBusy || user.id === post.authorId) return
+    setFollowBusy(true)
+    try {
+      if (followingAuthor) await userApi.unfollow(post.authorId)
+      else await userApi.follow(post.authorId)
+      setFollowingAuthor((value) => !value)
+      setNotice(followingAuthor ? '已取消关注作者' : '已关注作者')
+    } catch {
+      setNotice('关注失败，请稍后再试')
+    } finally {
+      setFollowBusy(false)
+    }
+  }
 
   const canModerate = Boolean(user && post && hasPerm(user, `forum.${post.board.id}`))
   const canDeletePost = Boolean(user && post && (user.id === post.authorId || canModerate))
@@ -203,6 +238,20 @@ export function ForumPostPage() {
             <span>{post.author}</span>
             <span className="border border-rhine-line px-1 py-0.5 text-[8px] text-rhine-faint">资料</span>
           </Link>
+          {user && user.id !== post.authorId && (
+            <button
+              type="button"
+              onClick={() => void toggleFollowAuthor()}
+              disabled={followBusy}
+              className={`border px-2 py-1 font-mono text-[9px] tracking-wider ${
+                followingAuthor
+                  ? 'border-rhine-line text-rhine-dim'
+                  : 'border-rhine-gold/50 bg-rhine-gold/10 text-rhine-gold'
+              }`}
+            >
+              {followBusy ? '处理中…' : followingAuthor ? '已关注作者' : '+ 关注作者'}
+            </button>
+          )}
           <span>{formatDateTime(post.createdAt)}</span>
           {post.pinned && (
             <span className="flex items-center gap-1 border border-rhine-gold/40 px-1.5 py-0.5 text-rhine-gold">
@@ -282,7 +331,13 @@ export function ForumPostPage() {
                   className="border border-rhine-line/60 bg-rhine-panel/30 px-4 py-3"
                 >
                   <div className="flex flex-wrap items-center gap-3 font-mono text-[9px] tracking-wider text-rhine-faint">
-                    <span className="text-rhine-cyan">{reply.author}</span>
+                    <Link
+                      to={`/u/${reply.authorId}`}
+                      className="text-rhine-cyan hover:text-rhine-gold"
+                      title="查看回复作者资料"
+                    >
+                      {reply.author}
+                    </Link>
                     <span>{formatDateTime(reply.createdAt)}</span>
                     {user && (
                       <span className="ml-auto flex gap-3">

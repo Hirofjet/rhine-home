@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Lock } from 'lucide-react'
 import { forumApi, accessLogApi, type Board } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
@@ -9,6 +9,7 @@ import { ThemeMenu } from '../components/theme/ThemeMenu'
 /** 论坛专属 Lab：列 = 有权限访问的论坛，前后 = 帖子。 */
 export function ForumLabPage({ embedded = false, active = true }: { embedded?: boolean; active?: boolean }) {
   const { theme } = useTheme()
+  const navigate = useNavigate()
   const { user, loading } = useSession()
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const [boards, setBoards] = useState<Board[] | null>(null)
@@ -68,6 +69,17 @@ export function ForumLabPage({ embedded = false, active = true }: { embedded?: b
       window.location.origin,
     )
   }, [lab3dTheme, iframeSrc])
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type !== "rhine:navigate") return
+      const path = String(event.data.path ?? "")
+      if (path.startsWith("/")) navigate(path)
+    }
+    window.addEventListener("message", onMessage)
+    return () => window.removeEventListener("message", onMessage)
+  }, [navigate])
 
   useEffect(() => {
     if (!active) return undefined

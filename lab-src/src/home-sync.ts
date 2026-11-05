@@ -9,7 +9,7 @@ type HomeRecord = {
   clearance: string;
   abstract: string;
   findings: string[];
-  replies?: { author: string; content: string; createdAt?: string }[];
+  replies?: { author: string; authorId?: number; content: string; createdAt?: string }[];
   tags?: string[];
   content?: Record<string, unknown>;
   source: string;
@@ -275,6 +275,7 @@ export async function syncForumArchives() {
             .slice(0, 24)
             .map((reply: any) => ({
               author: reply.author ?? "—",
+              authorId: Number(reply.authorId) || undefined,
               content: String(reply.content ?? "").replace(/[#>*_`[\]]/g, ""),
               createdAt: reply.createdAt ?? "",
             })),

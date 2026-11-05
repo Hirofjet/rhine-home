@@ -825,7 +825,9 @@ function contentPanel() {
 
   if (r.clearance.includes("BOARD") || r.findings.some((finding) => finding.includes("论坛"))) {
     const replies = r.replies ?? [];
-    return `<div class="archive-card">${head}<div class="archive-markdown">${markdownText(item.content ?? r.abstract)}</div>${attachmentHtml}<div class="panel-label">REPLIES / 回复 ${replies.length}</div>${replies.length ? `<ol class="reply-list">${replies.map((reply, index) => `<li><span class="reply-index">${String(index + 1).padStart(2, "0")}</span><div><b>${escapeHtml(reply.author)}</b><small>${escapeHtml(reply.createdAt ?? "")}</small><p>${escapeHtml(reply.content)}</p></div></li>`).join("")}</ol>` : `<p class="log-note">该帖子暂无回复。</p>`}</div>`;
+    const authorId = Number(item.authorId) || 0;
+    const author = escapeHtml(item.author ?? r.lead);
+    return `<div class="archive-card">${head}<div class="thread-author">${authorId ? `<button type="button" class="archive-author" data-profile-user="${authorId}" onclick="rhineOpenProfile(${authorId})">@${author}<span>资料</span></button><button type="button" class="archive-follow" data-follow-user="${authorId}" onclick="rhineToggleFollow(this)">关注作者</button>` : `<b>@${author}</b>`}</div><div class="archive-markdown">${markdownText(item.content ?? r.abstract)}</div>${attachmentHtml}<div class="panel-label">REPLIES / 回复 ${replies.length}</div>${replies.length ? `<ol class="reply-list">${replies.map((reply, index) => `<li><span class="reply-index">${String(index + 1).padStart(2, "0")}</span><div>${reply.authorId ? `<button type="button" class="archive-reply-author" data-profile-user="${reply.authorId}" onclick="rhineOpenProfile(${reply.authorId})">${escapeHtml(reply.author)}</button>` : `<b>${escapeHtml(reply.author)}</b>`}<small>${escapeHtml(reply.createdAt ?? "")}</small><p>${escapeHtml(reply.content)}</p></div></li>`).join("")}</ol>` : `<p class="log-note">该帖子暂无回复。</p>`}</div>`;
   }
 
   if (category === "照片") {
@@ -853,6 +855,117 @@ function contentPanel() {
     : "";
   return `<div class="archive-card">${head}<div class="archive-markdown">${markdownText(item.markdown ?? r.abstract)}</div>${downloads}</div>`;
 }
+
+async function syncFollowButtons() {
+  const token = localStorage.getItem("rhine:token") ?? "";
+  const buttons = [...document.querySelectorAll<HTMLElement>("[data-follow-user]")];
+  const ids = [...new Set(buttons.map((button) => Number(button.dataset.followUser)).filter(Boolean))];
+  let selfId = 0;
+  if (token) {
+    try {
+      const me = await fetch(`${location.origin}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (me.ok) selfId = Number((await me.json())?.user?.id) || 0;
+    } catch {
+      /* ignore */
+    }
+  }
+  await Promise.all(
+    ids.map(async (id) => {
+      if (id === selfId) {
+        buttons
+          .filter((button) => Number(button.dataset.followUser) === id)
+          .forEach((button) => {
+            button.hidden = true;
+          });
+        return;
+      }
+      try {
+        const response = await fetch(`${location.origin}/api/users/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const followed = Boolean(data?.user?.isFollowing);
+        buttons
+          .filter((button) => Number(button.dataset.followUser) === id)
+          .forEach((button) => {
+            button.dataset.followed = String(followed);
+            button.textContent = followed ? "已关注" : "关注作者";
+            button.classList.toggle("followed", followed);
+          });
+      } catch {
+        /* keep default label */
+      }
+    }),
+  );
+}
+
+function navigateFromLab(path: string) {
+  if (!path.startsWith("/")) return;
+  window.parent.postMessage({ type: "rhine:navigate", path }, location.origin);
+}
+
+function bindContentActions() {
+  /* Kept for keyboard/assistive activation in older browsers. */
+  document.querySelectorAll<HTMLElement>("[data-profile-user]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      event.stopPropagation();
+      navigateFromLab(`/u/${button.dataset.profileUser}`);
+    });
+  });
+  document.querySelectorAll<HTMLElement>("[data-follow-user]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void toggleAuthorFollow(button);
+    });
+  });
+}
+
+async function toggleAuthorFollow(button: HTMLElement) {
+  const id = Number(button.dataset.followUser);
+  if (!id) return;
+  const token = localStorage.getItem("rhine:token") ?? "";
+  if (!token) {
+    navigateFromLab("/login");
+    return;
+  }
+  const followed = button.dataset.followed === "true";
+  button.setAttribute("aria-busy", "true");
+  try {
+    const response = await fetch(`${location.origin}/api/users/${id}/follow`, {
+      method: followed ? "DELETE" : "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      notify("关注失败，请稍后再试。");
+      return;
+    }
+    document
+      .querySelectorAll<HTMLElement>(`[data-follow-user="${id}"]`)
+      .forEach((item) => {
+        item.dataset.followed = String(!followed);
+        item.textContent = followed ? "关注作者" : "已关注";
+        item.classList.toggle("followed", !followed);
+      });
+    notify(followed ? "已取消关注作者。" : "已关注作者。");
+  } catch {
+    notify("关注失败，请检查网络。");
+  } finally {
+    button.removeAttribute("aria-busy");
+  }
+}
+
+Object.assign(window, {
+  rhineOpenProfile: (id: number) => navigateFromLab(`/u/${id}`),
+  rhineToggleFollow: (button: HTMLElement) => void toggleAuthorFollow(button),
+});
+
 function setTab(tab: string, sound = true) {
   if (sound && tab === activeTab) return;
   activeTab = tab;
@@ -870,6 +983,10 @@ function setTab(tab: string, sound = true) {
   indicator.style.transform = `translateX(${tabButton.offsetLeft}px) scaleX(${tabButton.offsetWidth})`;
   $("#tab-panel").setAttribute("aria-labelledby", tabButton.id);
   $("#tab-panel").innerHTML = tab === "content" ? contentPanel() : infoPanel();
+  if (tab === "content") {
+    bindContentActions();
+    void syncFollowButtons();
+  }
   $("#tab-panel").scrollTop = 0;
   documentDecryption.refresh();
   if (sound) {
@@ -2007,6 +2124,17 @@ if (isWallpaper) {
 }
 void start();
 enableGamepad();
+
+document.addEventListener("click", (event) => {
+  const target = event.target as Element;
+  const profile = target.closest<HTMLElement>("[data-profile-user]");
+  if (profile) {
+    navigateFromLab(`/u/${profile.dataset.profileUser}`);
+    return;
+  }
+  const follow = target.closest<HTMLElement>("[data-follow-user]");
+  if (follow) void toggleAuthorFollow(follow);
+});
 setTimeout(() => void initOffline(notify), 2600);
 const ARCHIVE_HINT: Record<"keyboard" | "gamepad", string> = {
   keyboard: `<kbd>←</kbd> <kbd>→</kbd> 切换列 <span>／</span> <kbd>↑</kbd> <kbd>↓</kbd> 前后档案 <span>／</span> <kbd>ENTER</kbd> 读取`,

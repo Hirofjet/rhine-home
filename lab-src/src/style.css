@@ -2586,6 +2586,52 @@ button {
   font-size: 8px;
   color: #617064;
 }
+.thread-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.archive-author,
+.archive-reply-author {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #566b5a;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  text-align: left;
+}
+.archive-author span {
+  margin-left: 6px;
+  padding: 1px 4px;
+  border: 1px solid rgba(170, 165, 154, 0.5);
+  font-size: 7px;
+  color: #8a857a;
+}
+.archive-author:hover,
+.archive-reply-author:hover {
+  color: #9b7247;
+}
+.archive-follow {
+  padding: 2px 7px;
+  border: 1px solid rgba(155, 114, 71, 0.55);
+  background: rgba(155, 114, 71, 0.08);
+  color: #76552d;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+}
+.archive-follow.followed {
+  border-color: rgba(170, 165, 154, 0.55);
+  background: transparent;
+  color: #817b6f;
+}
+.archive-reply-author {
+  font-size: 9px;
+}
+.archive-reply-author:hover {
+  text-decoration: underline;
+}
 .archive-markdown {
   margin: 10px 0 0 !important;
   font-size: 11px !important;

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSession } from '../auth/useSession'
 
 /** 档案库 lab mode：完整 RHINE LAB 3D 场景，导航由外层统一侧栏提供。 */
 export function LabArchiveView() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const navigate = useNavigate()
   const pendingColumn = useRef<number | null>(null)
   const { user } = useSession()
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -13,6 +15,17 @@ export function LabArchiveView() {
       return 'light'
     }
   })
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type !== 'rhine:navigate') return
+      const path = String(event.data.path ?? '')
+      if (path.startsWith('/')) navigate(path)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [navigate])
 
   useEffect(() => {
     const applyPending = () => {
