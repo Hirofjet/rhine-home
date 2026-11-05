@@ -38,6 +38,9 @@ const MessagesPage = lazy(() =>
 const PublicUserPage = lazy(() =>
   import('./pages/PublicUserPage').then((m) => ({ default: m.PublicUserPage })),
 )
+const LegalPage = lazy(() =>
+  import('./pages/LegalPage').then((m) => ({ default: m.LegalPage })),
+)
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
 )
@@ -144,6 +147,7 @@ export default function App() {
               <Route path="/profile" element={<Page><ProfilePage /></Page>} />
               <Route path="/messages" element={<Page><MessagesPage /></Page>} />
               <Route path="/u/:id" element={<Page><PublicUserPage /></Page>} />
+              <Route path="/legal" element={<Page><LegalPage /></Page>} />
               <Route path="/login" element={<Page><LoginPage /></Page>} />
               <Route path={`${ADMIN_PATH}/*`} element={<Page><AdminPage /></Page>} />
               <Route path="/lab" element={<Navigate to="/archive?mode=lab" replace />} />

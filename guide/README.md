@@ -20,5 +20,5 @@
 
 - 所有命令默认在项目根目录执行，除非标注 `cd server`。
 - 生产环境必须使用 MySQL/MariaDB，不要把 JSON 文件当数据库。
-- `.env`、`server/uploads`、`server/data`、`logs/` 不进入 Git。
+- `.env`、`server/uploads`、`server/data` 不进入 Git；`logs/` 随仓库维护。
 - 3D Lab 素材的署名与许可证见根目录 README 和 `lab-src/PR15-ATTRIBUTION.md`。

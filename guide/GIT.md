@@ -50,8 +50,9 @@ npm run release -- "release: vX.Y.Z - 说明"
 - `.env`；
 - `node_modules`、`dist`；
 - `server/uploads`、`server/data`；
-- `logs/`；
 - 个人资料备份、临时测试文件。
+
+> `logs/` 自 v2.4.0 起随仓库维护，不再忽略。
 
 ## 覆盖项目前
 

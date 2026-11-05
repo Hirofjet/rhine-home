@@ -395,6 +395,12 @@ export function SiteSidebar({ children }: { children: ReactNode }) {
                 <option value="dark">暗色</option>
               </select>
             </div>
+            <Link
+              to="/legal"
+              className="block border-t border-rhine-line/50 pt-2 font-mono text-[8px] tracking-[0.16em] text-rhine-faint hover:text-rhine-gold"
+            >
+              法律 · 版权 · 开源声明
+            </Link>
           </div>
         )}
         <button

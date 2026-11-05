@@ -1,6 +1,7 @@
 import { ArrowUp, Diamond } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { moduleLinks, navItems, site } from '../../content'
+import { legal } from '../../content/legal'
 import { useSiteBrand } from '../../hooks/useSiteBrand'
 import { useSession } from '../auth/useSession'
 import { Barcode } from '../ui'
@@ -92,9 +93,30 @@ export function Footer() {
 
         {/* 小字声明 */}
         <div className="mt-10 space-y-2 border-t border-rhine-line/60 pt-6 font-mono text-[10px] leading-relaxed tracking-wider text-rhine-faint">
-          <p>
-            © {YEAR} {brand}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p>© {YEAR} {legal.owner} · 保留所有权利</p>
+            <Link to="/legal" className="text-rhine-cyan hover:text-rhine-gold">
+              版权与开源声明
+            </Link>
+            <a
+              href={legal.icp.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-rhine-faint hover:text-rhine-gold"
+            >
+              {legal.icp.label}：{legal.icp.number || legal.icp.placeholder}
+            </a>
+            {legal.publicSecurity.number && (
+              <a
+                href={legal.publicSecurity.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-rhine-faint hover:text-rhine-gold"
+              >
+                {legal.publicSecurity.label}：{legal.publicSecurity.number}
+              </a>
+            )}
+          </div>
           <p>{site.footer.line2}</p>
           <p className="text-rhine-gold-deep">
             {site.footer.builtWith} · ARKNIGHTS RHINE LAB TRIBUTE
