@@ -240,13 +240,16 @@ const initialLabTheme = currentLabTheme();
 prefs.colorTheme = initialLabTheme === "dark" || initialLabTheme === "noctis" ? "dark" : "light";
 prefs.uiTheme = prefs.colorTheme;
 const queryTheme = new URLSearchParams(location.search).get("theme");
+const queryPageTheme = new URLSearchParams(location.search).get("pageTheme");
+const isPageTheme = (value: string | null): value is "light" | "dark" | "archive" | "sakura" | "noctis" =>
+  value === "light" || value === "dark" || value === "archive" || value === "sakura" || value === "noctis";
 const customQuery = new URLSearchParams(location.search).get("custom");
 if (queryTheme && ["light", "dark", "archive", "sakura", "noctis"].includes(queryTheme)) {
   prefs.colorTheme = queryTheme === "dark" || queryTheme === "noctis" ? "dark" : "light";
   prefs.uiTheme = prefs.colorTheme;
-  setLabTheme(queryTheme as "light" | "dark" | "archive" | "sakura" | "noctis");
+  setLabTheme(isPageTheme(queryPageTheme) ? queryPageTheme : (queryTheme as "light" | "dark" | "archive" | "sakura" | "noctis"));
 } else {
-  setLabTheme(initialLabTheme);
+  setLabTheme(isPageTheme(queryPageTheme) ? queryPageTheme : initialLabTheme);
 }
 const customColors = customQuery?.split(",").filter((color) => /^#[0-9a-f]{6}$/i.test(color));
 if (customColors?.length === 3) {
@@ -1120,6 +1123,13 @@ function motionPreferenceNoteMarkup() {
   const allEnabled = Object.values(prefs.motion).every(Boolean);
   return `<div id="motion-preference-note" class="motion-preference-note"><p>${motionSummary(prefs.motion)}</p><span>预设：${preset === "full" ? "完整动画" : preset === "reduced" ? "减少动画" : "自定义"} · 选择会保存在本站</span>${allEnabled ? "" : '<button data-action="enable-motion">启用完整动画并重播 ↻</button>'}</div>`;
 }
+function syncThemeControls() {
+  const page = document.querySelector<HTMLSelectElement>("#lab-page-theme");
+  if (page) page.value = currentLabTheme();
+  const three = document.querySelector<HTMLSelectElement>("#lab-3d-theme-select");
+  if (three) three.value = prefs.colorTheme === "dark" ? "dark" : "light";
+}
+
 function themeSettingsSplitMarkup() {
   const ui = currentLabTheme();
   const three = prefs.colorTheme === "dark" ? "dark" : "light";
@@ -1292,11 +1302,25 @@ window.addEventListener("message", (event) => {
     return;
   }
   const theme = event.data?.theme;
+  if (event.data?.type === "rhine:set-page-theme") {
+    if (!isPageTheme(theme)) return;
+    setLabTheme(theme);
+    prefs.uiTheme = theme === "dark" || theme === "noctis" ? "dark" : "light";
+    savePrefs();
+    syncThemeControls();
+    return;
+  }
   if (event.data?.type !== "rhine:set-lab-theme") return;
   if (!["light", "dark", "archive", "sakura", "noctis"].includes(theme)) return;
   prefs.colorTheme = theme === "dark" || theme === "noctis" ? "dark" : "light";
   scene?.setTheme(prefs.colorTheme === "dark", !motionActive("surfaceTransitions"));
+  try {
+    localStorage.setItem("rhine:lab3d-theme", prefs.colorTheme);
+  } catch {
+    /* ignore */
+  }
   savePrefs();
+  syncThemeControls();
 });
 
 document.addEventListener("click", (e) => {

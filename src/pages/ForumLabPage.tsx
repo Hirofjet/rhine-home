@@ -5,10 +5,16 @@ import { forumApi, accessLogApi, type Board } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
 import { useTheme } from '../components/theme/ThemeProvider'
 import { ThemeMenu } from '../components/theme/ThemeMenu'
+import {
+  appThemeFromLabPage,
+  isLab3DTheme,
+  isLabPageTheme,
+  labPageThemeFromApp,
+} from '../lib/labTheme'
 
 /** 论坛专属 Lab：列 = 有权限访问的论坛，前后 = 帖子。 */
 export function ForumLabPage({ embedded = false, active = true }: { embedded?: boolean; active?: boolean }) {
-  const { theme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const { user, loading } = useSession()
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
@@ -46,7 +52,7 @@ export function ForumLabPage({ embedded = false, active = true }: { embedded?: b
   useEffect(() => {
     if (loading || !boards || iframeSrc) return
     setIframeSrc(
-      `/rhine-lab/index.html?mode=forum&theme=${lab3dTheme}&user=${encodeURIComponent(user?.nickname || user?.username || 'Unknown Visitor')}`,
+      `/rhine-lab/index.html?mode=forum&theme=${lab3dTheme}&pageTheme=${labPageThemeFromApp(theme)}&user=${encodeURIComponent(user?.nickname || user?.username || 'Unknown Visitor')}`,
     )
     // The src is intentionally frozen after the first resolution. Session and
     // theme refreshes must not reload the 3D scene and replay its boot.
@@ -64,22 +70,46 @@ export function ForumLabPage({ embedded = false, active = true }: { embedded?: b
   }, [])
 
   useEffect(() => {
-    iframeRef.current?.contentWindow?.postMessage(
+    const target = iframeRef.current?.contentWindow
+    if (!target) return
+    target.postMessage(
       { type: 'rhine:set-lab-theme', theme: lab3dTheme },
       window.location.origin,
     )
-  }, [lab3dTheme, iframeSrc])
+    target.postMessage(
+      { type: 'rhine:set-page-theme', theme: labPageThemeFromApp(theme) },
+      window.location.origin,
+    )
+  }, [lab3dTheme, theme, iframeSrc])
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
+      if (event.data?.type === 'rhine:lab3d-theme') {
+        const next = event.data.theme
+        if (!isLab3DTheme(next)) return
+        setLab3dTheme(next)
+        try {
+          localStorage.setItem('rhine:lab3d-theme', next)
+        } catch {
+          /* ignore */
+        }
+        window.dispatchEvent(new CustomEvent('rhine:lab3d-theme', { detail: next }))
+        return
+      }
+      if (event.data?.type === 'rhine:page-theme') {
+        const next = event.data.theme
+        if (!isLabPageTheme(next)) return
+        setTheme(appThemeFromLabPage(next))
+        return
+      }
       if (event.data?.type !== "rhine:navigate") return
       const path = String(event.data.path ?? "")
       if (path.startsWith("/")) navigate(path)
     }
     window.addEventListener("message", onMessage)
     return () => window.removeEventListener("message", onMessage)
-  }, [navigate])
+  }, [navigate, setTheme])
 
   useEffect(() => {
     if (!active) return undefined
@@ -137,6 +167,10 @@ export function ForumLabPage({ embedded = false, active = true }: { embedded?: b
         onLoad={() => {
           iframeRef.current?.contentWindow?.postMessage(
             { type: 'rhine:set-lab-theme', theme: lab3dTheme },
+            window.location.origin,
+          )
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'rhine:set-page-theme', theme: labPageThemeFromApp(theme) },
             window.location.origin,
           )
         }}

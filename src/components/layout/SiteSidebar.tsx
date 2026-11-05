@@ -63,6 +63,14 @@ export function SiteSidebar({ children }: { children: ReactNode }) {
       return 'light'
     }
   })
+  useEffect(() => {
+    const onLabTheme = (event: Event) => {
+      const next = (event as CustomEvent<'light' | 'dark'>).detail
+      if (next === 'light' || next === 'dark') setLabTheme(next)
+    }
+    window.addEventListener('rhine:lab3d-theme', onLabTheme)
+    return () => window.removeEventListener('rhine:lab3d-theme', onLabTheme)
+  }, [])
   const params = new URLSearchParams(location.search)
   const storedMode = readViewMode()
   const queryMode = params.get('mode')
