@@ -1,6 +1,8 @@
 import { createRollingClock } from "./rolling-clock";
 import { InspectionOverlay } from "./inspection-overlay";
 import { DocumentDecryption } from "./document-decryption";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import "./document-decryption.css";
 import "./decryption.css";
 import { escapeHtml } from "./html";
@@ -771,9 +773,19 @@ function safeUrl(value: unknown) {
 }
 
 function markdownText(value: unknown) {
-  return escapeHtml(String(value ?? ""))
-    .replace(/\n/g, "<br/>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const source = String(value ?? "");
+  try {
+    const html = marked.parse(source, {
+      gfm: true,
+      breaks: true,
+      async: false,
+    });
+    return DOMPurify.sanitize(String(html), {
+      USE_PROFILES: { html: true },
+    });
+  } catch {
+    return escapeHtml(source).replace(/\n/g, "<br/>");
+  }
 }
 
 function infoPanel() {
