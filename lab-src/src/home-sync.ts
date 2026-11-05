@@ -10,6 +10,8 @@ type HomeRecord = {
   abstract: string;
   findings: string[];
   replies?: { author: string; content: string; createdAt?: string }[];
+  tags?: string[];
+  content?: Record<string, unknown>;
   source: string;
 };
 
@@ -59,6 +61,8 @@ function recordFor(module: (typeof modules)[number], item: any, index: number): 
       `编号：${asText(item.id ?? item.code, "—")}`,
       "内容来自 RHINE//HOME 个人档案接口。",
     ],
+    tags: Array.isArray(item.tags) ? item.tags.map((tag: unknown) => asText(tag)).filter(Boolean) : [],
+    content: item,
     source: "",
   };
 }
@@ -210,7 +214,13 @@ async function readForum() {
         const res = await fetch(`${location.origin}/api/forum/boards/${encodeURIComponent(board.slug)}?page=1&t=${Date.now()}`, { headers });
         if (!res.ok) return;
         const body = await res.json();
-        const visible = (Array.isArray(body.posts) ? body.posts : []).slice(0, 8);
+        const visible = (Array.isArray(body.posts) ? body.posts : [])
+          .slice()
+          .sort((a: any, b: any) => {
+            if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+            return String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? ""));
+          })
+          .slice(0, 8);
         await Promise.all(visible.map(async (post: any) => {
           if (!post?.id) return;
           if (Number(post.replyCount ?? 0) === 0) {
@@ -268,6 +278,8 @@ export async function syncForumArchives() {
               content: String(reply.content ?? "").replace(/[#>*_`[\]]/g, ""),
               createdAt: reply.createdAt ?? "",
             })),
+          tags: Array.isArray(post.tags) ? post.tags : [],
+          content: post,
           source: "",
         }))
       : [{

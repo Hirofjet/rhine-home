@@ -738,21 +738,15 @@ function renderDetail() {
   const r = records[selected];
   const moduleLabel = r.department || r.category;
   const moduleCount = records.filter((record) => record.category === r.category).length;
-  const replies = r.replies ?? [];
-  const isForum = r.clearance.includes("BOARD") || r.findings.some((item) => item.includes("论坛"));
-  const secondTab = isForum
-    ? `<button id="tab-replies" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="replies">02 <span>回复 ${replies.length}</span></button>`
-    : `<button id="tab-notes" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="notes">02 <span>研究记录</span></button>`;
+  activeTab = "info";
   $("#object-id").textContent = "NO." + String(selected + 1).padStart(3, "0");
   $("#detail-content").innerHTML = `
+  <div class="detail-tabs detail-switch" role="tablist"><button id="tab-info" class="active" role="tab" aria-controls="tab-panel" aria-selected="true" data-tab="info">档案信息</button><button id="tab-content" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="content">档案内容</button><i class="tab-indicator" aria-hidden="true"></i></div>
   <div class="detail-kicker"><span>${escapeHtml(moduleLabel)} / MODULE</span><span>FILE ${r.id} · ${escapeHtml(r.clearance)}</span></div>
   <div class="detail-module-row"><span class="detail-module">${escapeHtml(moduleLabel)}</span><span class="detail-count">${String(moduleCount).padStart(2, "0")} RECORDS IN MODULE</span></div>
   <h2>${escapeHtml(r.title)}</h2><div class="detail-title-cn">${escapeHtml(r.en)}<span>${escapeHtml(r.category)}</span></div>
-  <p class="detail-lede">${escapeHtml(r.abstract)}</p>
   <div class="detail-rule"></div>
-  <dl class="metadata"><div><dt>MODULE / 模块</dt><dd>${escapeHtml(r.department)}</dd></div><div><dt>DATE / 日期</dt><dd>${escapeHtml(r.date)}</dd></div><div><dt>AUTHOR / 作者</dt><dd>${escapeHtml(r.lead)}</dd></div><div><dt>STATUS / 状态</dt><dd><i></i>${r.clearance === "RESTRICTED" ? "目录访问" : "已归档 · 可读取"}</dd></div></dl>
-  <div class="detail-tabs" role="tablist"><button id="tab-overview" class="active" role="tab" aria-controls="tab-panel" aria-selected="true" data-tab="overview">01 <span>模块重点</span></button>${secondTab}<button id="tab-history" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="history">03 <span>访问日志</span></button><i class="tab-indicator" aria-hidden="true"></i></div>
-  <div id="tab-panel" class="tab-panel" role="tabpanel">${overview()}</div>
+  <div id="tab-panel" class="tab-panel" role="tabpanel">${infoPanel()}</div>
   <div class="detail-actions"><button class="solid-button" data-action="bookmark">${saved.has(r.id) ? "REMOVE FROM SAVED" : "SAVE ARCHIVE"}<span>${saved.has(r.id) ? "已收藏" : "收藏档案"}</span></button></div>
   <div class="detail-footnote"><span>PERSONAL ARCHIVE · RUNTIME SYNCED</span><span>${String(selected + 1).padStart(3, "0")} / ${String(records.length).padStart(3, "0")}</span></div>`;
   $("#detail-content").setAttribute("tabindex", "-1");
@@ -769,12 +763,95 @@ function renderDetail() {
   // Readability guard: the redaction is decorative. If the physical reveal
   // never reaches its clarity cue, never leave the record text covered.
   window.setTimeout(() => documentDecryption.finish(), 1200);
-  setTab(activeTab, false);
+  setTab("info", false);
 }
-function overview() {
+function safeUrl(value: unknown) {
+  const url = String(value ?? "");
+  return /^(\/(?!\/)|https?:\/\/)/.test(url) ? escapeHtml(url) : "";
+}
+
+function markdownText(value: unknown) {
+  return escapeHtml(String(value ?? ""))
+    .replace(/\n/g, "<br/>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function infoPanel() {
   const r = records[selected];
-  const highlights = r.findings.slice(0, 3);
-  return `<div class="panel-label">MODULE FOCUS / 模块重点</div><p class="detail-abstract">${escapeHtml(r.abstract)}</p><ul class="focus-points">${highlights.map((item, index) => `<li><span>${String(index + 1).padStart(2, "0")}</span>${escapeHtml(item)}</li>`).join("")}</ul>`;
+  const access = accessLog
+    .filter((entry) => entry.id === r.id)
+    .slice(0, 6)
+    .map(
+      (entry) =>
+        `<div class="log-row"><span>${entry.time}</span><span>HIROFJET</span><b>READ AUTHORIZED</b></div>`,
+    )
+    .join("");
+  const tags = (r.tags ?? []).map((tag) => `<span>#${escapeHtml(tag)}</span>`).join("");
+  return `<div class="archive-info">
+    <dl class="metadata">
+      <div><dt>TITLE / 标题</dt><dd>${escapeHtml(r.title)}</dd></div>
+      <div><dt>DATE / 发布时间</dt><dd>${escapeHtml(r.date)}</dd></div>
+      <div><dt>AUTHOR / 作者</dt><dd>${escapeHtml(r.lead)}</dd></div>
+      <div><dt>MODULE / 模块</dt><dd>${escapeHtml(r.department)}</dd></div>
+      <div><dt>STATUS / 状态</dt><dd><i></i>${r.clearance === "RESTRICTED" ? "目录访问" : "已归档 · 可读取"}</dd></div>
+      <div><dt>FILE / 档案号</dt><dd>${escapeHtml(r.id)}</dd></div>
+    </dl>
+    <div class="info-tags"><span>TAGS</span>${tags || "<em>暂无标签</em>"}</div>
+    <div class="panel-label">ABSTRACT / 摘要</div>
+    <p class="detail-abstract">${escapeHtml(r.abstract)}</p>
+    <div class="panel-label">RESEARCH NOTES / 研究记录</div>
+    <ul class="focus-points">${r.findings.map((item, index) => `<li><span>${String(index + 1).padStart(2, "0")}</span>${escapeHtml(item)}</li>`).join("")}</ul>
+    <div class="panel-label">ACCESS LOG / 访问记录</div>
+    ${access || `<p class="log-note">本次会话暂无该档案的访问记录。</p>`}
+  </div>`;
+}
+
+function contentPanel() {
+  const r = records[selected];
+  const item = (r.content ?? {}) as Record<string, any>;
+  const tags = (r.tags ?? []).map((tag) => `<span>#${escapeHtml(tag)}</span>`).join("");
+  const category = r.category;
+  const head = `<header class="archive-card-head"><div><small>${escapeHtml(r.department)} · ${escapeHtml(r.date)}</small><strong>${escapeHtml(r.title)}</strong></div><div class="archive-card-tags">${tags}</div></header>`;
+  const attachments = Array.isArray(item.attachments) ? item.attachments : [];
+  const attachmentHtml = attachments
+    .map((file: any) => {
+      const url = safeUrl(file.url);
+      if (!url) return "";
+      if (file.type === "image") return `<img class="archive-inline-image" src="${url}" alt="${escapeHtml(file.name)}" loading="lazy"/>`;
+      if (file.type === "video") return `<video class="archive-inline-video" controls preload="metadata" src="${url}"></video>`;
+      return `<a class="archive-file" href="${url}" target="_blank" rel="noopener">${escapeHtml(file.name || "附件")} ↗</a>`;
+    })
+    .join("");
+
+  if (r.clearance.includes("BOARD") || r.findings.some((finding) => finding.includes("论坛"))) {
+    const replies = r.replies ?? [];
+    return `<div class="archive-card">${head}<div class="archive-markdown">${markdownText(item.content ?? r.abstract)}</div>${attachmentHtml}<div class="panel-label">REPLIES / 回复 ${replies.length}</div>${replies.length ? `<ol class="reply-list">${replies.map((reply, index) => `<li><span class="reply-index">${String(index + 1).padStart(2, "0")}</span><div><b>${escapeHtml(reply.author)}</b><small>${escapeHtml(reply.createdAt ?? "")}</small><p>${escapeHtml(reply.content)}</p></div></li>`).join("")}</ol>` : `<p class="log-note">该帖子暂无回复。</p>`}</div>`;
+  }
+
+  if (category === "照片") {
+    const src = safeUrl(item.url);
+    return `<div class="archive-card">${head}${src ? `<img class="archive-image" src="${src}" alt="${escapeHtml(r.title)}" loading="lazy"/>` : ""}<p class="archive-markdown">${escapeHtml(item.description ?? r.abstract)}</p></div>`;
+  }
+
+  if (category === "视频") {
+    const src = safeUrl(item.src);
+    const poster = safeUrl(item.poster);
+    return `<div class="archive-card">${head}${src ? `<video class="archive-video" controls preload="metadata" poster="${poster}" src="${src}"></video>` : ""}<p class="archive-markdown">${escapeHtml(item.description ?? r.abstract)}</p></div>`;
+  }
+
+  if (category === "项目库") {
+    return `<div class="archive-card">${head}<dl class="project-facts"><div><dt>CODE</dt><dd>${escapeHtml(item.code ?? "—")}</dd></div><div><dt>STATUS</dt><dd>${escapeHtml(item.status ?? "—")}</dd></div><div><dt>VERSION</dt><dd>${escapeHtml(item.version ?? "—")}</dd></div><div><dt>GITHUB</dt><dd>${item.githubUrl ? `<a href="${safeUrl(item.githubUrl)}" target="_blank" rel="noopener">OPEN ↗</a>` : "—"}</dd></div></dl><div class="archive-markdown">${markdownText(item.details ?? item.description ?? r.abstract)}</div></div>`;
+  }
+
+  const downloads = Array.isArray(item.downloads)
+    ? item.downloads
+        .map((file: any) => {
+          const url = safeUrl(file.file ?? file.url);
+          return url ? `<a class="archive-file" href="${url}" target="_blank" rel="noopener">${escapeHtml(file.name || "下载附件")} ↗</a>` : "";
+        })
+        .join("")
+    : "";
+  return `<div class="archive-card">${head}<div class="archive-markdown">${markdownText(item.markdown ?? r.abstract)}</div>${downloads}</div>`;
 }
 function setTab(tab: string, sound = true) {
   if (sound && tab === activeTab) return;
@@ -785,7 +862,6 @@ function setTab(tab: string, sound = true) {
     b.setAttribute("aria-selected", String(active));
     b.setAttribute("tabindex", active ? "0" : "-1");
   });
-  const r = records[selected];
   const tabButton = $<HTMLButtonElement>(`[data-tab="${tab}"]`);
   if (!tabButton) return;
   const indicator = $(".tab-indicator");
@@ -793,25 +869,7 @@ function setTab(tab: string, sound = true) {
     sound && motionActive("surfaceTransitions") ? "" : "none";
   indicator.style.transform = `translateX(${tabButton.offsetLeft}px) scaleX(${tabButton.offsetWidth})`;
   $("#tab-panel").setAttribute("aria-labelledby", tabButton.id);
-  $("#tab-panel").innerHTML =
-    tab === "overview"
-      ? overview()
-      : tab === "replies"
-        ? `<div class="panel-label">REPLIES / 帖子回复 ${r.replies?.length ?? 0}</div>${r.replies?.length
-            ? `<ol class="reply-list">${r.replies.map((reply, index) => `<li><span class="reply-index">${String(index + 1).padStart(2, "0")}</span><div><b>${escapeHtml(reply.author)}</b><small>${escapeHtml(reply.createdAt ?? "")}</small><p>${escapeHtml(reply.content)}</p></div></li>`).join("")}</ol>`
-            : `<p class="log-note">该帖子暂无回复。</p>`}`
-      : tab === "notes"
-        ? `<div class="panel-label">RESEARCH NOTES / 研究记录</div><ol class="research-notes">${r.findings.map((f, i) => `<li><span>${String(i + 1).padStart(2, "0")}</span>${escapeHtml(f)}</li>`).join("")}</ol>`
-        : `<div class="panel-label">ACCESS LOG / 本次访问</div>${accessLog
-            .filter((entry) => entry.id === r.id)
-            .slice(0, 4)
-            .map(
-              (entry) =>
-                `<div class="log-row"><span>${entry.time}</span><span>HIROFJET</span><b>READ AUTHORIZED</b></div>`,
-            )
-            .join(
-              "",
-            )}<p class="log-note">本次会话已通过身份验证。档案内容以当前终端可访问范围展示。</p>`;
+  $("#tab-panel").innerHTML = tab === "content" ? contentPanel() : infoPanel();
   $("#tab-panel").scrollTop = 0;
   documentDecryption.refresh();
   if (sound) {

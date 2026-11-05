@@ -12,6 +12,8 @@ export interface ArchiveRecord {
   abstract: string;
   findings: string[];
   replies?: { author: string; content: string; createdAt?: string }[];
+  tags?: string[];
+  content?: Record<string, unknown>;
   source: string;
 }
 
