@@ -136,3 +136,10 @@
 - 新增 `SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`。
 - `/legal` 页面增加项目法律文件入口与 MIT 代码许可说明。
 - `package.json` 增加作者与 MIT 许可字段。
+
+## v2.4.2 — 2026-11-05
+
+- 补齐 v0.1.0–v0.4.0 日志，覆盖初始主页、Slot 模块、内容块/留言板与日志驱动 Lab。
+- 所有版本日志标题统一为 `Hirofjet//Home-vX.Y.Z 更新日志`。
+- 每篇日志增加 `作者：Hirofjet` 署名与页尾签名。
+- `logs/README.md` 重建完整索引，覆盖 v0.1.0–v2.4.2。
