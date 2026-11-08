@@ -63,6 +63,7 @@ function formatDate(date: Date | null): string {
 export function PhotoTimeline({ className }: { className?: string }) {
   const [localPhotos, setLocalPhotos] = useState<TimelinePhoto[] | null>(null)
   const [remotePhotos, setRemotePhotos] = useState<TimelinePhoto[] | null>(null)
+  const [orientations, setOrientations] = useState<Record<string, 'portrait' | 'landscape'>>({})
 
   useEffect(() => {
     let alive = true
@@ -157,56 +158,93 @@ export function PhotoTimeline({ className }: { className?: string }) {
   }
 
   return (
-    <ol
-      className={cx(
-        'relative space-y-5 border-l border-rhine-line/70 pl-4',
-        className,
-      )}
-    >
+    <ol className={cx('relative mx-auto max-w-5xl pb-6', className)}>
+      <span
+        aria-hidden
+        className="absolute bottom-0 left-4 top-0 w-px bg-rhine-line/70 md:left-1/2"
+      />
       {groups.map((group) => (
-        <li key={group.year} className="relative">
-          <span
-            aria-hidden
-            className="absolute -left-[21px] top-1.5 h-2 w-2 rotate-45 border border-rhine-gold bg-rhine-abyss"
-          />
-          <p className="font-mono text-[10px] tracking-[0.3em] text-rhine-gold">
-            {group.year}
-          </p>
-          <div className="mt-2 space-y-3">
-            {group.items.map((p) => (
-              <figure
-                key={p.key}
-                className="flex gap-3 border border-rhine-line/70 bg-rhine-abyss/40 p-2"
-              >
-                <a
-                  href={p.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block h-20 w-28 shrink-0 overflow-hidden border border-rhine-line/60"
+        <li key={group.year} className="relative pb-9">
+          <div className="relative z-10 mb-6 flex justify-start md:justify-center">
+            <span className="ml-10 border border-rhine-gold/50 bg-rhine-abyss px-3 py-1 font-mono text-[10px] tracking-[0.35em] text-rhine-gold md:ml-0">
+              {group.year}
+            </span>
+          </div>
+          <div className="space-y-7 md:space-y-9">
+            {group.items.map((p) => {
+              const index = photos.indexOf(p)
+              const left = index % 2 === 0
+              const portrait = orientations[p.key] === 'portrait'
+              return (
+                <article
+                  key={p.key}
+                  className="relative md:grid md:grid-cols-2 md:gap-12"
                 >
-                  <img
-                    src={p.url}
-                    alt={p.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
+                  <span
+                    aria-hidden
+                    className="absolute left-4 top-8 z-10 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border border-rhine-gold bg-rhine-abyss md:left-1/2"
                   />
-                </a>
-                <figcaption className="min-w-0 flex-1 py-0.5">
-                  <p className="font-mono text-[11px] tracking-wider text-rhine-ink">
-                    {formatDate(p.date)}
-                  </p>
-                  {p.description && (
-                    <p className="mt-1 text-xs leading-relaxed text-rhine-dim">
-                      {p.description}
-                    </p>
-                  )}
-                  <p className="mt-1 truncate font-mono text-[10px] text-rhine-faint">
-                    {p.name}
-                  </p>
-                </figcaption>
-              </figure>
-            ))}
+                  <div
+                    className={cx(
+                      'ml-10 md:ml-0',
+                      left ? 'md:col-start-1 md:pr-10' : 'md:col-start-2 md:pl-10',
+                    )}
+                  >
+                    <figure className="group overflow-hidden border border-rhine-line/70 bg-rhine-abyss/50 p-2.5 transition-colors hover:border-rhine-gold/50">
+                      <a
+                        href={p.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden border border-rhine-line/50 bg-rhine-abyss"
+                      >
+                        <img
+                          src={p.url}
+                          alt={p.name}
+                          loading="lazy"
+                          decoding="async"
+                          onLoad={(event) => {
+                            const image = event.currentTarget
+                            const next =
+                              image.naturalHeight > image.naturalWidth
+                                ? 'portrait'
+                                : 'landscape'
+                            setOrientations((current) =>
+                              current[p.key] === next
+                                ? current
+                                : { ...current, [p.key]: next },
+                            )
+                          }}
+                          className={cx(
+                            'block transition-transform duration-500 group-hover:scale-[1.015]',
+                            portrait
+                              ? 'mx-auto h-auto max-h-[32rem] w-auto max-w-full object-contain'
+                              : 'h-auto max-h-[26rem] w-full object-contain',
+                          )}
+                        />
+                      </a>
+                      <figcaption className="px-1 pb-1 pt-3">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="font-mono text-[11px] tracking-wider text-rhine-ink">
+                            {formatDate(p.date)}
+                          </p>
+                          <span className="font-mono text-[9px] tracking-wider text-rhine-faint">
+                            {portrait ? 'PORTRAIT' : 'LANDSCAPE'}
+                          </span>
+                        </div>
+                        {p.description && (
+                          <p className="mt-1 text-xs leading-relaxed text-rhine-dim">
+                            {p.description}
+                          </p>
+                        )}
+                        <p className="mt-1 truncate font-mono text-[10px] text-rhine-faint">
+                          {p.name}
+                        </p>
+                      </figcaption>
+                    </figure>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </li>
       ))}

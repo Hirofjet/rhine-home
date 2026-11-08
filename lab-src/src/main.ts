@@ -109,14 +109,14 @@ $("#stage").innerHTML = `
     <div class="archive-callout">
       <div class="eyebrow">PERSONAL ARCHIVE <span>／</span> <span id="archive-category">个人档案</span></div>
       <div class="callout-module"><span id="selected-module" class="module-name">日志</span><span id="selected-count" class="module-count">08 RECORDS</span></div>
-      <button class="file-title" data-action="open"><span class="file-label">FILE</span><span id="selected-id">X-<span id="selected-code">001</span></span><span class="file-open">↗</span></button>
+      <button class="file-title" data-action="open"><span class="file-label">FILE</span><span id="selected-id"><span id="selected-prefix">02-</span><span id="selected-code">001</span></span><span class="file-open">↗</span></button>
       <div class="callout-rule"><i></i></div>
       <div class="file-summary"><span id="selected-title">莱茵生命</span><span id="selected-clearance">BUSINESS AREA</span></div>
       <p id="selected-excerpt" class="file-excerpt"></p>
       <div class="callout-meta"><span>MODULE <b id="selected-module-name">日志</b></span><span>DATE <b id="selected-date">—</b></span></div>
       <button class="read-file" data-action="open">OPEN MODULE <span>→</span></button>
     </div>
-    <div id="hover-label" class="hover-label" hidden>X-<span id="hover-code">001</span> / <span id="hover-title"></span></div>
+    <div id="hover-label" class="hover-label" hidden><span id="hover-prefix">02-</span><span id="hover-code">001</span> / <span id="hover-title"></span></div>
     <div class="archive-counter"><span class="tiny-label">ARCHIVE / SELECT</span><div><span id="selected-number">01</span><i>/</i><span class="count-total">12</span></div></div>
     <div class="archive-navigation"><button data-action="prev" aria-label="上一个档案">↑</button><div id="file-ticks" class="file-ticks"></div><button data-action="next" aria-label="下一个档案">↓</button></div>
     <div class="column-navigation"><button data-action="column-prev" aria-label="上一列">←</button><div><span id="column-number">COLUMN <span id="column-index">03</span> / <span id="column-total">05</span></span><span id="column-page">PAGE <span id="page-index">01</span>/<span id="page-total">01</span></span><strong id="column-name">个人档案</strong></div><button data-action="column-next" aria-label="下一列">→</button></div>
@@ -676,10 +676,11 @@ function updateSelection(navigation?: ArchiveNavigation) {
         : "down"
       : "auto";
   selectedCode.update({
-    value: Number(r.id.slice(2)),
+    value: Number(r.id.split("-")[1] ?? r.id.slice(2)),
     animated: motionActive("rollingNumbers") && mode === "archive",
     direction,
   });
+  $("#selected-prefix").textContent = `${r.id.split("-")[0]}-`;
   fileCounter.update({
     value: offset + 1,
     animated: motionActive("rollingNumbers") && mode === "archive",
@@ -770,7 +771,7 @@ function renderDetail() {
   const moduleLabel = r.department || r.category;
   const moduleCount = records.filter((record) => record.category === r.category).length;
   activeTab = "info";
-  $("#object-id").textContent = "NO." + String(selected + 1).padStart(3, "0");
+  $("#object-id").textContent = "NO." + r.id;
   $("#detail-content").innerHTML = `
   <div class="detail-tabs detail-switch" role="tablist"><button id="tab-info" class="active" role="tab" aria-controls="tab-panel" aria-selected="true" data-tab="info">档案信息</button><button id="tab-content" role="tab" aria-controls="tab-panel" aria-selected="false" data-tab="content">档案内容</button><i class="tab-indicator" aria-hidden="true"></i></div>
   <div class="detail-kicker"><span>${escapeHtml(moduleLabel)} / MODULE</span><span>FILE ${r.id} · ${escapeHtml(r.clearance)}</span></div>
@@ -1800,9 +1801,10 @@ function bindScene(scene: ArchiveScene, cell?: { lane: number; row: number }) {
     const numbersAnimated =
       motionActive("rollingNumbers") && mode === "archive";
     hoverCode.update({
-      value: Number(records[i].id.slice(2)),
+      value: Number(records[i].id.split("-")[1] ?? records[i].id.slice(2)),
       animated: !label.hidden && numbersAnimated,
     });
+    $("#hover-prefix").textContent = `${records[i].id.split("-")[0]}-`;
     hoverTitle.update({
       text: records[i].title,
       animated: !label.hidden && animated,
