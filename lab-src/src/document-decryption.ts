@@ -6,13 +6,11 @@ type Cover = { window: HTMLElement; ink: HTMLElement; order: number };
 export class DocumentDecryption {
   private root: HTMLElement | null = null;
   private covers: Cover[] = [];
-  private started: number | null = null;
   private progress = 0;
 
   reset(root: HTMLElement, clear: boolean) {
     this.remove();
     this.root = root;
-    this.started = null;
     this.progress = clear ? 1 : 0;
     this.refresh();
   }
@@ -74,18 +72,14 @@ export class DocumentDecryption {
     this.paint();
   }
 
-  update(now: number, frame: DecryptionFrame, reduced: boolean) {
+  update(_now: number, frame: DecryptionFrame, reduced: boolean) {
     if (!this.root || this.progress === 1) return;
+    // Drive the paper redaction from the same curve as the physical model.
+    // Starting a second local timer made the text decrypt at a different speed.
     if (reduced) this.progress = 1;
-    else {
-      // Keep covered through joining / holding / retraction. The text starts
-      // opening with the glass, and its easing tail lasts a little longer.
-      if (this.started === null && frame.clarity > 0) this.started = now;
-      if (this.started !== null)
-        this.progress = Math.min(1, Math.max(0, (now - this.started) / 0.95));
-    }
+    else this.progress = frame.clarity;
     if (this.progress === 1) this.remove();
-    else if (this.started !== null) this.paint();
+    else if (this.progress > 0) this.paint();
   }
 
   private paint() {

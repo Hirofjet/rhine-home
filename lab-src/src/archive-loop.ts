@@ -1,4 +1,4 @@
-import { archiveColumns, columnFiles, fileLocation } from "./data.ts";
+import { allColumnFiles, archiveColumns, columnFiles, fileLocation } from "./data.ts";
 
 export type ArchiveCell = { lane: number; row: number };
 export type ArchiveNavigation =
@@ -25,7 +25,7 @@ export function nearestOccurrence(
 }
 
 export function fileAtCell({ lane, row }: ArchiveCell) {
-  const files = columnFiles(wrap(lane, archiveColumns.length));
+  const files = allColumnFiles(wrap(lane, archiveColumns.length));
   return files[wrap(row - 12, files.length)];
 }
 

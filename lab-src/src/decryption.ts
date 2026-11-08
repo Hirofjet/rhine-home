@@ -3,6 +3,8 @@
 export const DECRYPTION_START = 34.12;
 export const DECRYPTION_END = 39.56;
 const INTERACTIVE_RATE = 1.5;
+export const DECRYPTION_SECONDS =
+  (DECRYPTION_END - DECRYPTION_START) / INTERACTIVE_RATE;
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const smooth = (value: number) => {
   const x = clamp(value);
@@ -126,9 +128,7 @@ export class DecryptionController {
   enter(alreadyClear = false) {
     if (this.active) return;
     this.active = true;
-    this.elapsed = alreadyClear
-      ? (DECRYPTION_END - DECRYPTION_START) / INTERACTIVE_RATE
-      : null;
+    this.elapsed = alreadyClear ? DECRYPTION_SECONDS : null;
     if (alreadyClear) this.finish();
   }
   leave() {
@@ -141,7 +141,7 @@ export class DecryptionController {
     this.clarity = clarity;
   }
   finish() {
-    this.elapsed = (DECRYPTION_END - DECRYPTION_START) / INTERACTIVE_RATE;
+    this.elapsed = DECRYPTION_SECONDS;
     this.clarity = 1;
     this.frame = decryptionFrame(DECRYPTION_END);
   }
@@ -167,7 +167,7 @@ export class DecryptionController {
     else if (this.elapsed !== null)
       this.elapsed = Math.min(
         this.elapsed + Math.max(0, dt),
-        (DECRYPTION_END - DECRYPTION_START) / INTERACTIVE_RATE,
+        DECRYPTION_SECONDS,
       );
     if (this.elapsed !== null) {
       this.frame = decryptionFrame(

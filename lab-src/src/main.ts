@@ -1,6 +1,7 @@
 import { createRollingClock } from "./rolling-clock";
 import { InspectionOverlay } from "./inspection-overlay";
 import { DocumentDecryption } from "./document-decryption";
+import { DECRYPTION_SECONDS } from "./decryption";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import "./document-decryption.css";
@@ -791,9 +792,12 @@ function renderDetail() {
       !scene ||
       scene.decryptionFrame.phase === "clear",
   );
-  // Readability guard: the redaction is decorative. If the physical reveal
-  // never reaches its clarity cue, never leave the record text covered.
-  window.setTimeout(() => documentDecryption.finish(), 1200);
+  // Readability guard: only finish if the physical reveal never starts.
+  // The normal path is driven by the model's own clarity curve.
+  window.setTimeout(
+    () => documentDecryption.finish(),
+    DECRYPTION_SECONDS * 1000 + 2500,
+  );
   setTab("info", false);
 }
 function safeUrl(value: unknown) {
