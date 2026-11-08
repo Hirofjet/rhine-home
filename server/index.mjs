@@ -237,6 +237,26 @@ function canManageTarget(actor, target) {
   )
 }
 
+/**
+ * 手动权限保存后，避免出现“权限已撤销但身份头衔还在”的脏状态。
+ * 身份头衔必须仍然有对应的基础权限或板块权限支撑。
+ */
+async function effectiveRoleAfterPermissions(target, permissions) {
+  if (target.isSuper) return 'super'
+  const role = target.identity || 'member'
+  if (role === 'member' || role === 'super') return role
+  if (!permissions.length) return 'member'
+  if (role === 'senior' || role === 'forum_master') {
+    return permissions.includes('forum') ? role : 'member'
+  }
+  const cls = roleClass(role)
+  if (!cls) return role
+  if (permissions.includes('forum')) return role
+  const boards = await query('SELECT id FROM forum_boards WHERE access = ?', [cls])
+  const hasClassBoard = boards.some((board) => permissions.includes(`forum.${board.id}`))
+  return hasClassBoard ? role : 'member'
+}
+
 // ---------- 邮箱验证码 ----------
 const codeHash = (code) =>
   crypto.createHash('sha256').update(String(code)).digest('hex')
@@ -566,8 +586,7 @@ app.put('/api/admin/users/:id', requireAuth, requireMembersManage, async (req, r
 })
 
 app.put(
-  '/api/admin/users/:id/permissions',
-  requireAuth,
+  '/api/admin/users/:id/permissions',  requireAuth,
   requireMembersGrant,
   async (req, res) => {
     const id = Number(req.params.id)
@@ -582,8 +601,10 @@ app.put(
       return res.status(403).json({ error: 'forbidden' })
     }
     const permissions = sanitizePermissions(req.body?.permissions, req.user)
-    await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+    const nextRole = await effectiveRoleAfterPermissions(target, permissions)
+    await execute('UPDATE users SET permissions = ?, role_code = ? WHERE id = ?', [
       JSON.stringify(permissions),
+      nextRole,
       id,
     ])
     await notify(
@@ -628,12 +649,9 @@ app.put('/api/admin/users/:id/identity', requireAuth, async (req, res) => {
     if (Number(rows[0]?.n ?? 0) >= 4) return res.status(409).json({ error: 'identity_limit' })
   }
 
-  const permissions = permissionsForRole(role)
-  const cls = roleClass(role)
-  if (cls) {
-    const boards = await query('SELECT id FROM forum_boards WHERE access = ?', [cls])
-    for (const board of boards) permissions.push(`forum.${board.id}`)
-  }
+  const permissions = [
+    ...new Set([...permissionsForRole(role), ...target.permissions.filter(isForumPermission)]),
+  ]
   await execute('UPDATE users SET role_code = ?, permissions = ? WHERE id = ?', [
     role,
     JSON.stringify([...new Set(permissions)]),
@@ -1320,6 +1338,7 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
   const posts = await query(
     `SELECT p.id, p.title, p.created_at, p.updated_at, p.tags, p.pinned,
             COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.id AS author_id, u.avatar_url AS author_avatar,
+            u.forum_title AS author_title, u.forum_level AS author_level,
             (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
      FROM forum_posts p JOIN users u ON u.id = p.author_id
      WHERE p.board_id = ? AND p.status = 'approved'
@@ -1334,6 +1353,8 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
       author: p.author,
       authorId: Number(p.author_id),
       authorAvatar: p.author_avatar ?? '',
+      authorTitle: p.author_title ?? '',
+      authorLevel: Number(p.author_level ?? 0),
       tags: parseTags(p.tags),
       pinned: Boolean(p.pinned),
       createdAt: p.created_at,
@@ -1348,6 +1369,7 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   const id = Number(req.params.id)
   const rows = await query(
     `SELECT p.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar,
+            u.forum_title AS author_title, u.forum_level AS author_level,
             b.slug AS board_slug, b.name AS board_name
      FROM forum_posts p
      JOIN users u ON u.id = p.author_id
@@ -1358,7 +1380,8 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
   const post = rows[0]
   const replies = await query(
-    `SELECT r.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar
+    `SELECT r.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar,
+            u.forum_title AS author_title, u.forum_level AS author_level
      FROM forum_replies r JOIN users u ON u.id = r.author_id
      WHERE r.post_id = ? AND r.status = 'approved'
      ORDER BY r.created_at ASC LIMIT 300`,
@@ -1375,6 +1398,8 @@ app.get('/api/forum/posts/:id', async (req, res) => {
       author: post.author,
       authorAvatar: post.author_avatar ?? '',
       authorId: Number(post.author_id),
+      authorTitle: post.author_title ?? '',
+      authorLevel: Number(post.author_level ?? 0),
       board: { id: Number(post.board_id), slug: post.board_slug, name: post.board_name },
       createdAt: post.created_at,
     },
@@ -1386,6 +1411,8 @@ app.get('/api/forum/posts/:id', async (req, res) => {
       author: r.author,
       authorAvatar: r.author_avatar ?? '',
       authorId: Number(r.author_id),
+      authorTitle: r.author_title ?? '',
+      authorLevel: Number(r.author_level ?? 0),
       createdAt: r.created_at,
     })),
   })
@@ -1434,6 +1461,37 @@ async function notify(userId, type, title, content, link) {
   }
 }
 
+/** 论坛活跃度：发帖 5 分、回复 1 分，按规则自动发头衔。 */
+async function refreshForumActivity(userId) {
+  if (!userId) return
+  try {
+    const stats = await query(
+      `SELECT
+         (SELECT COUNT(*) FROM forum_posts WHERE author_id = ? AND status = 'approved') AS posts,
+         (SELECT COUNT(*) FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id
+           WHERE r.author_id = ? AND r.status = 'approved' AND p.status = 'approved') AS replies`,
+      [userId, userId],
+    )
+    const points = Number(stats[0]?.posts ?? 0) * 5 + Number(stats[0]?.replies ?? 0)
+    const rules = await query(
+      'SELECT level, min_points, title FROM forum_title_rules ORDER BY min_points DESC, level DESC',
+    )
+    const matched = rules.find((rule) => points >= Number(rule.min_points))
+    const level = matched ? Number(matched.level) : 0
+    const autoTitle = matched?.title ? String(matched.title).slice(0, 64) : ''
+    const rows = await query('SELECT forum_title, forum_title_locked FROM users WHERE id = ?', [
+      userId,
+    ])
+    const locked = Boolean(rows[0]?.forum_title_locked)
+    await execute(
+      `UPDATE users SET forum_points = ?, forum_level = ?${locked ? '' : ', forum_title = ?'} WHERE id = ?`,
+      locked ? [points, level, userId] : [points, level, autoTitle, userId],
+    )
+  } catch (error) {
+    console.error('[activity]', error.message)
+  }
+}
+
 app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res) => {
   const boardId = Number(req.body?.boardId)
   const title = asString(req.body?.title, 200)
@@ -1468,6 +1526,7 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
       autoApprove ? 'approved' : 'pending',
     ],
   )
+  if (autoApprove) await refreshForumActivity(req.user.id)
   res.status(201).json({
     id: Number(result.insertId),
     status: autoApprove ? 'approved' : 'pending',
@@ -1524,6 +1583,7 @@ app.post(
         `/forum/post/${postId}`,
       )
     }
+    await refreshForumActivity(req.user.id)
     res.status(201).json({
       id: Number(result.insertId),
       status: 'approved',
@@ -1536,7 +1596,7 @@ app.post(
 app.delete('/api/forum/posts/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id)
   const rows = await query(
-    'SELECT id, author_id, board_id FROM forum_posts WHERE id = ?',
+    'SELECT id, author_id, board_id, status FROM forum_posts WHERE id = ?',
     [id],
   )
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
@@ -1544,7 +1604,9 @@ app.delete('/api/forum/posts/:id', requireAuth, async (req, res) => {
     rows[0].author_id === req.user.id ||
     hasForumAction(req.user, Number(rows[0].board_id), 'post.delete')
   if (!allowed) return res.status(403).json({ error: 'forbidden' })
-  await execute(`UPDATE forum_posts SET status = 'deleted' WHERE id = ?`, [id])
+  if (rows[0].status === 'deleted') return res.status(404).json({ error: 'not_found' })
+  await execute(`UPDATE forum_posts SET status = 'deleted', pinned = 0 WHERE id = ?`, [id])
+  await refreshForumActivity(Number(rows[0].author_id))
   res.json({ ok: true })
 })
 
@@ -1557,7 +1619,7 @@ app.post(
     const id = Number(req.params.id)
     const action = asString(req.body?.action, 20)
     const rows = await query(
-      'SELECT id, board_id, status FROM forum_posts WHERE id = ?',
+      'SELECT id, board_id, author_id, status FROM forum_posts WHERE id = ?',
       [id],
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
@@ -1570,19 +1632,26 @@ app.post(
     if (!hasForumAction(req.user, Number(rows[0].board_id), actionKey)) {
       return res.status(403).json({ error: 'forbidden' })
     }
+    if (rows[0].status === 'deleted') {
+      return res.status(404).json({ error: 'not_found' })
+    }
     if (action === 'hide') {
       await execute(`UPDATE forum_posts SET status = 'hidden' WHERE id = ?`, [id])
     } else if (action === 'restore') {
+      if (rows[0].status !== 'hidden') {
+        return res.status(409).json({ error: 'not_hidden' })
+      }
       await execute(`UPDATE forum_posts SET status = 'approved' WHERE id = ?`, [id])
     } else if (action === 'pin') {
       await execute('UPDATE forum_posts SET pinned = 1 WHERE id = ?', [id])
     } else if (action === 'unpin') {
       await execute('UPDATE forum_posts SET pinned = 0 WHERE id = ?', [id])
     } else if (action === 'delete') {
-      await execute(`UPDATE forum_posts SET status = 'deleted' WHERE id = ?`, [id])
+      await execute(`UPDATE forum_posts SET status = 'deleted', pinned = 0 WHERE id = ?`, [id])
     } else {
       return res.status(400).json({ error: 'invalid_action' })
     }
+    await refreshForumActivity(Number(rows[0].author_id))
     res.json({ ok: true })
   },
 )
@@ -1604,6 +1673,7 @@ app.delete('/api/forum/replies/:id', requireAuth, async (req, res) => {
     hasForumAction(req.user, Number(row.board_id), 'reply.delete')
   if (!allowed) return res.status(403).json({ error: 'forbidden' })
   await execute(`UPDATE forum_replies SET status = 'deleted' WHERE id = ?`, [id])
+  await refreshForumActivity(Number(row.author_id))
   res.json({ ok: true })
 })
 
@@ -1613,7 +1683,7 @@ app.delete('/api/forum/replies/:id', requireAuth, async (req, res) => {
 app.get('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req, res) => {
   const rows = await query(
     `SELECT b.*,
-      (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id) AS post_count,
+      (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.status <> 'deleted') AS post_count,
       (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'pending') AS pending_count,
       (SELECT MAX(p.created_at) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'approved') AS last_post_at
      FROM forum_boards b ORDER BY last_post_at DESC, b.id DESC`,
@@ -1925,6 +1995,7 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
       `UPDATE forum_posts SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
       [approve ? 'approved' : 'rejected', note, req.user.id, id],
     )
+    await refreshForumActivity(Number(rows[0].author_id))
     if (Number(rows[0].author_id) !== req.user.id) {
       await notify(
         Number(rows[0].author_id),
@@ -1936,7 +2007,7 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
     }
   } else {
     const rows = await query(
-      `SELECT p.board_id FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE r.id = ?`,
+      `SELECT p.board_id, r.author_id FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE r.id = ?`,
       [id],
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
@@ -1948,6 +2019,7 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
       `UPDATE forum_replies SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
       [approve ? 'approved' : 'rejected', note, req.user.id, id],
     )
+    await refreshForumActivity(Number(rows[0].author_id))
   }
   res.json({ ok: true })
 })
@@ -1971,7 +2043,7 @@ app.get(
               (SELECT COUNT(*) FROM forum_replies r
                WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
        FROM forum_posts p JOIN users u ON u.id = p.author_id
-       WHERE p.board_id = ?
+       WHERE p.board_id = ? AND p.status <> 'deleted'
        ORDER BY p.pinned DESC, p.created_at DESC LIMIT ? OFFSET ?`,
       [boardId, limit, offset],
     )
@@ -1988,6 +2060,99 @@ app.get(
       })),
       pagination: { page, limit },
     })
+  },
+)
+
+// ============================================================
+// 论坛头衔与活跃等级
+// ============================================================
+app.get(
+  '/api/admin/forum/users',
+  requireAuth,
+  requireForumAccess,
+  async (_req, res) => {
+    const users = await query(
+      `SELECT id, username, nickname, role_code, forum_title, forum_title_locked,
+              forum_points, forum_level
+       FROM users WHERE status = 'active' ORDER BY forum_points DESC, id ASC LIMIT 500`,
+    )
+    res.json({
+      users: users.map((user) => ({
+        id: Number(user.id),
+        username: user.username,
+        nickname: user.nickname || user.username,
+        identity: user.role_code,
+        forumTitle: user.forum_title ?? '',
+        forumTitleLocked: Boolean(user.forum_title_locked),
+        forumPoints: Number(user.forum_points ?? 0),
+        forumLevel: Number(user.forum_level ?? 0),
+      })),
+    })
+  },
+)
+
+app.get(
+  '/api/admin/forum/title-rules',
+  requireAuth,
+  requireForumAccess,
+  async (_req, res) => {
+    const rules = await query(
+      'SELECT id, level, min_points AS minPoints, title FROM forum_title_rules ORDER BY min_points ASC, level ASC',
+    )
+    res.json({ rules })
+  },
+)
+
+app.put(
+  '/api/admin/forum/title-rules',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const input = Array.isArray(req.body?.rules) ? req.body.rules : []
+    const rules = input
+      .map((rule) => ({
+        level: Math.max(1, Math.min(99, Number(rule?.level) || 0)),
+        minPoints: Math.max(0, Math.min(1000000, Number(rule?.minPoints) || 0)),
+        title: asString(rule?.title, 64),
+      }))
+      .filter((rule) => rule.level && rule.title)
+      .slice(0, 30)
+    if (rules.length !== input.length) {
+      return res.status(400).json({ error: 'invalid_rules' })
+    }
+    await transaction(async (connection) => {
+      await connection.execute('DELETE FROM forum_title_rules')
+      for (const rule of rules) {
+        await connection.execute(
+          'INSERT INTO forum_title_rules (level, min_points, title) VALUES (?, ?, ?)',
+          [rule.level, rule.minPoints, rule.title],
+        )
+      }
+    })
+    const users = await query("SELECT id FROM users WHERE status = 'active'")
+    for (const user of users) await refreshForumActivity(Number(user.id))
+    res.json({ ok: true })
+  },
+)
+
+app.post(
+  '/api/admin/forum/users/:id/title',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const id = Number(req.params.id)
+    const title = asString(req.body?.title, 64)
+    const locked = req.body?.locked !== false && Boolean(title)
+    const rows = await query('SELECT id FROM users WHERE id = ?', [id])
+    if (!rows.length) return res.status(404).json({ error: 'not_found' })
+    await execute('UPDATE users SET forum_title = ?, forum_title_locked = ? WHERE id = ?', [
+      title,
+      locked ? 1 : 0,
+      id,
+    ])
+    if (!locked) await refreshForumActivity(id)
+    await notify(id, 'permission', '论坛头衔已更新', title || '已恢复自动等级头衔', '/profile')
+    res.json({ ok: true })
   },
 )
 
@@ -2054,7 +2219,7 @@ app.get(
        FROM forum_posts p
        JOIN forum_boards b ON b.id = p.board_id
        JOIN users u ON u.id = p.author_id
-       WHERE p.id = ?`,
+       WHERE p.id = ? AND p.status <> 'deleted'`,
       [id],
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
@@ -2509,8 +2674,25 @@ app.post('/api/notifications/read', requireAuth, async (req, res) => {
   res.json({ ok: true })
 })
 
-// ============================================================
-// 私信 / 好友（互相关注即好友）
+app.delete('/api/notifications/:id', requireAuth, async (req, res) => {
+  await execute('DELETE FROM notifications WHERE id = ? AND user_id = ?', [
+    Number(req.params.id),
+    req.user.id,
+  ])
+  res.json({ ok: true })
+})
+
+app.delete('/api/notifications', requireAuth, async (req, res) => {
+  if (String(req.query.scope ?? '') === 'read') {
+    await execute(
+      'DELETE FROM notifications WHERE user_id = ? AND read_at IS NOT NULL',
+      [req.user.id],
+    )
+  } else {
+    await execute('DELETE FROM notifications WHERE user_id = ?', [req.user.id])
+  }
+  res.json({ ok: true })
+})
 // ============================================================
 async function areFriends(firstId, secondId) {
   const rows = await query(

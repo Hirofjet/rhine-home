@@ -9,7 +9,7 @@ type HomeRecord = {
   clearance: string;
   abstract: string;
   findings: string[];
-  replies?: { author: string; authorId?: number; content: string; createdAt?: string }[];
+  replies?: { author: string; authorId?: number; authorTitle?: string; authorLevel?: number; content: string; createdAt?: string }[];
   tags?: string[];
   content?: Record<string, unknown>;
   source: string;
@@ -44,7 +44,7 @@ function asText(value: unknown, fallback = ""): string {
 
 function recordFor(module: (typeof modules)[number], item: any, index: number): HomeRecord {
   return {
-    id: `${String(modules.indexOf(module) + 1).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
+    id: `${String(modules.indexOf(module) + 1).padStart(2, "0")}-${String(index + 1).padStart(3, "0")}`,
     title: asText(item.title ?? item.name ?? item.code, `${module.label}档案`).slice(0, 80),
     en: module.en,
     department: module.label,
@@ -86,7 +86,7 @@ async function homeArchiveRecords(): Promise<HomeRecord[]> {
         ],
       },
       ...(profile.dossier ?? []).map((text: string, index: number) => ({
-        title: `个人档案 ${String(index + 1).padStart(2, "0")}`,
+        title: `个人档案 ${String(index + 1).padStart(3, "0")}`,
         abstract: text,
         findings: [`模块：主页`, `档案序号：${index + 1}`],
       })),
@@ -99,7 +99,7 @@ async function homeArchiveRecords(): Promise<HomeRecord[]> {
       });
     }
     return base.slice(0, 8).map((item, index) => ({
-      id: `00-${String(index + 1).padStart(2, "0")}`,
+      id: `00-${String(index + 1).padStart(3, "0")}`,
       title: item.title,
       en: "HOME / PROFILE",
       department: "主页",
@@ -113,7 +113,7 @@ async function homeArchiveRecords(): Promise<HomeRecord[]> {
     }));
   } catch {
     return Array.from({ length: 8 }, (_, index) => ({
-      id: `00-${String(index + 1).padStart(2, "0")}`,
+      id: `00-${String(index + 1).padStart(3, "0")}`,
       title: index === 0 ? "HIROFJET" : `个人档案 ${String(index).padStart(2, "0")}`,
       en: "HOME / PROFILE",
       department: "主页",
@@ -140,8 +140,8 @@ export async function syncHomeArchives() {
   for (const { module, items } of moduleItems) {
     const existing = records.filter((record) => record.category === module.label);
     const list = items.length
-      ? items.slice(0, 8).map((item: any, index: number) => recordFor(module, item, index))
-      : existing.slice(0, 8);
+      ? items.slice(0, 20).map((item: any, index: number) => recordFor(module, item, index))
+      : existing.slice(0, 20);
     while (list.length < 8) {
       list.push(
         recordFor(
@@ -211,7 +211,7 @@ async function readForum() {
     const posts = new Map<string, any[]>();
     await Promise.all(boards.map(async (board: any) => {
       try {
-        const res = await fetch(`${location.origin}/api/forum/boards/${encodeURIComponent(board.slug)}?page=1&t=${Date.now()}`, { headers });
+        const res = await fetch(`${location.origin}/api/forum/boards/${encodeURIComponent(board.slug)}?page=1&limit=50&t=${Date.now()}`, { headers });
         if (!res.ok) return;
         const body = await res.json();
         const visible = (Array.isArray(body.posts) ? body.posts : [])
@@ -220,7 +220,7 @@ async function readForum() {
             if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
             return String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? ""));
           })
-          .slice(0, 8);
+          .slice(0, 20);
         await Promise.all(visible.map(async (post: any) => {
           if (!post?.id) return;
           if (Number(post.replyCount ?? 0) === 0) {
@@ -252,11 +252,11 @@ export async function syncForumArchives() {
   const { boards, posts } = await readForum();
   if (!boards.length) return false;
   const next: HomeRecord[] = [];
-  for (const [boardIndex, board] of boards.slice(0, 8).entries()) {
-    const list = (posts.get(board.slug) ?? []).slice(0, 8);
+  for (const [boardIndex, board] of boards.slice(0, 12).entries()) {
+    const list = (posts.get(board.slug) ?? []).slice(0, 20);
     const mapped: HomeRecord[] = list.length
       ? list.map((post: any, index: number) => ({
-          id: `${String(boardIndex + 1).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
+          id: `${String(boardIndex + 1).padStart(2, "0")}-${String(index + 1).padStart(3, "0")}`,
           title: post.title ?? "无标题帖子",
           en: board.name,
           department: board.name,
@@ -276,6 +276,8 @@ export async function syncForumArchives() {
             .map((reply: any) => ({
               author: reply.author ?? "—",
               authorId: Number(reply.authorId) || undefined,
+              authorTitle: reply.authorTitle ?? "",
+              authorLevel: Number(reply.authorLevel) || 0,
               content: String(reply.content ?? "").replace(/[#>*_`[\]]/g, ""),
               createdAt: reply.createdAt ?? "",
             })),
@@ -314,8 +316,8 @@ export async function syncForumArchives() {
     next.push(...mapped);
   }
   records.splice(0, records.length, ...next);
-  archiveColumns.splice(0, archiveColumns.length, ...boards.slice(0, 8).map((board: any) => board.name));
-  categories.splice(1, categories.length - 1, "全部论坛", ...boards.slice(0, 8).map((board: any) => board.name));
+  archiveColumns.splice(0, archiveColumns.length, ...boards.slice(0, 12).map((board: any) => board.name));
+  categories.splice(1, categories.length - 1, "全部论坛", ...boards.slice(0, 12).map((board: any) => board.name));
   return true;
 }
 

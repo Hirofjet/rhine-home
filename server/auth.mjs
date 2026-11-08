@@ -149,6 +149,10 @@ export function normalizeUser(row) {
         return []
       }
     })(),
+    forumTitle: row.forum_title ?? '',
+    forumTitleLocked: Boolean(row.forum_title_locked),
+    forumPoints: Number(row.forum_points ?? 0),
+    forumLevel: Number(row.forum_level ?? 0),
     banned: Boolean(row.banned),
     bannedUntil: row.banned_until ?? null,
     bannedReason: row.banned_reason ?? '',
@@ -184,6 +188,10 @@ export function publicUser(user) {
     birthday: user.birthday,
     bio: user.bio,
     tags: user.tags,
+    forumTitle: user.forumTitle,
+    forumTitleLocked: user.forumTitleLocked,
+    forumPoints: user.forumPoints,
+    forumLevel: user.forumLevel,
     banned: banActive(user),
     bannedUntil: user.banned ? user.bannedUntil : null,
     bannedReason: user.banned ? user.bannedReason : '',

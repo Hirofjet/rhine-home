@@ -19,9 +19,7 @@ export function PermissionTree({
   disabled = false,
 }: PermissionTreeProps) {
   const has = (key: string) => value.includes(key)
-  const forumChildren = boards.map((board) => `forum.${board.id}`)
-  const forumAll = forumChildren.length > 0 && forumChildren.every((key) => has(key))
-  const forumParent = has('forum') || forumAll
+  const forumParent = has('forum')
 
   const apply = (next: string[]) => {
     if (!disabled) onChange([...new Set(next)])
@@ -29,8 +27,8 @@ export function PermissionTree({
 
   const toggleForumParent = (checked: boolean) => {
     let next = value.filter((item) => item !== 'forum')
-    next = next.filter((item) => !/^forum\.\d+$/.test(item))
-    if (checked) next.push('forum', ...forumChildren)
+    next = next.filter((item) => !/^forum(?:\.|$)/.test(item))
+    if (checked) next.push('forum')
     apply(next)
   }
 
@@ -38,11 +36,8 @@ export function PermissionTree({
     let next = value.filter((item) => item !== 'forum')
     if (checked) {
       if (!next.includes(key)) next.push(key)
-      if (forumChildren.length > 0 && forumChildren.every((child) => next.includes(child))) {
-        next.push('forum')
-      }
     } else {
-      next = next.filter((item) => item !== key)
+      next = next.filter((item) => item !== key && !item.startsWith(`${key}.`))
     }
     apply(next)
   }
@@ -107,6 +102,9 @@ export function PermissionTree({
 
       {groupTitle('论坛 / FORUM')}
       <div className="space-y-2 border-l border-rhine-line/60 pl-3">
+        <p className="font-mono text-[8px] leading-relaxed text-rhine-faint">
+          「全部板块」会授予现有及未来所有论坛；只授予单个板块请逐项勾选，不会自动扩大到全部普通论坛。
+        </p>
         <AdminCheckbox
           checked={forumParent}
           onChange={toggleForumParent}

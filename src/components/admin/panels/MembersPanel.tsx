@@ -559,8 +559,11 @@ export function MembersPanel({ user }: MembersPanelProps) {
                 ))}
               </select>
               <AdminButton variant="ghost" onClick={() => void applyIdentity()} disabled={busy}>
-                应用身份并重算权限
+                应用身份（保留现有板块权限）
               </AdminButton>
+              <p className="font-mono text-[8px] leading-relaxed text-rhine-faint">
+                身份只决定头衔与基础权限；具体板块权限请在下方按板块勾选，避免自动获得全部普通论坛。
+              </p>
             </div>
           )}
           <PermissionTree

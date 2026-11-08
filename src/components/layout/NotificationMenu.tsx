@@ -88,6 +88,11 @@ export function NotificationMenu() {
     void userApi.readNotifications(id).catch(() => undefined)
   }
 
+  const clearRead = () => {
+    setNotifications((current) => current.filter((item) => !item.read))
+    void userApi.clearReadNotifications().catch(() => undefined)
+  }
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -120,6 +125,13 @@ export function NotificationMenu() {
             >
               全部
             </Link>
+            <button
+              type="button"
+              onClick={clearRead}
+              className="font-mono text-[9px] text-rhine-faint hover:text-rhine-red"
+            >
+              清除已读
+            </button>
           </div>
 
           {important.length > 0 && (

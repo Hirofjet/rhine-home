@@ -5,6 +5,7 @@ import { hasPerm, type ApiUser } from '../../lib/api'
 import { ArticlesPanel } from './panels/ArticlesPanel'
 import { ForumAnnouncementsPanel } from './panels/ForumAnnouncementsPanel'
 import { ForumClassPanel } from './panels/ForumClassPanel'
+import { ForumTitlesPanel } from './panels/ForumTitlesPanel'
 import { CreateForumPanel } from './panels/CreateForumPanel'
 import { IdentityPanel } from './panels/IdentityPanel'
 import { GuestbookPanel } from './panels/GuestbookPanel'
@@ -35,6 +36,7 @@ type PanelKey =
   | 'forum-public'
   | 'forum-special'
   | 'forum-core'
+  | 'forum-titles'
   | 'review-access'
   | 'review-posts'
   | 'members'
@@ -117,6 +119,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
         { key: 'forum-public', label: '普通论坛', labelEn: 'PUBLIC', subgroup: '论坛管理' },
         { key: 'forum-special', label: '特殊论坛', labelEn: 'SPECIAL', subgroup: '论坛管理' },
         { key: 'forum-core', label: '核心论坛', labelEn: 'CORE', subgroup: '论坛管理' },
+        { key: 'forum-titles', label: '头衔等级', labelEn: 'TITLES', subgroup: '论坛管理' },
         { key: 'review-access', label: '特殊申请', labelEn: 'APPLICATIONS', subgroup: '审核平台' },
         { key: 'review-posts', label: '待审帖子', labelEn: 'PENDING', subgroup: '审核平台' },
       )
@@ -254,6 +257,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
               {current === 'forum-public' && <ForumClassPanel access="public" />}
               {current === 'forum-special' && <ForumClassPanel access="special" />}
               {current === 'forum-core' && <ForumClassPanel access="core" />}
+              {current === 'forum-titles' && <ForumTitlesPanel />}
               {current === 'review-access' && <ReviewAccessPanel />}
               {current === 'review-posts' && <ReviewPanel postsOnly />}
               {current === 'members' && <MembersPanel user={user} />}

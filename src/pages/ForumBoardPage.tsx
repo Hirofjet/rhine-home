@@ -12,6 +12,7 @@ import {
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
+import { AuthorTitle } from '../components/forum/AuthorTitle'
 import { fadeUp, stagger } from '../lib/motion'
 import { formatDateTime } from '../lib/format'
 
@@ -283,6 +284,7 @@ export function ForumBoardPage() {
                     <span className="flex items-center gap-1">
                       <User className="h-2.5 w-2.5" /> {post.author}
                     </span>
+                    <AuthorTitle title={post.authorTitle} level={post.authorLevel} />
                     <span>{formatDateTime(post.createdAt)}</span>
                     {(Array.isArray(post.tags) ? post.tags : []).map((tag) => (
                       <span key={tag} className="border border-rhine-line/70 px-1.5 py-0.5 text-rhine-cyan">

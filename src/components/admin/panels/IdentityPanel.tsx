@@ -136,6 +136,9 @@ export function IdentityPanel({ actor }: { actor: ApiUser }) {
       <AdminError message={error} />
       <AdminNotice message={notice} />
       <AdminPanel title="身份管理" subtitle="IDENTITY GROUPS">
+        <p className="mb-3 border border-rhine-line/60 bg-rhine-abyss/30 px-3 py-2 font-mono text-[9px] leading-relaxed text-rhine-faint">
+          身份决定头衔与基础权限，不再自动把某一类论坛全部加入；板块权限请在「成员与权限 → 权限」中逐项分配。移除权限后，无法支撑当前身份时会自动降为普通成员。
+        </p>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <AdminInput
             value={query}

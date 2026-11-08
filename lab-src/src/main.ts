@@ -115,7 +115,7 @@ $("#stage").innerHTML = `
     <div id="hover-label" class="hover-label" hidden>X-<span id="hover-code">001</span> / <span id="hover-title"></span></div>
     <div class="archive-counter"><span class="tiny-label">ARCHIVE / SELECT</span><div><span id="selected-number">01</span><i>/</i><span class="count-total">12</span></div></div>
     <div class="archive-navigation"><button data-action="prev" aria-label="上一个档案">↑</button><div id="file-ticks" class="file-ticks"></div><button data-action="next" aria-label="下一个档案">↓</button></div>
-    <div class="column-navigation"><button data-action="column-prev" aria-label="上一列">←</button><div><span id="column-number">COLUMN <span id="column-index">03</span> / 05</span><strong id="column-name">个人档案</strong></div><button data-action="column-next" aria-label="下一列">→</button></div>
+    <div class="column-navigation"><button data-action="column-prev" aria-label="上一列">←</button><div><span id="column-number">COLUMN <span id="column-index">03</span> / <span id="column-total">05</span></span><strong id="column-name">个人档案</strong></div><button data-action="column-next" aria-label="下一列">→</button></div>
     <div class="archive-hint"><kbd>←</kbd> <kbd>→</kbd> 切换列 <span>／</span> <kbd>↑</kbd> <kbd>↓</kbd> 前后档案 <span>／</span> <kbd>ENTER</kbd> 读取</div>
   </section>
   <section id="detail-ui" class="detail-ui" aria-label="档案内容" hidden>
@@ -512,12 +512,15 @@ window.visualViewport?.addEventListener("resize", fit);
 window.visualViewport?.addEventListener("scroll", fit);
 matchMedia("(pointer: coarse)").addEventListener("change", fit);
 fit();
-$("#file-ticks").innerHTML = columnFiles(fileLocation(selected).lane)
-  .map((index) => `<button data-select="${index}"></button>`)
-  .join("");
-const fileTicks = [
-  ...$("#file-ticks").querySelectorAll<HTMLButtonElement>("button"),
-];
+function rebuildFileTicks() {
+  const lane = fileLocation(selected).lane;
+  $("#file-ticks").innerHTML = columnFiles(lane)
+    .map((index) => `<button data-select="${index}"></button>`)
+    .join("");
+  fileTicks = [...$("#file-ticks").querySelectorAll<HTMLButtonElement>("button")];
+}
+let fileTicks: HTMLButtonElement[] = [];
+rebuildFileTicks();
 
 function setMode(next: Mode) {
   if (workbench?.enabled && next === "detail") next = "archive";
@@ -667,6 +670,7 @@ function updateSelection(navigation?: ArchiveNavigation) {
         : "auto",
   });
   $(".count-total").textContent = String(files.length).padStart(2, "0");
+  $("#column-total").textContent = String(archiveColumns.length).padStart(2, "0");
   columnCounter.update({
     value: lane + 1,
     animated: motionActive("rollingNumbers") && mode === "archive",
@@ -681,6 +685,7 @@ function updateSelection(navigation?: ArchiveNavigation) {
   });
   $<HTMLButtonElement>('[data-action="column-prev"]').disabled = false;
   $<HTMLButtonElement>('[data-action="column-next"]').disabled = false;
+  if (fileTicks.length !== files.length) rebuildFileTicks();
   fileTicks.forEach((button, slot) => {
     const index = files[slot],
       record = records[index];
@@ -842,7 +847,10 @@ function contentPanel() {
     const replies = r.replies ?? [];
     const authorId = Number(item.authorId) || 0;
     const author = escapeHtml(item.author ?? r.lead);
-    return `<div class="archive-card">${head}<div class="thread-author">${authorId ? `<button type="button" class="archive-author" data-profile-user="${authorId}" onclick="rhineOpenProfile(${authorId})">@${author}<span>资料</span></button><button type="button" class="archive-follow" data-follow-user="${authorId}" onclick="rhineToggleFollow(this)">关注作者</button>` : `<b>@${author}</b>`}</div><div class="archive-markdown">${markdownText(item.content ?? r.abstract)}</div>${attachmentHtml}<div class="panel-label">REPLIES / 回复 ${replies.length}</div>${replies.length ? `<ol class="reply-list">${replies.map((reply, index) => `<li><span class="reply-index">${String(index + 1).padStart(2, "0")}</span><div>${reply.authorId ? `<button type="button" class="archive-reply-author" data-profile-user="${reply.authorId}" onclick="rhineOpenProfile(${reply.authorId})">${escapeHtml(reply.author)}</button>` : `<b>${escapeHtml(reply.author)}</b>`}<small>${escapeHtml(reply.createdAt ?? "")}</small><p>${escapeHtml(reply.content)}</p></div></li>`).join("")}</ol>` : `<p class="log-note">该帖子暂无回复。</p>`}</div>`;
+    const authorTitle = item.authorTitle
+      ? `<span class="archive-author-title">${escapeHtml(String(item.authorTitle))}${Number(item.authorLevel) > 0 ? ` Lv.${Number(item.authorLevel)}` : ""}</span>`
+      : "";
+    return `<div class="archive-card">${head}<div class="thread-author">${authorId ? `<button type="button" class="archive-author" data-profile-user="${authorId}" onclick="rhineOpenProfile(${authorId})">@${author}<span>资料</span></button><button type="button" class="archive-follow" data-follow-user="${authorId}" onclick="rhineToggleFollow(this)">关注作者</button>` : `<b>@${author}</b>`}${authorTitle}</div><div class="archive-markdown">${markdownText(item.content ?? r.abstract)}</div>${attachmentHtml}<div class="panel-label">REPLIES / 回复 ${replies.length}</div>${replies.length ? `<ol class="reply-list">${replies.map((reply, index) => `<li><span class="reply-index">${String(index + 1).padStart(2, "0")}</span><div>${reply.authorId ? `<button type="button" class="archive-reply-author" data-profile-user="${reply.authorId}" onclick="rhineOpenProfile(${reply.authorId})">${escapeHtml(reply.author)}</button>` : `<b>${escapeHtml(reply.author)}</b>`}${reply.authorTitle ? `<span class="archive-author-title">${escapeHtml(reply.authorTitle)}${Number(reply.authorLevel) > 0 ? ` Lv.${Number(reply.authorLevel)}` : ""}</span>` : ""}<small>${escapeHtml(reply.createdAt ?? "")}</small><p>${escapeHtml(reply.content)}</p></div></li>`).join("")}</ol>` : `<p class="log-note">该帖子暂无回复。</p>`}</div>`;
   }
 
   if (category === "照片") {

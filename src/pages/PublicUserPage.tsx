@@ -9,6 +9,7 @@ import {
   type PublicProfile,
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
+import { AuthorTitle } from '../components/forum/AuthorTitle'
 import { formatDate } from '../lib/format'
 
 export function PublicUserPage() {
@@ -107,6 +108,9 @@ export function PublicUserPage() {
           <h1 className="text-2xl font-bold text-rhine-ink">
             {profile.nickname || profile.username}
           </h1>
+          <div className="mt-2">
+            <AuthorTitle title={profile.forumTitle} level={profile.forumLevel} />
+          </div>
           <p className="mt-1 font-mono text-[10px] tracking-wider text-rhine-faint">
             @{profile.username} · {ROLE_LABELS[profile.role]} · 加入于 {formatDate(profile.createdAt)}
           </p>

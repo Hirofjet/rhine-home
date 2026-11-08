@@ -16,6 +16,7 @@ import {
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
+import { AuthorTitle } from '../components/forum/AuthorTitle'
 import { AttachmentGrid } from '../components/forum/AttachmentGrid'
 import { ContentComposer, type ComposerValue } from '../components/forum/ContentComposer'
 import { fadeUp, stagger } from '../lib/motion'
@@ -238,6 +239,7 @@ export function ForumPostPage() {
             <span>{post.author}</span>
             <span className="border border-rhine-line px-1 py-0.5 text-[8px] text-rhine-faint">资料</span>
           </Link>
+          <AuthorTitle title={post.authorTitle} level={post.authorLevel} />
           {user && user.id !== post.authorId && (
             <button
               type="button"
@@ -338,6 +340,7 @@ export function ForumPostPage() {
                     >
                       {reply.author}
                     </Link>
+                    <AuthorTitle title={reply.authorTitle} level={reply.authorLevel} />
                     <span>{formatDateTime(reply.createdAt)}</span>
                     {user && (
                       <span className="ml-auto flex gap-3">

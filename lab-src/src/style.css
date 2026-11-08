@@ -2631,6 +2631,14 @@ button {
 .archive-reply-author {
   font-size: 9px;
 }
+.archive-author-title {
+  margin-left: 5px;
+  padding: 1px 4px;
+  border: 1px solid rgba(155, 114, 71, 0.4);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 7px;
+  color: #76552d;
+}
 .archive-reply-author:hover {
   text-decoration: underline;
 }

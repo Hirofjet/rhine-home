@@ -6,6 +6,7 @@
    - 管理后台（内容、成员、权限、论坛板块、审核、上传）
    ============================================================ */
 import { notifyContentUpdated } from './contentEvents'
+import { cachedContent } from './contentCache'
 
 const changed = <T>(promise: Promise<T>) =>
   promise.then((result) => {
@@ -36,6 +37,10 @@ export interface ApiUser {
   birthday?: string
   bio?: string
   tags?: string[]
+  forumTitle?: string
+  forumTitleLocked?: boolean
+  forumPoints?: number
+  forumLevel?: number
   banned?: boolean
   bannedUntil?: string | null
   bannedReason?: string
@@ -185,6 +190,8 @@ export interface PostSummary {
   author: string
   authorId: number
   authorAvatar?: string
+  authorTitle?: string
+  authorLevel?: number
   tags?: string[]
   pinned?: boolean
   createdAt: string
@@ -201,6 +208,8 @@ export interface ForumPost {
   pinned?: boolean
   author: string
   authorAvatar?: string
+  authorTitle?: string
+  authorLevel?: number
   authorId: number
   board: { id: number; slug: string; name: string }
   createdAt: string
@@ -213,6 +222,8 @@ export interface ForumReply {
   attachments: Attachment[]
   author: string
   authorAvatar?: string
+  authorTitle?: string
+  authorLevel?: number
   authorId: number
   createdAt: string
 }
@@ -265,6 +276,10 @@ export interface PublicProfile {
   avatarUrl?: string
   bio?: string
   tags?: string[]
+  forumTitle?: string
+  forumTitleLocked?: boolean
+  forumPoints?: number
+  forumLevel?: number
   role: Role
   gender?: string
   birthday?: string
@@ -507,34 +522,44 @@ export const authApi = {
 // ---------- 前台内容 ----------
 export const contentApi = {
   async articles(): Promise<ContentArticle[]> {
-    const data = await api<{ items?: ContentArticle[] }>(`/api/content/articles?t=${Date.now()}`, {
-      auth: false,
+    return cachedContent('articles', async () => {
+      const data = await api<{ items?: ContentArticle[] }>(`/api/content/articles?t=${Date.now()}`, {
+        auth: false,
+      })
+      return data.items ?? []
     })
-    return data.items ?? []
   },
   async logs(): Promise<ContentLog[]> {
-    const data = await api<{ items?: ContentLog[] }>(`/api/content/logs?t=${Date.now()}`, {
-      auth: false,
+    return cachedContent('logs', async () => {
+      const data = await api<{ items?: ContentLog[] }>(`/api/content/logs?t=${Date.now()}`, {
+        auth: false,
+      })
+      return data.items ?? []
     })
-    return data.items ?? []
   },
   async photos(): Promise<ContentPhoto[]> {
-    const data = await api<{ items?: ContentPhoto[] }>(`/api/content/photos?t=${Date.now()}`, {
-      auth: false,
+    return cachedContent('photos', async () => {
+      const data = await api<{ items?: ContentPhoto[] }>(`/api/content/photos?t=${Date.now()}`, {
+        auth: false,
+      })
+      return data.items ?? []
     })
-    return data.items ?? []
   },
   async videos(): Promise<ContentVideo[]> {
-    const data = await api<{ items?: ContentVideo[] }>(`/api/content/videos?t=${Date.now()}`, {
-      auth: false,
+    return cachedContent('videos', async () => {
+      const data = await api<{ items?: ContentVideo[] }>(`/api/content/videos?t=${Date.now()}`, {
+        auth: false,
+      })
+      return data.items ?? []
     })
-    return data.items ?? []
   },
   async projects(): Promise<SiteProject[]> {
-    const data = await api<{ items?: SiteProject[] }>(`/api/content/projects?t=${Date.now()}`, {
-      auth: false,
+    return cachedContent('projects', async () => {
+      const data = await api<{ items?: SiteProject[] }>(`/api/content/projects?t=${Date.now()}`, {
+        auth: false,
+      })
+      return data.items ?? []
     })
-    return data.items ?? []
   },
 }
 
@@ -895,6 +920,37 @@ export const adminApi = {
       method: 'DELETE',
     })
   },
+  forumTitleRules() {
+    return api<{
+      rules: Array<{ id: number; level: number; minPoints: number; title: string }>
+    }>('/api/admin/forum/title-rules')
+  },
+  forumUsers() {
+    return api<{
+      users: Array<{
+        id: number
+        username: string
+        nickname: string
+        identity?: string
+        forumTitle?: string
+        forumTitleLocked?: boolean
+        forumPoints?: number
+        forumLevel?: number
+      }>
+    }>('/api/admin/forum/users')
+  },
+  saveForumTitleRules(rules: Array<{ level: number; minPoints: number; title: string }>) {
+    return api<{ ok: boolean }>('/api/admin/forum/title-rules', {
+      method: 'PUT',
+      body: { rules },
+    })
+  },
+  grantForumTitle(userId: number, title: string, locked = true) {
+    return api<{ ok: boolean }>(`/api/admin/forum/users/${userId}/title`, {
+      method: 'POST',
+      body: { title, locked },
+    })
+  },
   inviteToBoard(boardId: number, userId: number) {
     return api<{ ok: boolean }>(`/api/admin/forum/boards/${boardId}/invite`, {
       method: 'POST',
@@ -1110,6 +1166,12 @@ export const userApi = {
       method: 'POST',
       body: id ? { id } : {},
     })
+  },
+  deleteNotification(id: number) {
+    return api<{ ok: boolean }>(`/api/notifications/${id}`, { method: 'DELETE' })
+  },
+  clearReadNotifications() {
+    return api<{ ok: boolean }>('/api/notifications?scope=read', { method: 'DELETE' })
   },
   conversations() {
     return api<{ conversations: Conversation[] }>('/api/messages/conversations')

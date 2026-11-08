@@ -10,6 +10,7 @@ import {
   Mail,
   MessageSquare,
   Send,
+  Trash2,
   Upload,
   UserRound,
 } from 'lucide-react'
@@ -217,6 +218,24 @@ export function ProfilePage() {
     try {
       await userApi.readNotifications()
       setNotifications((current) => current.map((item) => ({ ...item, read: true })))
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const deleteNotification = async (id: number) => {
+    try {
+      await userApi.deleteNotification(id)
+      setNotifications((current) => current.filter((item) => item.id !== id))
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const clearRead = async () => {
+    try {
+      await userApi.clearReadNotifications()
+      setNotifications((current) => current.filter((item) => !item.read))
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -533,6 +552,13 @@ export function ProfilePage() {
               >
                 <CheckCheck className="h-3 w-3" /> 全部已读
               </button>
+              <button
+                type="button"
+                onClick={() => void clearRead()}
+                className="flex items-center gap-1 font-mono text-[10px] text-rhine-faint hover:text-rhine-red"
+              >
+                <Trash2 className="h-3 w-3" /> 清除已读
+              </button>
             </div>
             {systemNotifications.length === 0 ? (
               <p className="px-4 py-5 font-mono text-[10px] text-rhine-faint">暂无通知</p>
@@ -579,6 +605,14 @@ export function ProfilePage() {
                         <span className="font-mono text-[9px] text-rhine-faint">
                           {formatDateTime(item.createdAt)}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => void deleteNotification(item.id)}
+                          className="ml-auto text-rhine-faint hover:text-rhine-red"
+                          aria-label="删除通知"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
                       </div>
                       {item.content && (
                         <p className="mt-1 whitespace-pre-wrap text-xs text-rhine-dim">

@@ -273,6 +273,16 @@ const TABLES = [
     KEY idx_notifications_user (user_id, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS forum_title_rules (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    level INT NOT NULL,
+    min_points INT NOT NULL DEFAULT 0,
+    title VARCHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_forum_title_level (level)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS direct_messages (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     sender_id BIGINT UNSIGNED NOT NULL,
@@ -370,6 +380,14 @@ async function ensureSchemaUpgrades() {
     'role_code',
     "role_code VARCHAR(32) NOT NULL DEFAULT 'member'",
   )
+  await ensureColumn('users', 'forum_title', 'forum_title VARCHAR(64) NULL')
+  await ensureColumn(
+    'users',
+    'forum_title_locked',
+    'forum_title_locked TINYINT(1) NOT NULL DEFAULT 0',
+  )
+  await ensureColumn('users', 'forum_points', 'forum_points INT NOT NULL DEFAULT 0')
+  await ensureColumn('users', 'forum_level', 'forum_level INT NOT NULL DEFAULT 0')
   await pool.query("UPDATE users SET role_code = 'super' WHERE is_super = 1").catch(() => undefined)
   await ensureColumn('users', 'nickname', 'nickname VARCHAR(64) NULL')
   await ensureColumn('users', 'gender', 'gender VARCHAR(16) NULL')
