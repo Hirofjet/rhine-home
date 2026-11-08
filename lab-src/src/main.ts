@@ -613,18 +613,17 @@ function stepFile(direction: number) {
   if (all.length < 2) return;
   const offset = Math.max(0, all.indexOf(selected));
   const nextOffset = offset + direction;
+  // Page changes reset the ticks, but the 3D cards keep moving to the next
+  // physical row instead of rewinding to row 12.
   if (nextOffset < 0) {
-    select(all[all.length - 1], { cell: { lane, row: 19 } });
+    select(all[all.length - 1], { axis: "row", direction });
     return;
   }
   if (nextOffset >= all.length) {
-    select(all[0], { cell: { lane, row: 12 } });
+    select(all[0], { axis: "row", direction });
     return;
   }
-  const pageChanged = Math.floor(nextOffset / 8) !== Math.floor(offset / 8);
-  select(all[nextOffset], {
-    cell: { lane, row: pageChanged ? (direction > 0 ? 12 : 19) : 12 + (nextOffset % 8) },
-  });
+  select(all[nextOffset], { axis: "row", direction });
 }
 function stepColumn(direction: number) {
   const lane = fileLocation(selected).lane;
