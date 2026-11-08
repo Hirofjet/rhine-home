@@ -189,8 +189,8 @@ export async function syncHomeArchives() {
   for (const { module, items } of moduleItems) {
     const existing = records.filter((record) => record.category === module.label);
     const list = items.length
-      ? items.slice(0, 20).map((item: any, index: number) => recordFor(module, item, index))
-      : existing.slice(0, 20);
+      ? items.map((item: any, index: number) => recordFor(module, item, index))
+      : existing;
     while (list.length < 8) {
       list.push(
         recordFor(
@@ -269,8 +269,7 @@ async function readForum() {
           .sort((a: any, b: any) => {
             if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
             return String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? ""));
-          })
-          .slice(0, 20);
+          });
         await Promise.all(visible.map(async (post: any) => {
           if (!post?.id) return;
           if (Number(post.replyCount ?? 0) === 0) {
@@ -303,7 +302,7 @@ export async function syncForumArchives() {
   if (!boards.length) return false;
   const next: HomeRecord[] = [];
   for (const [boardIndex, board] of boards.slice(0, 12).entries()) {
-    const list = (posts.get(board.slug) ?? []).slice(0, 20);
+    const list = posts.get(board.slug) ?? [];
     const mapped: HomeRecord[] = list.length
       ? list.map((post: any, index: number) => ({
           id: `${String(boardIndex + 1).padStart(2, "0")}-${String(index + 1).padStart(3, "0")}`,
