@@ -24,10 +24,61 @@ const modules = [
 ];
 
 const api = (path: string) => `${location.origin}${path}?t=${Date.now()}`;
+const LAB_CONTENT_CACHE = "rhine:lab-content-cache-v1";
+const LAB_CONTENT_TTL = 5 * 60 * 1000;
+
+function readLabContentCache(): { at: number; items: Array<{ key: string; items: any[] }> } | null {
+  try {
+    const raw = localStorage.getItem(LAB_CONTENT_CACHE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.items)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeLabContentCache(items: Array<{ key: string; items: any[] }>) {
+  try {
+    localStorage.setItem(LAB_CONTENT_CACHE, JSON.stringify({ at: Date.now(), items }));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+async function readContentModules() {
+  const cached = readLabContentCache();
+  if (cached && Date.now() - cached.at < LAB_CONTENT_TTL) {
+    return cached.items.map((entry) => ({
+      module: modules.find((module) => module.key === entry.key) ?? modules[0],
+      items: entry.items,
+    }));
+  }
+  const moduleItems = await Promise.all(
+    modules.map(async (module) => ({ module, items: await readModule(module.key) })),
+  );
+  writeLabContentCache(moduleItems.map(({ module, items }) => ({ key: module.key, items })));
+  return moduleItems;
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeout = 3500,
+) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 
 async function readModule(key: string) {
   try {
-    const response = await fetch(api(`/api/content/${key}`));
+    const response = await fetchWithTimeout(api(`/api/content/${key}`));
     if (!response.ok) return [];
     const data = await response.json();
     return Array.isArray(data.items) ? data.items : [];
@@ -69,7 +120,7 @@ function recordFor(module: (typeof modules)[number], item: any, index: number): 
 
 async function homeArchiveRecords(): Promise<HomeRecord[]> {
   try {
-    const response = await fetch(api("/api/site/home"));
+    const response = await fetchWithTimeout(api("/api/site/home"));
     if (!response.ok) return [];
     const data = await response.json();
     const profile = data.profile;
@@ -129,10 +180,8 @@ async function homeArchiveRecords(): Promise<HomeRecord[]> {
 }
 
 export async function syncHomeArchives() {
-  const { records, archiveColumns, categories } = await import("./data");
-  const moduleItems = await Promise.all(
-    modules.map(async (module) => ({ module, items: await readModule(module.key) })),
-  );
+  const { records, archiveColumns, categories, resetArchivePages } = await import("./data");
+  const moduleItems = await readContentModules();
   const homeRecords = await homeArchiveRecords();
   void homeRecords;
 
@@ -158,6 +207,7 @@ export async function syncHomeArchives() {
   }
 
   records.splice(0, records.length, ...next);
+  resetArchivePages();
   const labels = modules.map((module) => module.label);
   archiveColumns.splice(0, archiveColumns.length, ...labels);
   categories.splice(1, categories.length - 1, ...labels);
@@ -166,7 +216,7 @@ export async function syncHomeArchives() {
 
 export async function syncLabIdentity() {
   try {
-    const response = await fetch(`${location.origin}/api/site/home?t=${Date.now()}`);
+    const response = await fetchWithTimeout(`${location.origin}/api/site/home?t=${Date.now()}`, {}, 2500);
     if (!response.ok) return;
     const data = await response.json();
     const profile = data.profile;
@@ -204,14 +254,14 @@ async function readForum() {
   const token = localStorage.getItem("rhine:token") ?? "";
   const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   try {
-    const response = await fetch(`${location.origin}/api/forum/boards?t=${Date.now()}`, { headers });
+    const response = await fetchWithTimeout(`${location.origin}/api/forum/boards?t=${Date.now()}`, { headers });
     if (!response.ok) return { boards: [], posts: new Map<string, any[]>() };
     const data = await response.json();
     const boards = (Array.isArray(data.boards) ? data.boards : []).filter((board: any) => board.canAccess);
     const posts = new Map<string, any[]>();
     await Promise.all(boards.map(async (board: any) => {
       try {
-        const res = await fetch(`${location.origin}/api/forum/boards/${encodeURIComponent(board.slug)}?page=1&limit=50&t=${Date.now()}`, { headers });
+        const res = await fetchWithTimeout(`${location.origin}/api/forum/boards/${encodeURIComponent(board.slug)}?page=1&limit=50&t=${Date.now()}`, { headers });
         if (!res.ok) return;
         const body = await res.json();
         const visible = (Array.isArray(body.posts) ? body.posts : [])
@@ -228,7 +278,7 @@ async function readForum() {
             return;
           }
           try {
-            const detail = await fetch(`${location.origin}/api/forum/posts/${post.id}?t=${Date.now()}`, { headers });
+            const detail = await fetchWithTimeout(`${location.origin}/api/forum/posts/${post.id}?t=${Date.now()}`, { headers });
             if (!detail.ok) return;
             const payload = await detail.json();
             post.replies = Array.isArray(payload.replies) ? payload.replies : [];
@@ -248,7 +298,7 @@ async function readForum() {
 }
 
 export async function syncForumArchives() {
-  const { records, archiveColumns, categories } = await import("./data");
+  const { records, archiveColumns, categories, resetArchivePages } = await import("./data");
   const { boards, posts } = await readForum();
   if (!boards.length) return false;
   const next: HomeRecord[] = [];
@@ -316,6 +366,7 @@ export async function syncForumArchives() {
     next.push(...mapped);
   }
   records.splice(0, records.length, ...next);
+  resetArchivePages();
   archiveColumns.splice(0, archiveColumns.length, ...boards.slice(0, 12).map((board: any) => board.name));
   categories.splice(1, categories.length - 1, "全部论坛", ...boards.slice(0, 12).map((board: any) => board.name));
   return true;

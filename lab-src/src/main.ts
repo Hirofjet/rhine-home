@@ -34,8 +34,12 @@ import {
   records,
   categories,
   archiveColumns,
+  allColumnFiles,
+  columnPage,
+  columnPageCount,
   columnFiles,
   fileLocation,
+  setColumnPage,
 } from "./data";
 import { TerminalAudio } from "./audio";
 import { syncHomeArchives, syncForumArchives, syncLabIdentity } from "./home-sync";
@@ -115,7 +119,7 @@ $("#stage").innerHTML = `
     <div id="hover-label" class="hover-label" hidden>X-<span id="hover-code">001</span> / <span id="hover-title"></span></div>
     <div class="archive-counter"><span class="tiny-label">ARCHIVE / SELECT</span><div><span id="selected-number">01</span><i>/</i><span class="count-total">12</span></div></div>
     <div class="archive-navigation"><button data-action="prev" aria-label="上一个档案">↑</button><div id="file-ticks" class="file-ticks"></div><button data-action="next" aria-label="下一个档案">↓</button></div>
-    <div class="column-navigation"><button data-action="column-prev" aria-label="上一列">←</button><div><span id="column-number">COLUMN <span id="column-index">03</span> / <span id="column-total">05</span></span><strong id="column-name">个人档案</strong></div><button data-action="column-next" aria-label="下一列">→</button></div>
+    <div class="column-navigation"><button data-action="column-prev" aria-label="上一列">←</button><div><span id="column-number">COLUMN <span id="column-index">03</span> / <span id="column-total">05</span></span><span id="column-page">PAGE <span id="page-index">01</span>/<span id="page-total">01</span></span><strong id="column-name">个人档案</strong></div><button data-action="column-next" aria-label="下一列">→</button></div>
     <div class="archive-hint"><kbd>←</kbd> <kbd>→</kbd> 切换列 <span>／</span> <kbd>↑</kbd> <kbd>↓</kbd> 前后档案 <span>／</span> <kbd>ENTER</kbd> 读取</div>
   </section>
   <section id="detail-ui" class="detail-ui" aria-label="档案内容" hidden>
@@ -604,17 +608,29 @@ function select(index: number, navigation?: ArchiveNavigation) {
   );
 }
 function stepFile(direction: number) {
-  const files = columnFiles(fileLocation(selected).lane);
-  if (files.length < 2) return;
-  select(
-    files[(files.indexOf(selected) + direction + files.length) % files.length],
-    { axis: "row", direction },
-  );
+  const lane = fileLocation(selected).lane;
+  const all = allColumnFiles(lane);
+  if (all.length < 2) return;
+  const offset = Math.max(0, all.indexOf(selected));
+  const nextOffset = offset + direction;
+  if (nextOffset < 0) {
+    select(all[all.length - 1], { cell: { lane, row: 19 } });
+    return;
+  }
+  if (nextOffset >= all.length) {
+    select(all[0], { cell: { lane, row: 12 } });
+    return;
+  }
+  const pageChanged = Math.floor(nextOffset / 8) !== Math.floor(offset / 8);
+  select(all[nextOffset], {
+    cell: { lane, row: pageChanged ? (direction > 0 ? 12 : 19) : 12 + (nextOffset % 8) },
+  });
 }
 function stepColumn(direction: number) {
   const lane = fileLocation(selected).lane;
   const next = wrap(lane + direction, archiveColumns.length);
-  select(columnMemory[next], { axis: "lane", direction });
+  setColumnPage(next, 0);
+  select(allColumnFiles(next)[0], { cell: { lane: next, row: 12 } });
 }
 
 // The embedding shell uses this to jump directly to a column. Clicking the
@@ -622,8 +638,9 @@ function stepColumn(direction: number) {
 (window as unknown as { __rhineGoToColumn?: (lane: number) => void }).__rhineGoToColumn = (
   lane: number,
 ) => {
-  const files = columnFiles(lane);
+  const files = allColumnFiles(lane);
   if (!files.length) return;
+  setColumnPage(lane, 0);
   setMode("archive");
   select(files[0], { cell: { lane, row: 12 } });
 };
@@ -631,6 +648,8 @@ function updateSelection(navigation?: ArchiveNavigation) {
   const r = records[selected];
   const { lane } = fileLocation(selected);
   const files = columnFiles(lane);
+  const all = allColumnFiles(lane);
+  const offset = Math.max(0, all.indexOf(selected));
   selectionTitle.update({
     text: r.title,
     animated: motionActive("rollingText") && mode === "archive",
@@ -644,7 +663,7 @@ function updateSelection(navigation?: ArchiveNavigation) {
     animated: motionActive("rollingText") && mode === "archive",
   });
   const moduleLabel = archiveColumns[lane] ?? r.department;
-  const moduleCount = String(files.length).padStart(2, "0");
+  const moduleCount = String(all.length).padStart(2, "0");
   $("#selected-module").textContent = moduleLabel;
   $("#selected-module-name").textContent = moduleLabel;
   $("#selected-count").textContent = `${moduleCount} RECORDS`;
@@ -662,15 +681,17 @@ function updateSelection(navigation?: ArchiveNavigation) {
     direction,
   });
   fileCounter.update({
-    value: files.indexOf(selected) + 1,
+    value: offset + 1,
     animated: motionActive("rollingNumbers") && mode === "archive",
     direction:
       navigation && "axis" in navigation && navigation.axis === "row"
         ? direction
         : "auto",
   });
-  $(".count-total").textContent = String(files.length).padStart(2, "0");
+  $(".count-total").textContent = String(all.length).padStart(2, "0");
   $("#column-total").textContent = String(archiveColumns.length).padStart(2, "0");
+  $("#page-index").textContent = String(columnPage(lane) + 1).padStart(2, "0");
+  $("#page-total").textContent = String(columnPageCount(lane)).padStart(2, "0");
   columnCounter.update({
     value: lane + 1,
     animated: motionActive("rollingNumbers") && mode === "archive",
