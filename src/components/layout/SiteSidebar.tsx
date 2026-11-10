@@ -24,6 +24,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useSession } from '../auth/useSession'
 import { userApi } from '../../lib/api'
 import { THEMES, useTheme } from '../theme/ThemeProvider'
+import { legal } from '../../content/legal'
 import { cx } from '../../lib/cx'
 import { readViewMode, writeViewMode } from '../../lib/viewMode'
 
@@ -228,7 +229,7 @@ export function SiteSidebar({ children }: { children: ReactNode }) {
           <span className="flex h-8 w-8 items-center justify-center border border-rhine-gold/50 text-rhine-gold">
             <Archive className="h-4 w-4" />
           </span>
-          {open && <span className="hidden xl:inline">RHINE</span>}
+          {open && <span className="hidden xl:inline">HIROFJET</span>}
         </Link>
         <button
           type="button"
@@ -474,9 +475,44 @@ export function SiteSidebar({ children }: { children: ReactNode }) {
 }
 
 function SiteFooter() {
+  const year = new Date().getFullYear()
+  const icpNumber = legal.icp.number || legal.icp.placeholder
   return (
-    <footer className="border-t border-rhine-line/50 px-6 py-4 text-center font-mono text-[9px] tracking-[0.18em] text-rhine-faint">
-      RHINE//HOME · SYSTEM INTERFACE
+    <footer className="border-t border-rhine-line/50 px-6 py-4 text-center font-mono text-[9px] leading-relaxed tracking-[0.18em] text-rhine-faint">
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <span>© {year} {legal.owner} · 保留所有权利</span>
+        <Link to="/legal" className="text-rhine-cyan hover:text-rhine-gold">
+          版权与开源声明
+        </Link>
+        <Link to="/complaints" className="text-rhine-cyan hover:text-rhine-gold">
+          投诉举报
+        </Link>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <a
+          href={legal.icp.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-rhine-gold"
+        >
+          {legal.icp.label}：{icpNumber}
+        </a>
+        {legal.publicSecurity.number ? (
+          <a
+            href={legal.publicSecurity.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-rhine-gold"
+          >
+            {legal.publicSecurity.label}：{legal.publicSecurity.number}
+          </a>
+        ) : (
+          <span>
+            {legal.publicSecurity.label}：{legal.publicSecurity.placeholder}
+          </span>
+        )}
+        <span>HIROFJET//HOME · SYSTEM INTERFACE</span>
+      </div>
     </footer>
   )
 }
