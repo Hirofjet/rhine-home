@@ -209,6 +209,18 @@ export function LegalPage() {
               </a>{' '}
               联系站点运营者。
             </p>
+            <p>
+              违法有害信息、骚扰、隐私泄露与侵权投诉，请使用{' '}
+              <Link to="/complaints" className="text-rhine-cyan underline underline-offset-2">
+                投诉举报页面
+              </Link>
+              。紧急事项请同时联系属地公安机关。
+            </p>
+            <p className="font-mono text-[10px] leading-6 text-rhine-faint">
+              安全负责人：{legal.securityOfficer}
+              {legal.complaintEmail ? ` · 投诉邮箱：${legal.complaintEmail}` : ''}
+              {legal.complaintPhone ? ` · 电话：${legal.complaintPhone}` : ''}
+            </p>
           </div>
         </article>
       </div>

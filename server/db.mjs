@@ -247,9 +247,14 @@ const TABLES = [
     content VARCHAR(200) NOT NULL,
     user_id BIGINT UNSIGNED NULL,
     owner_token CHAR(64) NULL,
+    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved',
+    review_note VARCHAR(255) NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    reviewed_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY idx_messages_created (created_at)
+    KEY idx_messages_created (created_at),
+    KEY idx_messages_status (status, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS follows (
@@ -379,6 +384,61 @@ const TABLES = [
     KEY idx_audit_request (request_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS content_reports (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ticket CHAR(16) NOT NULL,
+    reporter_id BIGINT UNSIGNED NULL,
+    reporter_name VARCHAR(64) NULL,
+    reporter_contact VARCHAR(190) NULL,
+    target_type VARCHAR(32) NOT NULL,
+    target_id VARCHAR(64) NOT NULL,
+    target_owner_id BIGINT UNSIGNED NULL,
+    category VARCHAR(32) NOT NULL,
+    detail TEXT NULL,
+    snapshot TEXT NULL,
+    status ENUM('pending','reviewing','resolved','rejected','appealed') NOT NULL DEFAULT 'pending',
+    resolution VARCHAR(500) NULL,
+    handled_by BIGINT UNSIGNED NULL,
+    handled_at DATETIME NULL,
+    appeal TEXT NULL,
+    appeal_status ENUM('none','pending','accepted','rejected') NOT NULL DEFAULT 'none',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_report_ticket (ticket),
+    KEY idx_report_status (status, created_at),
+    KEY idx_report_target (target_type, target_id),
+    KEY idx_report_reporter (reporter_id, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker_id BIGINT UNSIGNED NOT NULL,
+    blocked_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (blocker_id, blocked_id),
+    KEY idx_blocks_blocked (blocked_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS moderation_terms (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    term VARCHAR(80) NOT NULL,
+    action ENUM('review','block') NOT NULL DEFAULT 'review',
+    enabled TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_moderation_term (term)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS moderation_settings (
+    id TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    emergency_stop TINYINT(1) NOT NULL DEFAULT 0,
+    replies_require_review TINYINT(1) NOT NULL DEFAULT 1,
+    guestbook_require_review TINYINT(1) NOT NULL DEFAULT 1,
+    updated_by BIGINT UNSIGNED NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS access_logs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NULL,
@@ -441,6 +501,8 @@ async function ensureSchemaUpgrades() {
   )
   await ensureColumn('users', 'forum_points', 'forum_points INT NOT NULL DEFAULT 0')
   await ensureColumn('users', 'forum_level', 'forum_level INT NOT NULL DEFAULT 0')
+  await ensureColumn('users', 'mfa_secret', 'mfa_secret VARCHAR(64) NULL')
+  await ensureColumn('users', 'mfa_enabled', 'mfa_enabled TINYINT(1) NOT NULL DEFAULT 0')
   await pool.query("UPDATE users SET role_code = 'super' WHERE is_super = 1").catch(() => undefined)
   await ensureColumn('users', 'nickname', 'nickname VARCHAR(64) NULL')
   await ensureColumn('users', 'gender', 'gender VARCHAR(16) NULL')
@@ -520,6 +582,14 @@ async function ensureSchemaUpgrades() {
   )
   await ensureColumn('guest_messages', 'user_id', 'user_id BIGINT UNSIGNED NULL')
   await ensureColumn('guest_messages', 'owner_token', 'owner_token CHAR(64) NULL')
+  await ensureColumn(
+    'guest_messages',
+    'status',
+    "status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved'",
+  )
+  await pool.query(
+    'INSERT IGNORE INTO moderation_settings (id) VALUES (1)',
+  )
   await ensureColumn(
     'forum_boards',
     'access',

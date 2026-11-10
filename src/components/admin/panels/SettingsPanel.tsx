@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import { authApi, errorMessage, ROLE_LABELS, type ApiUser } from '../../../lib/api'
 import {
@@ -17,6 +17,51 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [mfaEnabled, setMfaEnabled] = useState(false)
+  const [mfaSetup, setMfaSetup] = useState<{ secret: string; uri: string } | null>(null)
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaPassword, setMfaPassword] = useState('')
+
+  useEffect(() => {
+    authApi
+      .mfaStatus()
+      .then((data) => setMfaEnabled(data.enabled))
+      .catch(() => undefined)
+  }, [])
+
+  const startMfa = async () => {
+    try {
+      const data = await authApi.mfaSetup()
+      setMfaSetup({ secret: data.secret, uri: data.uri })
+      setNotice('请用认证器录入密钥，然后输入 6 位验证码完成绑定。')
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const enableMfa = async () => {
+    try {
+      await authApi.mfaEnable(mfaCode.trim())
+      setMfaEnabled(true)
+      setMfaSetup(null)
+      setMfaCode('')
+      setNotice('动态验证码已启用')
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  const disableMfa = async () => {
+    try {
+      await authApi.mfaDisable({ password: mfaPassword, code: mfaCode.trim() })
+      setMfaEnabled(false)
+      setMfaCode('')
+      setMfaPassword('')
+      setNotice('动态验证码已关闭')
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   const submit = async () => {
     setError('')
@@ -107,6 +152,67 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
           </div>
           <AdminError message={error} />
           <AdminNotice message={notice} />
+        </div>
+      </AdminPanel>
+
+      <AdminPanel
+        title="动态验证码 / MFA"
+        subtitle="TWO-FACTOR AUTHENTICATION"
+        actions={
+          !mfaEnabled ? (
+            <AdminButton onClick={() => void startMfa()} disabled={Boolean(mfaSetup)}>
+              开始绑定
+            </AdminButton>
+          ) : null
+        }
+      >
+        <div className="space-y-3 text-xs text-rhine-dim">
+          <p>
+            启用后，登录时除密码外还需要认证器生成的 6 位动态验证码。
+            当前状态：
+            <span className={mfaEnabled ? 'text-rhine-green' : 'text-rhine-faint'}>
+              {mfaEnabled ? ' 已启用' : ' 未启用'}
+            </span>
+          </p>
+          {mfaSetup && !mfaEnabled && (
+            <div className="space-y-2 border border-rhine-line/60 bg-rhine-abyss/50 p-3">
+              <p className="font-mono text-[9px] tracking-wider text-rhine-gold">
+                手动密钥（保存到认证器）
+              </p>
+              <code className="block break-all font-mono text-xs text-rhine-ink">{mfaSetup.secret}</code>
+              <p className="break-all font-mono text-[9px] text-rhine-faint">{mfaSetup.uri}</p>
+              <AdminInput
+                value={mfaCode}
+                onChange={(event) => setMfaCode(event.target.value)}
+                placeholder="输入 6 位验证码"
+                inputMode="numeric"
+                maxLength={6}
+              />
+              <AdminButton onClick={() => void enableMfa()} disabled={mfaCode.length !== 6}>
+                完成绑定
+              </AdminButton>
+            </div>
+          )}
+          {mfaEnabled && (
+            <div className="space-y-2">
+              <AdminInput
+                type="password"
+                value={mfaPassword}
+                onChange={(event) => setMfaPassword(event.target.value)}
+                placeholder="当前密码"
+              />
+              <AdminInput
+                value={mfaCode}
+                onChange={(event) => setMfaCode(event.target.value)}
+                placeholder="6 位动态验证码"
+                inputMode="numeric"
+                maxLength={6}
+              />
+              <AdminButton variant="danger" onClick={() => void disableMfa()}>
+                关闭 MFA
+              </AdminButton>
+            </div>
+          )}
         </div>
       </AdminPanel>
     </div>

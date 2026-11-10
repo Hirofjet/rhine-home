@@ -21,6 +21,8 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaNeeded, setMfaNeeded] = useState(false)
 
   if (user) {
     return (
@@ -54,10 +56,16 @@ export function LoginPage() {
     setBusy(true)
     setError('')
     try {
-      await login(username.trim(), password)
+      await login(username.trim(), password, mfaCode.trim())
       navigate('/profile')
-    } catch {
-      setError('登录失败，请检查账号和密码。')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      if (message === 'mfa_required' || message === 'mfa_invalid') {
+        setMfaNeeded(true)
+        setError(message === 'mfa_invalid' ? '动态验证码错误。' : '请输入动态验证码。')
+      } else {
+        setError('登录失败，请检查账号和密码。')
+      }
     } finally {
       setBusy(false)
     }
@@ -176,6 +184,17 @@ export function LoginPage() {
                 placeholder="密码"
                 className={inputClass}
               />
+              {mfaNeeded && (
+                <input
+                  value={mfaCode}
+                  onChange={(event) => setMfaCode(event.target.value)}
+                  onKeyDown={(event) => event.key === 'Enter' && void submitLogin()}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="动态验证码（6 位）"
+                  className={inputClass}
+                />
+              )}
               {notice && <p className="mt-3 font-mono text-[10px] text-rhine-cyan">{notice}</p>}
               {error && <p className="mt-3 font-mono text-[10px] text-rhine-red">{error}</p>}
               <button

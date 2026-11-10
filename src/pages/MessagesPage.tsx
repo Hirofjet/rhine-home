@@ -20,6 +20,7 @@ import {
 import { cx } from '../lib/cx'
 import { formatDateTime } from '../lib/format'
 import { useSession } from '../components/auth/useSession'
+import { ReportDialog } from '../components/safety/ReportDialog'
 
 const IMPORTANT = new Set(['review', 'permission', 'ban', 'access'])
 
@@ -67,6 +68,8 @@ export function MessagesPage() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [blockedByMe, setBlockedByMe] = useState(false)
+  const [blockBusy, setBlockBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   const selected = friends.find((friend) => friend.id === selectedId) ?? null
@@ -90,6 +93,12 @@ export function MessagesPage() {
     }
     let alive = true
     setLoadingChat(true)
+    userApi
+      .blockStatus(selectedId)
+      .then((data) => {
+        if (alive) setBlockedByMe(data.blockedByMe)
+      })
+      .catch(() => undefined)
     userApi
       .messagesWith(selectedId)
       .then((data) => {
@@ -142,6 +151,22 @@ export function MessagesPage() {
       setError('发送失败，请确认你们已经是好友。')
     } finally {
       setSending(false)
+    }
+  }
+
+  const toggleBlock = async () => {
+    if (!selectedId || blockBusy) return
+    setBlockBusy(true)
+    try {
+      if (blockedByMe) await userApi.unblock(selectedId)
+      else await userApi.block(selectedId)
+      setBlockedByMe((value) => !value)
+      setError(blockedByMe ? '' : '已屏蔽该用户，对方无法再向你发送私信。')
+      if (!blockedByMe) setChat([])
+    } catch {
+      setError('操作失败，请稍后重试。')
+    } finally {
+      setBlockBusy(false)
     }
   }
 
@@ -329,12 +354,28 @@ export function MessagesPage() {
                     </p>
                   </div>
                 </div>
-                <Link
-                  to={`/u/${selected.id}`}
-                  className="font-mono text-[9px] text-rhine-faint hover:text-rhine-gold"
-                >
+                <div className="flex flex-wrap items-center gap-3">
+                  <ReportDialog
+                    targetType="user"
+                    targetId={selected.id}
+                    targetLabel={selected.username}
+                    className="font-mono text-[9px] text-rhine-faint hover:text-rhine-red"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void toggleBlock()}
+                    disabled={blockBusy}
+                    className="font-mono text-[9px] text-rhine-faint hover:text-rhine-red disabled:opacity-40"
+                  >
+                    {blockedByMe ? '解除屏蔽' : '屏蔽用户'}
+                  </button>
+                  <Link
+                    to={`/u/${selected.id}`}
+                    className="font-mono text-[9px] text-rhine-faint hover:text-rhine-gold"
+                  >
                   查看主页 →
                 </Link>
+                </div>
               </header>
 
               <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
@@ -364,6 +405,14 @@ export function MessagesPage() {
                     <span className="mt-1 block text-right font-mono text-[8px] opacity-60">
                       {formatDateTime(message.createdAt)}
                     </span>
+                    {!message.fromMe && (
+                      <ReportDialog
+                        targetType="message"
+                        targetId={message.id}
+                        targetLabel={message.content.slice(0, 80)}
+                        className="mt-1 font-mono text-[8px] text-rhine-faint hover:text-rhine-red"
+                      />
+                    )}
                   </div>
                 ))}
                 <div ref={bottomRef} />

@@ -11,10 +11,12 @@ import { IdentityPanel } from './panels/IdentityPanel'
 import { GuestbookPanel } from './panels/GuestbookPanel'
 import { LogsPanel } from './panels/LogsPanel'
 import { MembersPanel } from './panels/MembersPanel'
+import { ModerationPanel } from './panels/ModerationPanel'
 import { OverviewPanel } from './panels/OverviewPanel'
 import { PhotosPanel } from './panels/PhotosPanel'
 import { ProfilePanel } from './panels/ProfilePanel'
 import { ProjectsPanel } from './panels/ProjectsPanel'
+import { ReportsPanel } from './panels/ReportsPanel'
 import { ReviewPanel } from './panels/ReviewPanel'
 import { ReviewAccessPanel } from './panels/ReviewAccessPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
@@ -41,6 +43,8 @@ type PanelKey =
   | 'review-posts'
   | 'members'
   | 'identities'
+  | 'reports'
+  | 'moderation'
   | 'security-logs'
   | 'themes'
   | 'settings'
@@ -72,6 +76,11 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
     ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
     user.permissions.includes('access_logs') ||
     user.permissions.includes('members.manage')
+  const reportsAccess =
+    user.isSuper ||
+    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
+    user.permissions.includes('members.manage') ||
+    user.permissions.includes('security.readonly')
 
   const groups = useMemo(() => {
     const list: Array<{ title: string; items: MenuItem[] }> = [
@@ -143,6 +152,16 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
       })
     }
 
+    if (reportsAccess) {
+      list.push({
+        title: '安全',
+        items: [
+          { key: 'reports', label: '举报处理', labelEn: 'REPORTS' },
+          { key: 'moderation', label: '内容安全', labelEn: 'MODERATION' },
+        ],
+      })
+    }
+
     const settingsItems: MenuItem[] = []
     if (accessLogsAccess) {
       settingsItems.push({ key: 'security-logs', label: '安全日志', labelEn: 'SECURITY LOGS' })
@@ -151,7 +170,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
     settingsItems.push({ key: 'settings', label: '设置', labelEn: 'SETTINGS' })
     list.push({ title: '设置', items: settingsItems })
     return list
-  }, [user, forumAccess, memberAccess, accessLogsAccess])
+  }, [user, forumAccess, memberAccess, accessLogsAccess, reportsAccess])
 
   const allowedKeys = groups.flatMap((group) => group.items.map((item) => item.key))
   const current = allowedKeys.includes(panel) ? panel : 'overview'
@@ -262,6 +281,8 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
               {current === 'review-posts' && <ReviewPanel postsOnly />}
               {current === 'members' && <MembersPanel user={user} />}
               {current === 'identities' && <IdentityPanel actor={user} />}
+              {current === 'reports' && <ReportsPanel />}
+              {current === 'moderation' && <ModerationPanel />}
               {current === 'security-logs' && <SecurityLogsPanel />}
               {current === 'themes' && (
                 <ThemesPanel

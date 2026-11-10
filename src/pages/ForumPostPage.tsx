@@ -17,6 +17,7 @@ import {
 import { useSession } from '../components/auth/useSession'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { AuthorTitle } from '../components/forum/AuthorTitle'
+import { ReportDialog } from '../components/safety/ReportDialog'
 import { AttachmentGrid } from '../components/forum/AttachmentGrid'
 import { ContentComposer, type ComposerValue } from '../components/forum/ContentComposer'
 import { fadeUp, stagger } from '../lib/motion'
@@ -260,7 +261,13 @@ export function ForumPostPage() {
               <Pin className="h-2.5 w-2.5" /> 置顶
             </span>
           )}
-          <span className="ml-auto flex items-center gap-1">
+          <span className="ml-auto flex items-center gap-2">
+            <ReportDialog
+              targetType="post"
+              targetId={post.id}
+              targetLabel={post.title}
+              className="font-mono text-[9px] text-rhine-faint hover:text-rhine-red"
+            />
             <MessageSquare className="h-3 w-3" /> {replies.length} 回复
           </span>
         </motion.div>
@@ -342,8 +349,14 @@ export function ForumPostPage() {
                     </Link>
                     <AuthorTitle title={reply.authorTitle} level={reply.authorLevel} />
                     <span>{formatDateTime(reply.createdAt)}</span>
+                    <ReportDialog
+                      targetType="reply"
+                      targetId={reply.id}
+                      targetLabel={`回复：${reply.content.slice(0, 80)}`}
+                      className="ml-auto font-mono text-[9px] text-rhine-faint hover:text-rhine-red"
+                    />
                     {user && (
-                      <span className="ml-auto flex gap-3">
+                      <span className="flex gap-3">
                         <button
                           type="button"
                           onClick={() => setParent(reply)}

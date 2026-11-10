@@ -39,6 +39,7 @@ import {
 } from './auth.mjs'
 import { mailConfigured, sendCodeMail } from './mail.mjs'
 import { importLegacyIfEmpty } from './legacy-import.mjs'
+import { generateTotpSecret, totpUri, verifyTotp } from './totp.mjs'
 import {
   auditRequest,
   adminAuditMiddleware,
@@ -46,6 +47,12 @@ import {
   requestLogger,
   startSecurityLogMaintenance,
 } from './security-logs.mjs'
+import {
+  invalidateModerationCache,
+  matchModeration,
+  moderationBlockedResponse,
+  moderationSettings,
+} from './moderation.mjs'
 
 const exifr = exifrNamespace.default ?? exifrNamespace
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -253,6 +260,9 @@ async function effectiveRoleAfterPermissions(target, permissions) {
   if (target.isSuper) return 'super'
   const role = target.identity || 'member'
   if (role === 'member' || role === 'super') return role
+  if (role === 'regulator') {
+    return permissions.includes('security.readonly') ? role : 'member'
+  }
   if (!permissions.length) return 'member'
   if (role === 'senior' || role === 'forum_master') {
     return permissions.includes('forum') ? role : 'member'
@@ -341,6 +351,20 @@ app.use(express.json({ limit: '8mb' }))
 app.use(requestLogger)
 app.use(auth)
 app.use(adminAuditMiddleware)
+app.use((req, res, next) => {
+  const readOnly =
+    !req.user?.isSuper &&
+    (req.user?.identity === 'regulator' ||
+      req.user?.permissions?.includes('security.readonly'))
+  if (
+    readOnly &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+    req.path !== '/api/auth/logout'
+  ) {
+    return res.status(403).json({ error: 'readonly_account' })
+  }
+  next()
+})
 
 // ============================================================
 // 账号 / 会话
@@ -462,6 +486,27 @@ app.post('/api/auth/login', async (req, res) => {
       })
     }
   }
+  if (user.mfaEnabled) {
+    const mfaCode = String(req.body?.mfaCode ?? '').trim()
+    if (!mfaCode) {
+      void auditRequest(req, {
+        action: 'auth.login.mfa_required',
+        actorId: user.id,
+        actorUsername: user.username,
+        status: 401,
+      })
+      return res.status(401).json({ error: 'mfa_required' })
+    }
+    if (!verifyTotp(user.mfaSecret, mfaCode)) {
+      void auditRequest(req, {
+        action: 'auth.login.mfa_failed',
+        actorId: user.id,
+        actorUsername: user.username,
+        status: 401,
+      })
+      return res.status(401).json({ error: 'mfa_invalid' })
+    }
+  }
   const token = await createSession(user.id)
   void auditRequest(req, {
     action: 'auth.login.success',
@@ -538,6 +583,63 @@ app.post('/api/admin/me/password', requireAuth, async (req, res) => {
     'DELETE FROM sessions WHERE user_id = ? AND token <> ?',
     [req.user.id, tokenFromRequest(req)],
   )
+  res.json({ ok: true })
+})
+
+// ============================================================
+// 多因素认证（TOTP）
+// ============================================================
+app.get('/api/admin/me/mfa', requireAuth, async (req, res) => {
+  const rows = await query('SELECT mfa_enabled FROM users WHERE id = ?', [req.user.id])
+  res.json({ enabled: Boolean(rows[0]?.mfa_enabled) })
+})
+
+app.post('/api/admin/me/mfa/setup', requireAuth, async (req, res) => {
+  const rows = await query('SELECT mfa_enabled FROM users WHERE id = ?', [req.user.id])
+  if (rows[0]?.mfa_enabled) {
+    return res.status(409).json({ error: 'mfa_already_enabled' })
+  }
+  const secret = generateTotpSecret()
+  await execute('UPDATE users SET mfa_secret = ?, mfa_enabled = 0 WHERE id = ?', [
+    secret,
+    req.user.id,
+  ])
+  res.json({
+    secret,
+    uri: totpUri(secret, req.user.username),
+    issuer: 'RHINE//HOME',
+  })
+})
+
+app.post('/api/admin/me/mfa/enable', requireAuth, async (req, res) => {
+  const code = String(req.body?.code ?? '').replace(/\s/g, '')
+  const rows = await query('SELECT mfa_secret, mfa_enabled FROM users WHERE id = ?', [
+    req.user.id,
+  ])
+  if (rows[0]?.mfa_enabled) return res.status(409).json({ error: 'mfa_already_enabled' })
+  if (!rows[0]?.mfa_secret || !verifyTotp(rows[0].mfa_secret, code)) {
+    return res.status(400).json({ error: 'invalid_mfa_code' })
+  }
+  await execute('UPDATE users SET mfa_enabled = 1 WHERE id = ?', [req.user.id])
+  res.json({ ok: true })
+})
+
+app.post('/api/admin/me/mfa/disable', requireAuth, async (req, res) => {
+  const password = String(req.body?.password ?? '')
+  const code = String(req.body?.code ?? '').replace(/\s/g, '')
+  const rows = await query(
+    'SELECT password_hash, mfa_secret, mfa_enabled FROM users WHERE id = ?',
+    [req.user.id],
+  )
+  if (!verifyPassword(password, rows[0]?.password_hash)) {
+    return res.status(400).json({ error: 'wrong_password' })
+  }
+  if (!rows[0]?.mfa_enabled || !verifyTotp(rows[0].mfa_secret, code)) {
+    return res.status(400).json({ error: 'invalid_mfa_code' })
+  }
+  await execute('UPDATE users SET mfa_enabled = 0, mfa_secret = NULL WHERE id = ?', [
+    req.user.id,
+  ])
   res.json({ ok: true })
 })
 
@@ -1137,14 +1239,17 @@ const guestTokenOf = (req) => asString(req.headers['x-guest-token'], 64)
 app.get('/api/messages', async (req, res) => {
   const token = guestTokenOf(req)
   const rows = await query(
-    `SELECT id, name, content, user_id, owner_token, created_at AS createdAt
-     FROM guest_messages ORDER BY id DESC LIMIT 60`,
+    `SELECT id, name, content, user_id, owner_token, status, created_at AS createdAt
+     FROM guest_messages
+     WHERE status = 'approved'
+     ORDER BY id DESC LIMIT 60`,
   )
   res.json({
     messages: rows.map((row) => ({
       id: Number(row.id),
       name: row.name,
       content: row.content,
+      status: row.status,
       createdAt: row.createdAt,
       mine:
         (Boolean(token) && row.owner_token === token) ||
@@ -1160,20 +1265,32 @@ app.post('/api/messages', async (req, res) => {
   if (!rateLimit(`guestbook:${req.ip}`, 60 * 1000, 3)) {
     return res.status(429).json({ error: 'too_many_requests' })
   }
+  const settings = await moderationSettings()
+  if (settings.emergencyStop) {
+    return res.status(423).json({ error: 'moderation_closed', message: '留言暂时关闭。' })
+  }
+  const matched = await matchModeration(`${name}\n${content}`)
+  if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
+  const status =
+    settings.guestbookRequireReview || matched?.action === 'review'
+      ? 'pending'
+      : 'approved'
   const token =
     guestTokenOf(req) ||
     asString(req.body?.token, 64) ||
     crypto.randomBytes(16).toString('hex')
   const result = await execute(
-    'INSERT INTO guest_messages (name, content, user_id, owner_token) VALUES (?, ?, ?, ?)',
-    [name, content, req.user?.id ?? null, token],
+    'INSERT INTO guest_messages (name, content, user_id, owner_token, status) VALUES (?, ?, ?, ?, ?)',
+    [name, content, req.user?.id ?? null, token, status],
   )
   res.status(201).json({
     id: Number(result.insertId),
     name,
     content,
+    status,
     createdAt: new Date().toISOString(),
     token,
+    message: status === 'approved' ? '留言已发布' : '留言已提交审核',
   })
 })
 
@@ -1200,11 +1317,43 @@ app.delete('/api/messages/:id', async (req, res) => {
 // ---------- 后台留言管理 ----------
 app.get('/api/admin/messages', requireAuth, requirePermission('guestbook'), async (_req, res) => {
   const rows = await query(
-    `SELECT id, name, content, user_id, created_at AS createdAt
+    `SELECT id, name, content, user_id, status, created_at AS createdAt
      FROM guest_messages ORDER BY id DESC LIMIT 300`,
   )
   res.json({ messages: rows })
 })
+
+app.post(
+  '/api/admin/messages/:id/review',
+  requireAuth,
+  requirePermission('guestbook'),
+  async (req, res) => {
+    const id = Number(req.params.id)
+    const approve = req.body?.approve === true
+    const note = asString(req.body?.note, 255)
+    const rows = await query(
+      'SELECT user_id FROM guest_messages WHERE id = ? LIMIT 1',
+      [id],
+    )
+    if (!rows.length) return res.status(404).json({ error: 'not_found' })
+    await execute(
+      `UPDATE guest_messages
+       SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = NOW()
+       WHERE id = ?`,
+      [approve ? 'approved' : 'rejected', note || null, req.user.id, id],
+    )
+    if (rows[0].user_id) {
+      await notify(
+        Number(rows[0].user_id),
+        'review',
+        approve ? '留言已通过审核' : '留言未通过审核',
+        note || '你的留言状态已更新',
+        '/guestbook',
+      )
+    }
+    res.json({ ok: true })
+  },
+)
 
 app.delete(
   '/api/admin/messages/:id',
@@ -1538,6 +1687,364 @@ async function refreshForumActivity(userId) {
   }
 }
 
+// ============================================================
+// 举报、投诉与内容安全设置
+// ============================================================
+const REPORT_CATEGORIES = new Set([
+  'illegal',
+  'harassment',
+  'privacy',
+  'copyright',
+  'fraud',
+  'other',
+])
+const REPORT_TARGETS = new Set(['post', 'reply', 'message', 'user', 'guestbook', 'complaint'])
+
+const canReadReports = (user) =>
+  Boolean(
+    user?.isSuper ||
+      ['super', 'senior', 'admin'].includes(user?.identity) ||
+      user?.permissions?.includes('members.manage') ||
+      user?.permissions?.includes('security.readonly'),
+  )
+
+const canHandleReports = (user) =>
+  Boolean(
+    user?.isSuper ||
+      ['super', 'senior', 'admin'].includes(user?.identity) ||
+      user?.permissions?.includes('members.manage'),
+  )
+
+function reportTicket() {
+  return crypto.randomBytes(6).toString('hex').toUpperCase()
+}
+
+async function buildReportSnapshot(targetType, targetId, reporter) {
+  if (targetType === 'complaint') {
+    return { ownerId: null, snapshot: '站内投诉/建议' }
+  }
+  if (targetType === 'user') {
+    const rows = await query(
+      'SELECT id, username, nickname, bio FROM users WHERE id = ? LIMIT 1',
+      [Number(targetId)],
+    )
+    if (!rows.length) return null
+    return {
+      ownerId: Number(rows[0].id),
+      snapshot: `用户：${rows[0].nickname || rows[0].username}\n简介：${rows[0].bio || '（空）'}`,
+    }
+  }
+  if (targetType === 'post') {
+    const rows = await query(
+      `SELECT p.id, p.title, p.content, p.author_id, p.status, p.board_id, b.name AS board_name
+       FROM forum_posts p JOIN forum_boards b ON b.id = p.board_id
+       WHERE p.id = ? LIMIT 1`,
+      [Number(targetId)],
+    )
+    if (!rows.length) return null
+    return {
+      ownerId: Number(rows[0].author_id),
+      snapshot: `板块：${rows[0].board_name}\n标题：${rows[0].title}\n内容：${String(rows[0].content).slice(0, 3000)}`,
+    }
+  }
+  if (targetType === 'reply') {
+    const rows = await query(
+      `SELECT r.id, r.content, r.author_id, r.post_id, p.title AS post_title
+       FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id
+       WHERE r.id = ? LIMIT 1`,
+      [Number(targetId)],
+    )
+    if (!rows.length) return null
+    return {
+      ownerId: Number(rows[0].author_id),
+      snapshot: `回复所属帖子：${rows[0].post_title}\n回复：${String(rows[0].content).slice(0, 3000)}`,
+    }
+  }
+  if (targetType === 'guestbook') {
+    const rows = await query(
+      'SELECT id, name, content, user_id FROM guest_messages WHERE id = ? LIMIT 1',
+      [Number(targetId)],
+    )
+    if (!rows.length) return null
+    return {
+      ownerId: rows[0].user_id ? Number(rows[0].user_id) : null,
+      snapshot: `留言：${rows[0].name}\n${rows[0].content}`,
+    }
+  }
+  if (targetType === 'message') {
+    if (!reporter) return null
+    const rows = await query(
+      `SELECT id, sender_id, receiver_id, content, created_at
+       FROM direct_messages
+       WHERE id = ? AND (sender_id = ? OR receiver_id = ?) LIMIT 1`,
+      [Number(targetId), reporter.id, reporter.id],
+    )
+    if (!rows.length) return null
+    const conversation = await query(
+      `SELECT sender_id, content, created_at FROM direct_messages
+       WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+         AND id <= ?
+       ORDER BY id DESC LIMIT 6`,
+      [
+        rows[0].sender_id,
+        rows[0].receiver_id,
+        rows[0].receiver_id,
+        rows[0].sender_id,
+        Number(targetId),
+      ],
+    )
+    return {
+      ownerId:
+        Number(rows[0].sender_id) === reporter.id
+          ? Number(rows[0].receiver_id)
+          : Number(rows[0].sender_id),
+      snapshot: conversation
+        .reverse()
+        .map((item) => `${Number(item.sender_id) === reporter.id ? '我' : '对方'}：${String(item.content).slice(0, 500)}`)
+        .join('\n'),
+    }
+  }
+  return null
+}
+
+app.post('/api/reports', async (req, res) => {
+  const targetType = asString(req.body?.targetType, 32)
+  const targetId = asString(req.body?.targetId, 64) || (targetType === 'complaint' ? 'site' : '')
+  const category = asString(req.body?.category, 32) || 'other'
+  const detail = String(req.body?.detail ?? '').trim().slice(0, 2000)
+  const contact = asString(req.body?.contact, 190)
+  if (!REPORT_TARGETS.has(targetType) || !targetId || !REPORT_CATEGORIES.has(category)) {
+    return res.status(400).json({ error: 'invalid_report' })
+  }
+  if (!rateLimit(`report:${req.ip}`, 60 * 60 * 1000, 8)) {
+    return res.status(429).json({ error: 'too_many_requests' })
+  }
+  if (!req.user && !contact) {
+    return res.status(400).json({ error: 'contact_required' })
+  }
+  const snapshot = await buildReportSnapshot(targetType, targetId, req.user)
+  if (!snapshot) return res.status(404).json({ error: 'target_not_found' })
+  const ticket = reportTicket()
+  const reporterName =
+    req.user?.nickname || req.user?.username || asString(req.body?.name, 64) || '匿名访客'
+  await execute(
+    `INSERT INTO content_reports
+      (ticket, reporter_id, reporter_name, reporter_contact, target_type, target_id,
+       target_owner_id, category, detail, snapshot)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      ticket,
+      req.user?.id ?? null,
+      reporterName,
+      contact || null,
+      targetType,
+      targetId,
+      snapshot.ownerId,
+      category,
+      detail,
+      snapshot.snapshot.slice(0, 8000),
+    ],
+  )
+  if (req.user) {
+    await notify(
+      req.user.id,
+      'report',
+      '举报已受理',
+      `工单 ${ticket} 已进入处理队列。`,
+      `/complaints?ticket=${ticket}`,
+    )
+  }
+  res.status(201).json({
+    ok: true,
+    ticket,
+    message: '举报已提交，请保存工单号以便查询。',
+  })
+})
+
+app.get('/api/reports/:ticket', async (req, res) => {
+  const ticket = asString(req.params.ticket, 20).toUpperCase()
+  if (!ticket) return res.status(400).json({ error: 'invalid_ticket' })
+  if (!rateLimit(`report-lookup:${req.ip}`, 10 * 60 * 1000, 30)) {
+    return res.status(429).json({ error: 'too_many_requests' })
+  }
+  const rows = await query(
+    `SELECT ticket, target_type AS targetType, category, status,
+            resolution, appeal_status AS appealStatus, created_at AS createdAt,
+            handled_at AS handledAt
+     FROM content_reports WHERE ticket = ? LIMIT 1`,
+    [ticket],
+  )
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  res.json({ report: rows[0] })
+})
+
+app.post('/api/reports/:ticket/appeal', requireAuth, async (req, res) => {
+  const ticket = asString(req.params.ticket, 20).toUpperCase()
+  const appeal = String(req.body?.appeal ?? '').trim().slice(0, 2000)
+  if (!appeal) return res.status(400).json({ error: 'invalid_appeal' })
+  const rows = await query(
+    'SELECT id, reporter_id, status FROM content_reports WHERE ticket = ? LIMIT 1',
+    [ticket],
+  )
+  if (!rows.length || Number(rows[0].reporter_id) !== req.user.id) {
+    return res.status(404).json({ error: 'not_found' })
+  }
+  if (!['resolved', 'rejected'].includes(rows[0].status)) {
+    return res.status(409).json({ error: 'not_appealable' })
+  }
+  await execute(
+    `UPDATE content_reports
+     SET status = 'appealed', appeal = ?, appeal_status = 'pending'
+     WHERE id = ?`,
+    [appeal, rows[0].id],
+  )
+  res.json({ ok: true })
+})
+
+app.get('/api/admin/reports', requireAuth, async (req, res) => {
+  if (!canReadReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  const { page, limit, offset } = pageParams(req, 30)
+  const status = asString(req.query.status, 32)
+  const targetType = asString(req.query.targetType, 32)
+  const clauses = []
+  const params = []
+  if (status) {
+    clauses.push('status = ?')
+    params.push(status)
+  }
+  if (targetType) {
+    clauses.push('target_type = ?')
+    params.push(targetType)
+  }
+  const where = clauses.length ? clauses.join(' AND ') : '1=1'
+  const count = await query(
+    `SELECT COUNT(*) AS total FROM content_reports WHERE ${where}`,
+    params,
+  )
+  const rows = await query(
+    `SELECT id, ticket, reporter_name AS reporterName, reporter_contact AS reporterContact,
+            target_type AS targetType, target_id AS targetId, category, detail, snapshot,
+            status, resolution, appeal, appeal_status AS appealStatus,
+            created_at AS createdAt, handled_at AS handledAt
+     FROM content_reports WHERE ${where}
+     ORDER BY FIELD(status, 'pending','reviewing','appealed','resolved','rejected'), id DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
+  )
+  res.json({
+    reports: rows,
+    pagination: { page, limit, total: Number(count[0]?.total ?? 0) },
+    canHandle: canHandleReports(req.user),
+    readonly: !canHandleReports(req.user),
+  })
+})
+
+app.post('/api/admin/reports/:id', requireAuth, async (req, res) => {
+  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  const id = Number(req.params.id)
+  const status = String(req.body?.status ?? '')
+  if (!['reviewing', 'resolved', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'invalid_status' })
+  }
+  const rows = await query(
+    'SELECT * FROM content_reports WHERE id = ? LIMIT 1',
+    [id],
+  )
+  if (!rows.length) return res.status(404).json({ error: 'not_found' })
+  const resolution = String(req.body?.resolution ?? '').trim().slice(0, 500)
+  const hideContent = req.body?.hideContent === true
+  if (hideContent) {
+    if (rows[0].target_type === 'post') {
+      await execute(
+        `UPDATE forum_posts SET status = 'hidden', pinned = 0 WHERE id = ? AND status <> 'deleted'`,
+        [Number(rows[0].target_id)],
+      )
+    } else if (rows[0].target_type === 'reply') {
+      await execute(
+        `UPDATE forum_replies SET status = 'rejected' WHERE id = ? AND status <> 'deleted'`,
+        [Number(rows[0].target_id)],
+      )
+    } else if (rows[0].target_type === 'guestbook') {
+      await execute(
+        `UPDATE guest_messages SET status = 'rejected' WHERE id = ?`,
+        [Number(rows[0].target_id)],
+      )
+    }
+  }
+  await execute(
+    `UPDATE content_reports
+     SET status = ?, resolution = ?, handled_by = ?, handled_at = NOW()
+     WHERE id = ?`,
+    [status, resolution || null, req.user.id, id],
+  )
+  if (rows[0].reporter_id) {
+    await notify(
+      Number(rows[0].reporter_id),
+      'report',
+      status === 'resolved' ? '举报已处理' : status === 'rejected' ? '举报未通过' : '举报处理中',
+      `${rows[0].ticket}：${resolution || '处理状态已更新'}`,
+      `/complaints?ticket=${rows[0].ticket}`,
+    )
+  }
+  res.json({ ok: true })
+})
+
+app.get('/api/admin/moderation/settings', requireAuth, async (req, res) => {
+  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  const settings = await moderationSettings()
+  const terms = await query(
+    'SELECT id, term, action, enabled, created_at FROM moderation_terms ORDER BY id ASC',
+  )
+  res.json({ settings, terms })
+})
+
+app.put('/api/admin/moderation/settings', requireAuth, async (req, res) => {
+  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  const settings = {
+    emergencyStop: Boolean(req.body?.emergencyStop),
+    repliesRequireReview: req.body?.repliesRequireReview !== false,
+    guestbookRequireReview: req.body?.guestbookRequireReview !== false,
+  }
+  await execute(
+    `UPDATE moderation_settings
+     SET emergency_stop = ?, replies_require_review = ?, guestbook_require_review = ?,
+         updated_by = ?, updated_at = NOW()
+     WHERE id = 1`,
+    [
+      settings.emergencyStop ? 1 : 0,
+      settings.repliesRequireReview ? 1 : 0,
+      settings.guestbookRequireReview ? 1 : 0,
+      req.user.id,
+    ],
+  )
+  invalidateModerationCache()
+  res.json({ ok: true, settings })
+})
+
+app.post('/api/admin/moderation/terms', requireAuth, async (req, res) => {
+  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  const term = String(req.body?.term ?? '').trim().slice(0, 80)
+  const action = req.body?.action === 'block' ? 'block' : 'review'
+  if (!term) return res.status(400).json({ error: 'invalid_term' })
+  try {
+    const result = await execute(
+      'INSERT INTO moderation_terms (term, action) VALUES (?, ?)',
+      [term, action],
+    )
+    invalidateModerationCache()
+    res.status(201).json({ id: Number(result.insertId) })
+  } catch {
+    res.status(409).json({ error: 'term_exists' })
+  }
+})
+
+app.delete('/api/admin/moderation/terms/:id', requireAuth, async (req, res) => {
+  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  await execute('DELETE FROM moderation_terms WHERE id = ?', [Number(req.params.id)])
+  invalidateModerationCache()
+  res.json({ ok: true })
+})
+
 app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res) => {
   const boardId = Number(req.body?.boardId)
   const title = asString(req.body?.title, 200)
@@ -1558,7 +2065,13 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
   if (!rateLimit(`post:${req.user.id}`, 60 * 1000, 5)) {
     return res.status(429).json({ error: 'too_many_requests' })
   }
-  const autoApprove = canModerateBoard(req.user, boardId)
+  const settings = await moderationSettings()
+  if (settings.emergencyStop) {
+    return res.status(423).json({ error: 'moderation_closed', message: '内容发布暂时关闭。' })
+  }
+  const matched = await matchModeration(`${title}\n${content}`)
+  if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
+  const autoApprove = canModerateBoard(req.user, boardId) && matched?.action !== 'review'
   const result = await execute(
     `INSERT INTO forum_posts (board_id, author_id, title, content, attachments, tags, status)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -1615,12 +2128,23 @@ app.post(
     if (!rateLimit(`reply:${req.user.id}`, 60 * 1000, 10)) {
       return res.status(429).json({ error: 'too_many_requests' })
     }
+    const settings = await moderationSettings()
+    if (settings.emergencyStop) {
+      return res.status(423).json({ error: 'moderation_closed', message: '内容发布暂时关闭。' })
+    }
+    const matched = await matchModeration(content)
+    if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
+    const autoApprove =
+      matched?.action !== 'review' &&
+      (canModerateBoard(req.user, Number(posts[0].board_id)) ||
+        !settings.repliesRequireReview)
+    const status = autoApprove ? 'approved' : 'pending'
     const result = await execute(
       `INSERT INTO forum_replies (post_id, author_id, parent_id, content, attachments, status)
-       VALUES (?, ?, ?, ?, ?, 'approved')`,
-      [postId, req.user.id, validParent, content, JSON.stringify(attachments)],
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [postId, req.user.id, validParent, content, JSON.stringify(attachments), status],
     )
-    if (posts[0].author_id !== req.user.id) {
+    if (autoApprove && posts[0].author_id !== req.user.id) {
       await notify(
         posts[0].author_id,
         'reply',
@@ -1629,11 +2153,11 @@ app.post(
         `/forum/post/${postId}`,
       )
     }
-    await refreshForumActivity(req.user.id)
+    if (autoApprove) await refreshForumActivity(req.user.id)
     res.status(201).json({
       id: Number(result.insertId),
-      status: 'approved',
-      message: '回复已发布',
+      status,
+      message: autoApprove ? '回复已发布' : '回复已提交，等待审核',
     })
   },
 )
@@ -2053,7 +2577,9 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
     }
   } else {
     const rows = await query(
-      `SELECT p.board_id, r.author_id FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE r.id = ?`,
+      `SELECT p.board_id, p.author_id AS post_author, p.title AS post_title,
+              r.id AS reply_id, r.post_id, r.author_id
+       FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id WHERE r.id = ?`,
       [id],
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
@@ -2066,6 +2592,24 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
       [approve ? 'approved' : 'rejected', note, req.user.id, id],
     )
     await refreshForumActivity(Number(rows[0].author_id))
+    if (Number(rows[0].author_id) !== req.user.id) {
+      await notify(
+        Number(rows[0].author_id),
+        'review',
+        approve ? '回复已通过审核' : '回复未通过审核',
+        note || rows[0].post_title,
+        `/forum/post/${rows[0].post_id}`,
+      )
+    }
+    if (approve && Number(rows[0].post_author) !== Number(rows[0].author_id)) {
+      await notify(
+        Number(rows[0].post_author),
+        'reply',
+        '你的帖子收到新回复',
+        note || `回复已通过审核`,
+        `/forum/post/${rows[0].post_id}`,
+      )
+    }
   }
   res.json({ ok: true })
 })
@@ -2752,6 +3296,16 @@ async function areFriends(firstId, secondId) {
   return rows.length > 0
 }
 
+async function isBlockedBetween(firstId, secondId) {
+  const rows = await query(
+    `SELECT 1 FROM user_blocks
+     WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)
+     LIMIT 1`,
+    [firstId, secondId, secondId, firstId],
+  )
+  return rows.length > 0
+}
+
 app.get('/api/friends', requireAuth, async (req, res) => {
   const userId = req.user.id
   const rows = await query(
@@ -2859,6 +3413,9 @@ app.get('/api/messages/with/:id', requireAuth, async (req, res) => {
   if (!(await areFriends(req.user.id, otherId))) {
     return res.status(403).json({ error: 'not_friends' })
   }
+  if (await isBlockedBetween(req.user.id, otherId)) {
+    return res.status(403).json({ error: 'blocked' })
+  }
   const messages = await query(
     `SELECT id, sender_id, content, created_at
      FROM direct_messages
@@ -2903,8 +3460,26 @@ app.post('/api/messages/dm', requireAuth, async (req, res) => {
   if (!(await areFriends(req.user.id, toId))) {
     return res.status(403).json({ error: 'not_friends' })
   }
+  if (await isBlockedBetween(req.user.id, toId)) {
+    return res.status(403).json({ error: 'blocked' })
+  }
   if (!rateLimit(`dm:${req.user.id}`, 60 * 1000, 30)) {
     return res.status(429).json({ error: 'too_many_requests' })
+  }
+  const settings = await moderationSettings()
+  if (settings.emergencyStop) {
+    return res.status(423).json({ error: 'moderation_closed', message: '私信暂时关闭。' })
+  }
+  const matched = await matchModeration(content)
+  if (matched) {
+    await auditRequest(req, {
+      action: 'moderation.dm_blocked',
+      targetType: 'user',
+      targetId: toId,
+      status: 422,
+      detail: { term: matched.term, rule: matched.action },
+    })
+    return moderationBlockedResponse(res, matched.term)
   }
   const result = await execute(
     'INSERT INTO direct_messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
@@ -3063,6 +3638,41 @@ app.get('/api/users/:id', async (req, res) => {
       board: { slug: post.board_slug, name: post.board_name },
     })),
   })
+})
+
+app.get('/api/users/:id/block', requireAuth, async (req, res) => {
+  const targetId = Number(req.params.id)
+  if (!targetId) return res.status(400).json({ error: 'invalid_input' })
+  const rows = await query(
+    `SELECT
+       (SELECT COUNT(*) FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?) AS mine,
+       (SELECT COUNT(*) FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?) AS theirs`,
+    [req.user.id, targetId, targetId, req.user.id],
+  )
+  res.json({
+    blockedByMe: Number(rows[0]?.mine ?? 0) > 0,
+    blockedMe: Number(rows[0]?.theirs ?? 0) > 0,
+  })
+})
+
+app.post('/api/users/:id/block', requireAuth, async (req, res) => {
+  const targetId = Number(req.params.id)
+  if (!targetId || targetId === req.user.id) {
+    return res.status(400).json({ error: 'invalid_input' })
+  }
+  await execute(
+    'INSERT IGNORE INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)',
+    [req.user.id, targetId],
+  )
+  res.json({ ok: true })
+})
+
+app.delete('/api/users/:id/block', requireAuth, async (req, res) => {
+  await execute(
+    'DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?',
+    [req.user.id, Number(req.params.id)],
+  )
+  res.json({ ok: true })
 })
 
 app.post('/api/users/:id/follow', requireAuth, async (req, res) => {
@@ -3353,6 +3963,7 @@ function canManageSecurityLogs(user) {
     user?.isSuper ||
       ['super', 'senior', 'admin'].includes(user?.identity) ||
       user?.permissions?.includes('access_logs') ||
+      user?.permissions?.includes('security.readonly') ||
       user?.permissions?.includes('members.manage'),
   )
 }

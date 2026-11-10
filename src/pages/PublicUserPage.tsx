@@ -10,6 +10,7 @@ import {
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
 import { AuthorTitle } from '../components/forum/AuthorTitle'
+import { ReportDialog } from '../components/safety/ReportDialog'
 import { formatDate } from '../lib/format'
 
 export function PublicUserPage() {
@@ -130,6 +131,14 @@ export function PublicUserPage() {
           <div className="mt-3 flex flex-wrap items-center gap-4 font-mono text-[10px] text-rhine-dim">
             <span>{profile.followers ?? 0} 粉丝</span>
             <span>{profile.following ?? 0} 关注</span>
+            {!self && (
+              <ReportDialog
+                targetType="user"
+                targetId={profile.id}
+                targetLabel={profile.nickname || profile.username}
+                className="inline-flex items-center gap-1 font-mono text-[9px] text-rhine-faint hover:text-rhine-red"
+              />
+            )}
             {!self &&
               (me ? (
                 <button

@@ -186,6 +186,16 @@ export function PermissionTree({
               label="授权权限"
               disabled={disabled}
             />
+            <AdminCheckbox
+              checked={has('security.readonly')}
+              onChange={(checked) => {
+                let next = value.filter((item) => item !== 'security.readonly')
+                if (checked) next = [...next, 'security.readonly']
+                apply(next)
+              }}
+              label="安全只读"
+              disabled={disabled}
+            />
           </div>
         </>
       )}

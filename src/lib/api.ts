@@ -41,6 +41,7 @@ export interface ApiUser {
   forumTitleLocked?: boolean
   forumPoints?: number
   forumLevel?: number
+  mfaEnabled?: boolean
   banned?: boolean
   bannedUntil?: string | null
   bannedReason?: string
@@ -413,6 +414,20 @@ const ERROR_MESSAGES: Record<string, string> = {
   no_file: '请选择文件',
   db_unavailable: '数据库连接失败',
   server_error: '服务器异常，请稍后重试',
+  mfa_required: '该账号已启用动态验证码',
+  mfa_invalid: '动态验证码错误',
+  invalid_mfa_code: '动态验证码错误',
+  mfa_already_enabled: '动态验证码已启用',
+  content_blocked: '内容包含不允许发布的词语',
+  moderation_closed: '内容发布暂时关闭',
+  readonly_account: '监管只读账号不能执行此操作',
+  blocked: '对方已屏蔽你或你已屏蔽对方',
+  target_not_found: '被举报内容不存在或已删除',
+  invalid_report: '举报信息不完整',
+  contact_required: '匿名举报需要填写联系方式',
+  invalid_appeal: '申诉说明不能为空',
+  not_appealable: '当前状态不能申诉',
+  term_exists: '该关键词已存在',
 }
 
 export function errorMessage(error: unknown): string {
@@ -473,15 +488,35 @@ export function resolveMediaUrl(url?: string | null): string {
 
 // ---------- 账号 ----------
 export const authApi = {
-  login(username: string, password: string) {
+  login(username: string, password: string, mfaCode = '') {
     return api<{ token: string; user: ApiUser }>('/api/auth/login', {
       method: 'POST',
-      body: { username, password },
+      body: { username, password, mfaCode },
       auth: false,
     })
   },
   logout() {
     return api<{ ok: boolean }>('/api/auth/logout', { method: 'POST' })
+  },
+  mfaStatus() {
+    return api<{ enabled: boolean }>('/api/admin/me/mfa')
+  },
+  mfaSetup() {
+    return api<{ secret: string; uri: string; issuer: string }>('/api/admin/me/mfa/setup', {
+      method: 'POST',
+    })
+  },
+  mfaEnable(code: string) {
+    return api<{ ok: boolean }>('/api/admin/me/mfa/enable', {
+      method: 'POST',
+      body: { code },
+    })
+  },
+  mfaDisable(input: { password: string; code: string }) {
+    return api<{ ok: boolean }>('/api/admin/me/mfa/disable', {
+      method: 'POST',
+      body: input,
+    })
   },
   me() {
     return api<{ user: ApiUser }>('/api/auth/me')
@@ -596,6 +631,7 @@ export interface GuestMessage {
   id: number
   name: string
   content: string
+  status?: 'pending' | 'approved' | 'rejected'
   createdAt: string
   mine?: boolean
 }
@@ -1178,6 +1214,76 @@ export const adminApi = {
   unbanUser(id: number) {
     return api<{ ok: boolean }>(`/api/admin/users/${id}/ban`, { method: 'DELETE' })
   },
+  reports(input: { status?: string; targetType?: string; page?: number } = {}) {
+    const params = new URLSearchParams()
+    if (input.status) params.set('status', input.status)
+    if (input.targetType) params.set('targetType', input.targetType)
+    params.set('page', String(input.page ?? 1))
+    return api<{
+      reports: Array<{
+        id: number
+        ticket: string
+        reporterName: string
+        reporterContact: string | null
+        targetType: string
+        targetId: string
+        category: string
+        detail: string
+        snapshot: string
+        status: 'pending' | 'reviewing' | 'resolved' | 'rejected' | 'appealed'
+        resolution: string | null
+        appeal: string | null
+        appealStatus: string
+        createdAt: string
+        handledAt: string | null
+      }>
+      pagination: { page: number; limit: number; total: number }
+      canHandle: boolean
+      readonly: boolean
+    }>(`/api/admin/reports?${params.toString()}`)
+  },
+  handleReport(
+    id: number,
+    input: {
+      status: 'reviewing' | 'resolved' | 'rejected'
+      resolution?: string
+      hideContent?: boolean
+    },
+  ) {
+    return api<{ ok: boolean }>(`/api/admin/reports/${id}`, {
+      method: 'POST',
+      body: input,
+    })
+  },
+  moderationSettings() {
+    return api<{
+      settings: {
+        emergencyStop: boolean
+        repliesRequireReview: boolean
+        guestbookRequireReview: boolean
+      }
+      terms: Array<{ id: number; term: string; action: 'review' | 'block'; enabled: number }>
+    }>('/api/admin/moderation/settings')
+  },
+  saveModerationSettings(input: {
+    emergencyStop: boolean
+    repliesRequireReview: boolean
+    guestbookRequireReview: boolean
+  }) {
+    return api<{ ok: boolean }>('/api/admin/moderation/settings', {
+      method: 'PUT',
+      body: input,
+    })
+  },
+  addModerationTerm(input: { term: string; action: 'review' | 'block' }) {
+    return api<{ id: number }>('/api/admin/moderation/terms', {
+      method: 'POST',
+      body: input,
+    })
+  },
+  removeModerationTerm(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/moderation/terms/${id}`, { method: 'DELETE' })
+  },
   messages() {
     return api<{
       messages: Array<{
@@ -1185,12 +1291,64 @@ export const adminApi = {
         name: string
         content: string
         userId: number | null
+        status?: 'pending' | 'approved' | 'rejected'
         createdAt: string
       }>
     }>('/api/admin/messages')
   },
+  reviewMessage(id: number, approve: boolean, note = '') {
+    return api<{ ok: boolean }>(`/api/admin/messages/${id}/review`, {
+      method: 'POST',
+      body: { approve, note },
+    })
+  },
   removeMessage(id: number) {
     return api<{ ok: boolean }>(`/api/admin/messages/${id}`, { method: 'DELETE' })
+  },
+}
+
+// ---------- 举报 / 投诉 ----------
+export type ReportCategory =
+  | 'illegal'
+  | 'harassment'
+  | 'privacy'
+  | 'copyright'
+  | 'fraud'
+  | 'other'
+
+export interface PublicReport {
+  ticket: string
+  targetType: string
+  category: string
+  status: 'pending' | 'reviewing' | 'resolved' | 'rejected' | 'appealed'
+  resolution: string | null
+  appealStatus: 'none' | 'pending' | 'accepted' | 'rejected'
+  createdAt: string
+  handledAt: string | null
+}
+
+export const reportApi = {
+  create(input: {
+    targetType: 'post' | 'reply' | 'message' | 'user' | 'guestbook' | 'complaint'
+    targetId?: string | number
+    category: ReportCategory
+    detail?: string
+    contact?: string
+    name?: string
+  }) {
+    return api<{ ok: boolean; ticket: string; message: string }>('/api/reports', {
+      method: 'POST',
+      body: input,
+    })
+  },
+  lookup(ticket: string) {
+    return api<{ report: PublicReport }>(`/api/reports/${encodeURIComponent(ticket)}`)
+  },
+  appeal(ticket: string, appeal: string) {
+    return api<{ ok: boolean }>(`/api/reports/${encodeURIComponent(ticket)}/appeal`, {
+      method: 'POST',
+      body: { appeal },
+    })
   },
 }
 
@@ -1212,6 +1370,15 @@ export const userApi = {
   },
   unfollow(id: number) {
     return api<{ ok: boolean }>(`/api/users/${id}/follow`, { method: 'DELETE' })
+  },
+  blockStatus(id: number) {
+    return api<{ blockedByMe: boolean; blockedMe: boolean }>(`/api/users/${id}/block`)
+  },
+  block(id: number) {
+    return api<{ ok: boolean }>(`/api/users/${id}/block`, { method: 'POST' })
+  },
+  unblock(id: number) {
+    return api<{ ok: boolean }>(`/api/users/${id}/block`, { method: 'DELETE' })
   },
   followers(id: number) {
     return api<{

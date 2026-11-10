@@ -3,6 +3,7 @@ import { Search, Trash2 } from 'lucide-react'
 import { adminApi, errorMessage } from '../../../lib/api'
 import { formatDateTime } from '../../../lib/format'
 import {
+  AdminBadge,
   AdminButton,
   AdminError,
   AdminNotice,
@@ -14,6 +15,7 @@ interface AdminMessage {
   name: string
   content: string
   userId: number | null
+  status?: 'pending' | 'approved' | 'rejected'
   createdAt: string
 }
 
@@ -66,6 +68,16 @@ export function GuestbookPanel() {
     }
   }
 
+  const review = async (message: AdminMessage, approve: boolean) => {
+    try {
+      await adminApi.reviewMessage(message.id, approve)
+      setNotice(approve ? '留言已通过' : '留言已拒绝')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
   const filtered = messages.filter((message) => {
     if (!query.trim()) return true
     const keyword = query.trim().toLowerCase()
@@ -107,9 +119,34 @@ export function GuestbookPanel() {
                 <span className="min-w-0 flex-1 text-xs text-rhine-dim">
                   {message.content}
                 </span>
+                {message.status && (
+                  <AdminBadge
+                    tone={
+                      message.status === 'approved'
+                        ? 'green'
+                        : message.status === 'rejected'
+                          ? 'red'
+                          : 'gold'
+                    }
+                  >
+                    {message.status === 'approved'
+                      ? '已通过'
+                      : message.status === 'rejected'
+                        ? '已拒绝'
+                        : '待审核'}
+                  </AdminBadge>
+                )}
                 <span className="font-mono text-[9px] text-rhine-faint">
                   {formatDateTime(message.createdAt)}
                 </span>
+                {message.status === 'pending' && (
+                  <>
+                    <AdminButton onClick={() => void review(message, true)}>通过</AdminButton>
+                    <AdminButton variant="danger" onClick={() => void review(message, false)}>
+                      拒绝
+                    </AdminButton>
+                  </>
+                )}
                 <AdminButton variant="danger" onClick={() => void remove(message)}>
                   <Trash2 className="h-3 w-3" /> 删除
                 </AdminButton>

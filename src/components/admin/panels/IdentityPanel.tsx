@@ -14,6 +14,7 @@ const ROLES = [
   ['core_master', '核心论坛总管理员'],
   ['forum_master', '论坛总管理员'],
   ['senior', '高级管理员'],
+  ['regulator', '监管只读'],
 ] as const
 
 export function IdentityPanel({ actor }: { actor: ApiUser }) {

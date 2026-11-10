@@ -5,7 +5,7 @@ export interface SessionValue {
   user: ApiUser | null
   loading: boolean
   staff: boolean
-  login: (username: string, password: string) => Promise<ApiUser>
+  login: (username: string, password: string, mfaCode?: string) => Promise<ApiUser>
   logout: () => Promise<void>
   refresh: () => Promise<void>
 }

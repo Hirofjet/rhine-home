@@ -44,7 +44,7 @@ export function GuestbookPage({ embedded = false, home = false }: { embedded?: b
       const msg = await createMessage({ name: n, content: c })
       setMessages((prev) => [{ ...msg, mine: true }, ...prev].slice(0, 60))
       setContent('')
-      setNotice('讯号已投递 · SIGNAL SENT')
+      setNotice(msg.status === 'pending' ? '留言已提交审核 · PENDING' : '讯号已投递 · SIGNAL SENT')
     } finally {
       setSending(false)
     }

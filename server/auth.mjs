@@ -26,6 +26,7 @@ export const PERMISSION_KEYS = [
   'members.manage',
   'members.grant',
   'access_logs',
+  'security.readonly',
 ]
 
 export const ROLE_KEYS = [
@@ -38,6 +39,7 @@ export const ROLE_KEYS = [
   'special_admin',
   'normal_master',
   'normal_admin',
+  'regulator',
   'member',
 ]
 
@@ -51,6 +53,7 @@ export const ROLE_LABELS = {
   special_admin: '特殊论坛管理员',
   normal_master: '普通论坛总管理员',
   normal_admin: '普通论坛管理员',
+  regulator: '监管只读',
   member: '普通成员',
 }
 
@@ -72,6 +75,7 @@ const ROLE_BASE_PERMISSIONS = {
   special_admin: ['guestbook'],
   normal_master: ['guestbook'],
   normal_admin: ['guestbook'],
+  regulator: ['security.readonly'],
   member: [],
 }
 
@@ -153,6 +157,8 @@ export function normalizeUser(row) {
     forumTitleLocked: Boolean(row.forum_title_locked),
     forumPoints: Number(row.forum_points ?? 0),
     forumLevel: Number(row.forum_level ?? 0),
+    mfaEnabled: Boolean(row.mfa_enabled),
+    mfaSecret: row.mfa_secret ?? '',
     banned: Boolean(row.banned),
     bannedUntil: row.banned_until ?? null,
     bannedReason: row.banned_reason ?? '',
@@ -192,6 +198,7 @@ export function publicUser(user) {
     forumTitleLocked: user.forumTitleLocked,
     forumPoints: user.forumPoints,
     forumLevel: user.forumLevel,
+    mfaEnabled: Boolean(user.mfaEnabled),
     banned: banActive(user),
     bannedUntil: user.banned ? user.bannedUntil : null,
     bannedReason: user.banned ? user.bannedReason : '',
