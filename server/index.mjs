@@ -53,6 +53,7 @@ import {
   moderationBlockedResponse,
   moderationSettings,
 } from './moderation.mjs'
+import { pushConfigured, sendPushToUser } from './push.mjs'
 
 const exifr = exifrNamespace.default ?? exifrNamespace
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -562,6 +563,16 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'mfa_invalid' })
     }
   }
+  if (req.body?.appOnly === true && !isStaff(user)) {
+    void auditRequest(req, {
+      action: 'auth.app_login.denied',
+      actorId: user.id,
+      actorUsername: user.username,
+      status: 403,
+      detail: { reason: 'staff_only' },
+    })
+    return res.status(403).json({ error: 'app_staff_only' })
+  }
   const token = await createSession(user.id)
   void auditRequest(req, {
     action: 'auth.login.success',
@@ -900,6 +911,7 @@ app.delete('/api/admin/users/:id', requireAuth, requireMembersManage, async (req
     return res.status(403).json({ error: 'forbidden' })
   }
   await execute('DELETE FROM sessions WHERE user_id = ?', [id])
+  await execute('DELETE FROM push_subscriptions WHERE user_id = ?', [id])
   await execute('DELETE FROM users WHERE id = ?', [id])
   res.json({ ok: true })
 })
@@ -1355,6 +1367,9 @@ app.post('/api/messages', async (req, res) => {
     'INSERT INTO guest_messages (name, content, user_id, owner_token, status) VALUES (?, ?, ?, ?, ?)',
     [name, content, req.user?.id ?? null, token, status],
   )
+  if (status === 'pending') {
+    void notifyStaff('review', '新留言待审核', `${name}：${content}`, '/app')
+  }
   res.status(201).json({
     id: Number(result.insertId),
     name,
@@ -1723,8 +1738,27 @@ async function notify(userId, type, title, content, link) {
        VALUES (?, ?, ?, ?, ?)`,
       [userId, type, title, asString(content, 500), asString(link, 300)],
     )
+    void sendPushToUser(userId, {
+      title,
+      body: asString(content, 500),
+      url: './',
+      tag: type,
+    })
   } catch (error) {
     console.error('[notify]', error.message)
+  }
+}
+
+/** 通知所有可进入后台的管理/版主账号，并触发 App 推送。 */
+async function notifyStaff(type, title, content, link = '/app') {
+  try {
+    const rows = await query("SELECT * FROM users WHERE status = 'active'")
+    const staff = rows.map(normalizeUser).filter((item) => isStaff(item))
+    await Promise.all(
+      staff.map((item) => notify(item.id, type, title, content, link)),
+    )
+  } catch (error) {
+    console.error('[notifyStaff]', error.message)
   }
 }
 
@@ -1916,6 +1950,12 @@ app.post('/api/reports', async (req, res) => {
       detail,
       snapshot.snapshot.slice(0, 8000),
     ],
+  )
+  void notifyStaff(
+    'report',
+    '新举报工单',
+    `${ticket} · ${category} · ${reporterName}${detail ? `：${detail.slice(0, 120)}` : ''}`,
+    `/app`,
   )
   if (req.user) {
     await notify(
@@ -2160,6 +2200,14 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
     ],
   )
   if (autoApprove) await refreshForumActivity(req.user.id)
+  if (!autoApprove) {
+    void notifyStaff(
+      'review',
+      '新帖子待审核',
+      `${req.user.nickname || req.user.username}：${title}`,
+      '/app',
+    )
+  }
   res.status(201).json({
     id: Number(result.insertId),
     status: autoApprove ? 'approved' : 'pending',
@@ -2225,6 +2273,14 @@ app.post(
       )
     }
     if (autoApprove) await refreshForumActivity(req.user.id)
+    if (!autoApprove) {
+      void notifyStaff(
+        'review',
+        '新回复待审核',
+        `${req.user.nickname || req.user.username}：${content.slice(0, 100) || '[图片]'}`,
+        '/app',
+      )
+    }
     res.status(201).json({
       id: Number(result.insertId),
       status,
@@ -3343,9 +3399,64 @@ app.delete('/api/notifications/:id', requireAuth, async (req, res) => {
   res.json({ ok: true })
 })
 
+app.get('/api/app/status', requireAuth, (req, res) => {
+  if (!isStaff(req.user)) return res.status(403).json({ error: 'app_staff_only' })
+  res.json({ ok: true, pushConfigured: pushConfigured() })
+})
+
+app.get('/api/app/push/key', requireAuth, (req, res) => {
+  if (!isStaff(req.user)) return res.status(403).json({ error: 'app_staff_only' })
+  if (!pushConfigured()) {
+    return res.status(503).json({ error: 'push_not_configured' })
+  }
+  res.json({ publicKey: config.vapid.publicKey })
+})
+
+app.post('/api/app/push/subscribe', requireAuth, async (req, res) => {
+  if (!isStaff(req.user)) return res.status(403).json({ error: 'app_staff_only' })
+  const subscription = req.body?.subscription ?? req.body
+  const endpoint = asString(subscription?.endpoint, 500)
+  const p256dh = asString(subscription?.keys?.p256dh, 255)
+  const authKey = asString(subscription?.keys?.auth, 255)
+  if (!endpoint.startsWith('https://') || !p256dh || !authKey) {
+    return res.status(400).json({ error: 'invalid_subscription' })
+  }
+  await execute(
+    `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), p256dh = VALUES(p256dh),
+       auth = VALUES(auth), user_agent = VALUES(user_agent)`,
+    [req.user.id, endpoint, p256dh, authKey, asString(req.get('user-agent'), 300)],
+  )
+  res.status(201).json({ ok: true })
+})
+
+app.delete('/api/app/push/subscribe', requireAuth, async (req, res) => {
+  if (!isStaff(req.user)) return res.status(403).json({ error: 'app_staff_only' })
+  const endpoint = asString(req.body?.endpoint, 500)
+  if (endpoint) {
+    await execute('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?', [
+      req.user.id,
+      endpoint,
+    ])
+  }
+  res.json({ ok: true })
+})
+
+app.post('/api/app/push/test', requireAuth, async (req, res) => {
+  if (!isStaff(req.user)) return res.status(403).json({ error: 'app_staff_only' })
+  if (!pushConfigured()) return res.status(503).json({ error: 'push_not_configured' })
+  const sent = await sendPushToUser(req.user.id, {
+    title: 'HIROFJET ADMIN',
+    body: '通知链路测试成功。你会在 App 中看到这条消息。',
+    url: './',
+    tag: 'test',
+  })
+  res.json({ ok: true, sent })
+})
+
 app.delete('/api/notifications', requireAuth, async (req, res) => {
-  if (String(req.query.scope ?? '') === 'read') {
-    await execute(
+  if (String(req.query.scope ?? '') === 'read') {    await execute(
       'DELETE FROM notifications WHERE user_id = ? AND read_at IS NOT NULL',
       [req.user.id],
     )
@@ -3742,6 +3853,7 @@ app.delete('/api/profile', requireAuth, async (req, res) => {
   const anonymousName = `deleted_${rows[0].id}`
   await transaction(async (connection) => {
     await connection.execute('DELETE FROM sessions WHERE user_id = ?', [req.user.id])
+    await connection.execute('DELETE FROM push_subscriptions WHERE user_id = ?', [req.user.id])
     await connection.execute('DELETE FROM notifications WHERE user_id = ?', [req.user.id])
     await connection.execute(
       'DELETE FROM follows WHERE follower_id = ? OR following_id = ?',

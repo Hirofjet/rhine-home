@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages 部署时通过 VITE_BASE_PATH 指定子路径；普通服务器部署保持 /
+  base: process.env.VITE_BASE_PATH || '/',
   plugins: [react(), tailwindcss()],
   build: {
     // 把不常变化的运行时拆成独立 chunk，利用浏览器长期缓存

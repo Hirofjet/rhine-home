@@ -1,7 +1,7 @@
 # RHINE//HOME
 
 > 莱茵生命风格的个人主页、档案库、论坛、留言板与管理系统。  
-> 当前版本：**v2.7.2**
+> 当前版本：**v2.8.0**
 
 RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它把「个人档案」「内容发布」「论坛社交」「3D 档案库」和「后台治理」放在同一套视觉与权限体系中，既保留二次元终端风格的界面，也提供可长期维护的数据与权限结构。
 
@@ -206,6 +206,42 @@ access_logs
 - 密码重置不再暴露邮箱是否存在；
 - 全局 API 限流、备份脚本和安全运营手册见 `scripts/backup.mjs`、`docs/SECURITY_OPERATIONS.md`。
 
+## 管理员 App（PWA）
+
+- 独立入口 `/app/`，只允许后台管理账号登录，**没有注册入口**；
+- 普通用户无法查看任何管理内容，非 staff 登录由服务端返回 `app_staff_only`；
+- 可安装到桌面/手机主屏幕，使用独立窗口运行；
+- 顶栏消息中心显示通知标题、正文和时间；
+- 接入 Web Push，后台关闭时也能收到系统通知并显示消息内容；
+- 新举报、待审帖子/回复/留言会自动通知管理员；
+- 支持从正式站点或 GitHub Pages 安装，详见 [管理员 App 文档](docs/ADMIN_APP.md)。
+
+构建/部署：
+
+```bash
+# 正式站点
+npm run build
+
+# GitHub Pages 子路径
+VITE_BASE_PATH=/rhine-home/ \
+VITE_API_BASE=https://www.hirofjet.cn \
+npm run build
+```
+
+GitHub Actions 工作流：
+
+- `.github/workflows/pages.yml`：部署 Pages App；
+- `.github/workflows/release-app.yml`：标签发布 `rhine-admin-app.zip`。
+
+Web Push 需要在 `server/.env` 配置：
+
+```env
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:security@example.com
+CORS_ORIGIN=https://hirofjet.github.io
+```
+
 ## 技术栈
 
 | 层 | 技术 |
@@ -312,6 +348,7 @@ npm start
 | v2.7.0 | 项目库加载修复、隐私/注销、安全头与会话加固 |
 | v2.7.1 | 性别/生日/简介/标签逐项可见范围 |
 | v2.7.2 | 帖子默认审核、回复/留言直达与帖子免审授权 |
+| v2.8.0 | 管理员专用 PWA、App 推送通知与 GitHub Pages 发布 |
 
 `logs/` 已覆盖 v0.1.0–v2.4.2，自 v2.4.0 起随仓库维护；每篇均包含作者署名。
 

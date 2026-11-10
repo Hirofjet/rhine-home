@@ -64,8 +64,8 @@ export const config = {
   // 旧版 JSON 数据目录（默认 server/data；可指向项目外）
   dataDir: process.env.DATA_DIR ?? path.join(__dirname, 'data'),
 
-  // 跨域（默认同源部署，留空即可）
-  corsOrigin: process.env.CORS_ORIGIN ?? '',
+  // 跨域（默认同源；GitHub Pages 管理 App 需要允许 Pages 源）
+  corsOrigin: process.env.CORS_ORIGIN ?? 'https://hirofjet.github.io',
 
   // SMTP（可选；不配置时验证码打印到服务端日志）
   smtp: {
@@ -79,4 +79,11 @@ export const config = {
 
   // 是否在响应里返回开发用验证码（仅本地调试开启）
   allowDevCodes: (process.env.ALLOW_DEV_CODES ?? '0') === '1',
+
+  // Web Push / 管理 App 通知（VAPID 私钥绝对不能泄露）
+  vapid: {
+    publicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+    privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+    subject: process.env.VAPID_SUBJECT ?? 'mailto:admin@localhost',
+  },
 }

@@ -10,6 +10,7 @@ import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin'
+const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '')
 
 const ArchiveHubPage = lazy(() =>
   import('./pages/ArchiveHubPage').then((m) => ({ default: m.ArchiveHubPage })),
@@ -53,6 +54,9 @@ const RegulatorPage = lazy(() =>
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })),
 )
+const AdminAppPage = lazy(() =>
+  import('./pages/AdminAppPage').then((m) => ({ default: m.AdminAppPage })),
+)
 const LoginPage = lazy(() =>
   import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })),
 )
@@ -86,8 +90,9 @@ function ScrollManager() {
 function BootGate({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const isAdmin = pathname.startsWith(ADMIN_PATH)
+  const isApp = pathname === '/app' || pathname.startsWith('/app/')
   const [booted, setBooted] = useState(() => {
-    if (isAdmin) return true
+    if (isAdmin || isApp) return true
     try {
       return sessionStorage.getItem('rhine:booted') === '1'
     } catch {
@@ -133,7 +138,7 @@ function Page({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={BASENAME || undefined}>
       <ThemeProvider>
         <SessionProvider>
           <BootGate>
@@ -163,6 +168,14 @@ export default function App() {
               <Route path="/regulator" element={<Page><RegulatorPage /></Page>} />
               <Route path="/login" element={<Page><LoginPage /></Page>} />
               <Route path={`${ADMIN_PATH}/*`} element={<Page><AdminPage /></Page>} />
+              <Route
+                path="/app/*"
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AdminAppPage />
+                  </Suspense>
+                }
+              />
               <Route path="/lab" element={<Navigate to="/archive?mode=lab" replace />} />
               <Route path="/forum-lab" element={<Navigate to="/forum?mode=lab" replace />} />
               <Route path="/projects" element={<Navigate to="/archive/projects?mode=archive" replace />} />

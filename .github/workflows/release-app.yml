@@ -1,0 +1,44 @@
+name: Publish admin app release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build static app
+        env:
+          VITE_BASE_PATH: /rhine-home/
+          VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://www.hirofjet.cn' }}
+          VITE_ADMIN_PATH: /admin
+        run: npm run build
+      - name: Package
+        run: |
+          cp dist/index.html dist/404.html
+          cd dist && zip -r ../rhine-admin-app.zip .
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: rhine-admin-app.zip
+          body: |
+            ## HIROFJET ADMIN
+
+            管理后台 PWA，仅管理员账号可登录，无注册入口。
+
+            - 在线安装：https://hirofjet.github.io/rhine-home/app/
+            - 服务器 API：由 `VITE_API_BASE` 指定，默认 https://www.hirofjet.cn
+            - 压缩包是同一版本的静态构建，需通过 HTTPS 静态服务器托管后安装。
+            - 推送通知需要服务端配置 VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY，并在 App 内点击“开启通知”。

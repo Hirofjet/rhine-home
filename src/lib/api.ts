@@ -433,6 +433,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   consent_required: '请先阅读并同意用户协议与隐私政策',
   confirm_required: '请输入 DELETE 确认注销',
   invalid_visibility: '可见范围不合法',
+  app_staff_only: '该账号没有管理员权限，不能登录管理 App',
+  push_not_configured: '服务端未配置推送密钥，请联系超级管理员',
   invalid_appeal: '申诉说明不能为空',
   not_appealable: '当前状态不能申诉',
   term_exists: '该关键词已存在',
@@ -496,10 +498,10 @@ export function resolveMediaUrl(url?: string | null): string {
 
 // ---------- 账号 ----------
 export const authApi = {
-  login(username: string, password: string, mfaCode = '') {
+  login(username: string, password: string, mfaCode = '', appOnly = false) {
     return api<{ token: string; user: ApiUser }>('/api/auth/login', {
       method: 'POST',
-      body: { username, password, mfaCode },
+      body: { username, password, mfaCode, appOnly },
       auth: false,
     })
   },
@@ -1488,14 +1490,38 @@ export function hasPerm(user: ApiUser | null, permission: string): boolean {
   return false
 }
 
+export const appApi = {
+  status() {
+    return api<{ ok: boolean; pushConfigured: boolean }>('/api/app/status')
+  },
+  pushKey() {
+    return api<{ publicKey: string }>('/api/app/push/key')
+  },
+  subscribe(subscription: PushSubscriptionJSON) {
+    return api<{ ok: boolean }>('/api/app/push/subscribe', {
+      method: 'POST',
+      body: { subscription },
+    })
+  },
+  unsubscribe(endpoint: string) {
+    return api<{ ok: boolean }>('/api/app/push/subscribe', {
+      method: 'DELETE',
+      body: { endpoint },
+    })
+  },
+  testPush() {
+    return api<{ ok: boolean; sent: number }>('/api/app/push/test', { method: 'POST' })
+  },
+}
+
 export function isStaffUser(user: ApiUser | null): boolean {
   if (!user) return false
   if (user.isSuper) return true
   return user.permissions.some(
     (p) =>
-      p === 'archive' ||
-      p.startsWith('archive.') ||
+      p === 'projects' ||
       p === 'logs' ||
+      p === 'guestbook' ||
       p === 'forum' ||
       p.startsWith('forum.') ||
       p === 'members.manage' ||
