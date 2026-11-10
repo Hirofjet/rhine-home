@@ -31,7 +31,10 @@ jobs:
           VITE_ADMIN_PATH: /admin
         run: npm run build
       - name: SPA fallback
-        run: cp dist/index.html dist/404.html
+        run: |
+          cp dist/index.html dist/404.html
+          mkdir -p dist/app
+          cp dist/index.html dist/app/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

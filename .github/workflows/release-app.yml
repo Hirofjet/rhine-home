@@ -27,6 +27,8 @@ jobs:
       - name: Package
         run: |
           cp dist/index.html dist/404.html
+          mkdir -p dist/app
+          cp dist/index.html dist/app/index.html
           cd dist && zip -r ../rhine-admin-app.zip .
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
