@@ -55,6 +55,9 @@ export const config = {
   // 会话时长（小时）
   sessionHours: Number(process.env.SESSION_HOURS ?? 12),
 
+  // 可信反向代理：默认仅信任同机回环代理；直连部署时外部 IP 不会被伪造
+  trustProxy: process.env.TRUST_PROXY ?? 'loopback',
+
   // 上传目录（默认 server/uploads；可指向项目外，避免更新代码时丢失）
   uploadDir: process.env.UPLOAD_DIR ?? '',
 

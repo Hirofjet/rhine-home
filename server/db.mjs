@@ -327,6 +327,58 @@ const TABLES = [
     PRIMARY KEY (email)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS request_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    request_id VARCHAR(64) NOT NULL,
+    user_id BIGINT UNSIGNED NULL,
+    username VARCHAR(64) NULL,
+    method VARCHAR(12) NOT NULL,
+    path VARCHAR(512) NOT NULL,
+    query_keys VARCHAR(255) NULL,
+    status SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    duration_ms INT UNSIGNED NOT NULL DEFAULT 0,
+    ip VARCHAR(64) NULL,
+    remote_port INT UNSIGNED NULL,
+    target_host VARCHAR(255) NULL,
+    target_port INT UNSIGNED NULL,
+    user_agent VARCHAR(512) NULL,
+    device_hash CHAR(64) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_request_created (created_at),
+    KEY idx_request_user (user_id, created_at),
+    KEY idx_request_ip (ip, created_at),
+    KEY idx_request_status (status, created_at),
+    KEY idx_request_id (request_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS security_audit_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    request_id VARCHAR(64) NULL,
+    actor_id BIGINT UNSIGNED NULL,
+    actor_username VARCHAR(64) NULL,
+    action VARCHAR(120) NOT NULL,
+    target_type VARCHAR(64) NULL,
+    target_id VARCHAR(64) NULL,
+    target_label VARCHAR(200) NULL,
+    method VARCHAR(12) NULL,
+    path VARCHAR(512) NULL,
+    status SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    ip VARCHAR(64) NULL,
+    user_agent VARCHAR(512) NULL,
+    detail TEXT NULL,
+    prev_hash CHAR(64) NOT NULL,
+    entry_hash CHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    occurred_at VARCHAR(32) NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_audit_created (created_at),
+    KEY idx_audit_actor (actor_id, created_at),
+    KEY idx_audit_action (action, created_at),
+    KEY idx_audit_request (request_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS access_logs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NULL,
@@ -371,6 +423,7 @@ async function ensureColumn(table, column, definition) {
 
 /** 兼容已部署的旧表：缺少的列与状态枚举自动补齐 */
 async function ensureSchemaUpgrades() {
+  await ensureColumn('security_audit_logs', 'occurred_at', "occurred_at VARCHAR(32) NOT NULL DEFAULT ''")
   await ensureColumn('users', 'avatar_url', 'avatar_url VARCHAR(500) NULL')
   await ensureColumn('site_themes', 'primary_name', 'primary_name VARCHAR(40) NULL')
   await ensureColumn('site_themes', 'secondary_name', 'secondary_name VARCHAR(40) NULL')

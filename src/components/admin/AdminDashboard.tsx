@@ -18,7 +18,7 @@ import { ProjectsPanel } from './panels/ProjectsPanel'
 import { ReviewPanel } from './panels/ReviewPanel'
 import { ReviewAccessPanel } from './panels/ReviewAccessPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
-import { AccessLogsPanel } from './panels/AccessLogsPanel'
+import { SecurityLogsPanel } from './panels/SecurityLogsPanel'
 import { ThemesPanel } from './panels/ThemesPanel'
 import { VideosPanel } from './panels/VideosPanel'
 
@@ -41,7 +41,7 @@ type PanelKey =
   | 'review-posts'
   | 'members'
   | 'identities'
-  | 'access-logs'
+  | 'security-logs'
   | 'themes'
   | 'settings'
 
@@ -145,7 +145,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
 
     const settingsItems: MenuItem[] = []
     if (accessLogsAccess) {
-      settingsItems.push({ key: 'access-logs', label: '访问记录', labelEn: 'ACCESS LOGS' })
+      settingsItems.push({ key: 'security-logs', label: '安全日志', labelEn: 'SECURITY LOGS' })
       settingsItems.push({ key: 'themes', label: '主题颜色', labelEn: 'THEMES' })
     }
     settingsItems.push({ key: 'settings', label: '设置', labelEn: 'SETTINGS' })
@@ -262,15 +262,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
               {current === 'review-posts' && <ReviewPanel postsOnly />}
               {current === 'members' && <MembersPanel user={user} />}
               {current === 'identities' && <IdentityPanel actor={user} />}
-              {current === 'access-logs' && (
-                <AccessLogsPanel
-                  canDelete={
-                    user.isSuper ||
-                    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
-                    user.permissions.includes('access_logs')
-                  }
-                />
-              )}
+              {current === 'security-logs' && <SecurityLogsPanel />}
               {current === 'themes' && (
                 <ThemesPanel
                   canDelete={

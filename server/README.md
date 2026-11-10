@@ -28,6 +28,7 @@ curl http://127.0.0.1:3001/api/health
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | **必填**，MySQL 连接 |
 | `ADMIN_USER` / `ADMIN_PASSWORD` | 首次启动创建超级管理员 |
 | `SESSION_HOURS` | 会话时长（默认 12 小时，存 MySQL） |
+| `TRUST_PROXY` | 可信反向代理；默认 `loopback`，也支持 IP/CIDR 列表 |
 | `UPLOAD_DIR` | 上传目录（默认 `server/uploads`） |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | 验证码邮件；不配置则打印到日志 |
 | `ALLOW_DEV_CODES` | 本地调试返回验证码（生产必须 0） |
@@ -35,7 +36,21 @@ curl http://127.0.0.1:3001/api/health
 
 ## 数据表
 
-`users`、`sessions`、`email_codes`、`articles`、`photos`、`videos`、`logs`、`forum_boards`、`forum_posts`、`forum_replies`、`guest_messages`。完整 DDL 见 `schema.sql`。
+`users`、`sessions`、`email_codes`、`articles`、`photos`、`videos`、`logs`、`forum_boards`、`forum_posts`、`forum_replies`、`guest_messages`、`request_logs`、`security_audit_logs`。完整 DDL 见 `schema.sql`。
+
+## 安全日志
+
+- `request_logs`：请求级访问日志，默认保留 **180 天**；记录用户、方法、路径、状态、耗时、IP/端口、目标 Host/端口、UA 摘要与 request-id；不记录请求体或敏感查询值。
+- `security_audit_logs`：登录、注册、密码重置、权限、封禁、内容处置和后台写操作的只追加审计；`prev_hash` + `entry_hash` 构成 SHA-256 前向哈希链。
+- 应用层不提供删除接口；`request_logs` 只由 180 天到期任务清理，审计日志长期保留。
+- 后台「设置 → 安全日志」可查询请求日志和审计日志。
+
+## 安全日志接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/admin/security/request-logs` | 请求日志，支持 q/method/status/from/to/page/limit |
+| GET | `/api/admin/security/audit-logs` | 审计日志，支持 q/action/status/from/to/page/limit |
 
 ## 权限
 

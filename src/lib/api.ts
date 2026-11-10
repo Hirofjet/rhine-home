@@ -788,13 +788,90 @@ export const accessLogApi = {
     return api<{ ok: boolean }>('/api/access-logs', { method: 'POST', body: input })
   },
   list() {
-    return api<{ logs: AccessLogEntry[]; canDelete: boolean }>('/api/admin/access-logs')
+    return api<{ logs: AccessLogEntry[]; canDelete: boolean; immutable?: boolean }>(
+      '/api/admin/access-logs',
+    )
   },
-  remove(id: number) {
-    return api<{ ok: boolean }>(`/api/admin/access-logs/${id}`, { method: 'DELETE' })
+}
+
+// ---------- 安全日志（请求日志 / 审计日志） ----------
+export interface RequestLogEntry {
+  id: number
+  request_id: string
+  user_id: number | null
+  username: string | null
+  method: string
+  path: string
+  query_keys: string | null
+  status: number
+  duration_ms: number
+  ip: string | null
+  remote_port: number | null
+  target_host: string | null
+  target_port: number | null
+  user_agent: string | null
+  device_hash: string | null
+  created_at: string
+}
+
+export interface AuditLogEntry {
+  id: number
+  request_id: string | null
+  actor_id: number | null
+  actor_username: string | null
+  action: string
+  target_type: string | null
+  target_id: string | null
+  target_label: string | null
+  method: string | null
+  path: string | null
+  status: number
+  ip: string | null
+  user_agent: string | null
+  detail: string | null
+  prev_hash: string
+  entry_hash: string
+  created_at: string
+  occurred_at: string
+}
+
+export interface SecurityLogQuery {
+  q?: string
+  method?: string
+  status?: string
+  from?: string
+  to?: string
+  page?: number
+  limit?: number
+}
+
+export interface SecurityLogPage<T> {
+  logs: T[]
+  pagination: { page: number; limit: number; total: number }
+  retentionDays?: number
+  immutable?: boolean
+  canDelete: false
+}
+
+function securityLogQuery(input: SecurityLogQuery) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined && value !== '') params.set(key, String(value))
+  }
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export const securityLogApi = {
+  requests(input: SecurityLogQuery = {}) {
+    return api<SecurityLogPage<RequestLogEntry>>(
+      `/api/admin/security/request-logs${securityLogQuery(input)}`,
+    )
   },
-  clear(scope: 'all' | 'expired' = 'all') {
-    return api<{ ok: boolean }>(`/api/admin/access-logs?scope=${scope}`, { method: 'DELETE' })
+  audit(input: SecurityLogQuery = {}) {
+    return api<SecurityLogPage<AuditLogEntry>>(
+      `/api/admin/security/audit-logs${securityLogQuery(input)}`,
+    )
   },
 }
 

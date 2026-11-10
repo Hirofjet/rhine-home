@@ -39,6 +39,13 @@ import {
 } from './auth.mjs'
 import { mailConfigured, sendCodeMail } from './mail.mjs'
 import { importLegacyIfEmpty } from './legacy-import.mjs'
+import {
+  auditRequest,
+  adminAuditMiddleware,
+  clientIp,
+  requestLogger,
+  startSecurityLogMaintenance,
+} from './security-logs.mjs'
 
 const exifr = exifrNamespace.default ?? exifrNamespace
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -69,6 +76,7 @@ async function initDatabaseWithRetry(attempts = 20) {
 }
 
 await initDatabaseWithRetry()
+startSecurityLogMaintenance()
 
 // ---------- 基础工具 ----------
 const asString = (value, max = 500) => String(value ?? '').trim().slice(0, max)
@@ -324,13 +332,15 @@ if ((process.env.AUTO_IMPORT_LEGACY ?? '1') === '1') {
 
 // ---------- Express ----------
 const app = express()
-app.set('trust proxy', 1)
+app.set('trust proxy', config.trustProxy || false)
 if (config.corsOrigin) {
   app.use(cors({ origin: config.corsOrigin.split(',').map((s) => s.trim()) }))
 }
 app.use(compression())
 app.use(express.json({ limit: '8mb' }))
+app.use(requestLogger)
 app.use(auth)
+app.use(adminAuditMiddleware)
 
 // ============================================================
 // 账号 / 会话
@@ -394,6 +404,13 @@ app.post('/api/auth/register', async (req, res) => {
   const rows = await query('SELECT * FROM users WHERE id = ?', [result.insertId])
   const user = normalizeUser(rows[0])
   const token = await createSession(user.id)
+  void auditRequest(req, {
+    action: 'auth.register',
+    actorId: user.id,
+    actorUsername: user.username,
+    status: 201,
+    detail: { emailVerified: true },
+  })
   res.status(201).json({ token, user: publicUser(user) })
 })
 
@@ -412,6 +429,12 @@ app.post('/api/auth/login', async (req, res) => {
     rows[0].status !== 'active' ||
     !verifyPassword(password, rows[0].password_hash)
   ) {
+    void auditRequest(req, {
+      action: 'auth.login.failed',
+      actorUsername: login.slice(0, 64),
+      status: 401,
+      detail: { reason: 'invalid_credentials' },
+    })
     return res.status(401).json({ error: 'invalid_credentials' })
   }
   const user = normalizeUser(rows[0])
@@ -425,6 +448,13 @@ app.post('/api/auth/login', async (req, res) => {
         [user.id],
       )
     } else {
+      void auditRequest(req, {
+        action: 'auth.login.banned',
+        actorId: user.id,
+        actorUsername: user.username,
+        status: 403,
+        detail: { bannedUntil: user.bannedUntil },
+      })
       return res.status(403).json({
         error: 'account_banned',
         until: user.bannedUntil,
@@ -433,10 +463,20 @@ app.post('/api/auth/login', async (req, res) => {
     }
   }
   const token = await createSession(user.id)
+  void auditRequest(req, {
+    action: 'auth.login.success',
+    actorId: user.id,
+    actorUsername: user.username,
+    status: 200,
+  })
   res.json({ token, user: publicUser(user) })
 })
 
 app.post('/api/auth/logout', requireAuth, async (req, res) => {
+  void auditRequest(req, {
+    action: 'auth.logout',
+    status: 200,
+  })
   await destroySession(tokenFromRequest(req))
   res.json({ ok: true })
 })
@@ -462,6 +502,12 @@ app.post('/api/auth/password/reset', async (req, res) => {
     rows[0].id,
   ])
   await execute('DELETE FROM sessions WHERE user_id = ?', [rows[0].id])
+  void auditRequest(req, {
+    action: 'auth.password.reset',
+    actorId: rows[0].id,
+    actorUsername: email,
+    status: 200,
+  })
   res.json({ ok: true })
 })
 
@@ -3301,8 +3347,8 @@ app.delete('/api/admin/themes/:id', requireAuth, async (req, res) => {
   res.json({ ok: true })
 })
 
-// ---------- 访问日志 ----------
-function canManageAccessLogs(user) {
+// ---------- 安全日志（请求日志 / 审计日志） ----------
+function canManageSecurityLogs(user) {
   return Boolean(
     user?.isSuper ||
       ['super', 'senior', 'admin'].includes(user?.identity) ||
@@ -3311,50 +3357,156 @@ function canManageAccessLogs(user) {
   )
 }
 
+function securityLogFilters(req) {
+  const clauses = []
+  const params = []
+  const q = asString(req.query.q, 120)
+  if (q) {
+    const like = `%${q.replace(/[%_]/g, '\\$&')}%`
+    clauses.push('(path LIKE ? OR username LIKE ? OR ip LIKE ? OR request_id LIKE ?)')
+    params.push(like, like, like, like)
+  }
+  const method = asString(req.query.method, 12).toUpperCase()
+  if (method) {
+    clauses.push('method = ?')
+    params.push(method)
+  }
+  if (req.query.status !== undefined && req.query.status !== '') {
+    const status = Number(req.query.status)
+    if (Number.isInteger(status)) {
+      clauses.push('status = ?')
+      params.push(status)
+    }
+  }
+  const from = asDate(req.query.from)
+  if (from) {
+    clauses.push('created_at >= ?')
+    params.push(`${from} 00:00:00`)
+  }
+  const to = asDate(req.query.to)
+  if (to) {
+    clauses.push('created_at < DATE_ADD(?, INTERVAL 1 DAY)')
+    params.push(`${to} 00:00:00`)
+  }
+  return { where: clauses.length ? clauses.join(' AND ') : '1=1', params }
+}
+
+app.get(
+  '/api/admin/security/request-logs',
+  requireAuth,
+  async (req, res) => {
+    if (!canManageSecurityLogs(req.user)) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const { page, limit, offset } = pageParams(req, 30)
+    const { where, params } = securityLogFilters(req)
+    const count = await query(
+      `SELECT COUNT(*) AS total FROM request_logs WHERE ${where}`,
+      params,
+    )
+    const rows = await query(
+      `SELECT id, request_id, user_id, username, method, path, query_keys, status,
+              duration_ms, ip, remote_port, target_host, target_port, user_agent,
+              device_hash, created_at
+       FROM request_logs WHERE ${where}
+       ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    )
+    res.json({
+      logs: rows,
+      pagination: { page, limit, total: Number(count[0]?.total ?? 0) },
+      retentionDays: 180,
+      canDelete: false,
+    })
+  },
+)
+
+app.get(
+  '/api/admin/security/audit-logs',
+  requireAuth,
+  async (req, res) => {
+    if (!canManageSecurityLogs(req.user)) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const { page, limit, offset } = pageParams(req, 30)
+    const clauses = []
+    const params = []
+    const q = asString(req.query.q, 120)
+    if (q) {
+      const like = `%${q.replace(/[%_]/g, '\\$&')}%`
+      clauses.push(
+        '(action LIKE ? OR actor_username LIKE ? OR path LIKE ? OR ip LIKE ? OR target_id LIKE ? OR target_label LIKE ?)',
+      )
+      params.push(like, like, like, like, like, like)
+    }
+    const action = asString(req.query.action, 120)
+    if (action) {
+      clauses.push('action = ?')
+      params.push(action)
+    }
+    if (req.query.status !== undefined && req.query.status !== '') {
+      const status = Number(req.query.status)
+      if (Number.isInteger(status)) {
+        clauses.push('status = ?')
+        params.push(status)
+      }
+    }
+    const from = asDate(req.query.from)
+    if (from) {
+      clauses.push('created_at >= ?')
+      params.push(`${from} 00:00:00`)
+    }
+    const to = asDate(req.query.to)
+    if (to) {
+      clauses.push('created_at < DATE_ADD(?, INTERVAL 1 DAY)')
+      params.push(`${to} 00:00:00`)
+    }
+    const where = clauses.length ? clauses.join(' AND ') : '1=1'
+    const count = await query(
+      `SELECT COUNT(*) AS total FROM security_audit_logs WHERE ${where}`,
+      params,
+    )
+    const rows = await query(
+      `SELECT id, request_id, actor_id, actor_username, action, target_type,
+              target_id, target_label, method, path, status, ip, user_agent,
+              detail, prev_hash, entry_hash, created_at, occurred_at
+       FROM security_audit_logs WHERE ${where}
+       ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    )
+    res.json({
+      logs: rows,
+      pagination: { page, limit, total: Number(count[0]?.total ?? 0) },
+      immutable: true,
+      canDelete: false,
+    })
+  },
+)
+
+// 旧版“模块访问”记录：保留写入与只读查询，但不再提供删除入口。
 app.post('/api/access-logs', requireAuth, async (req, res) => {
   const moduleType = asString(req.body?.moduleType, 32)
   if (!moduleType) return res.status(400).json({ error: 'module_required' })
   const targetType = asString(req.body?.targetType, 32)
   const targetId = asString(req.body?.targetId, 64)
   const targetTitle = asString(req.body?.targetTitle, 200)
-  const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '')
-    .split(',')[0]
-    .trim()
-    .slice(0, 64)
   await execute(
     `INSERT INTO access_logs
       (user_id, username, module_type, target_type, target_id, target_title, ip, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))`,
-    [req.user.id, req.user.username, moduleType, targetType, targetId, targetTitle, ip],
+     VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 180 DAY))`,
+    [req.user.id, req.user.username, moduleType, targetType, targetId, targetTitle, clientIp(req)],
   )
   res.status(201).json({ ok: true })
 })
 
 app.get('/api/admin/access-logs', requireAuth, async (req, res) => {
-  if (!canManageAccessLogs(req.user)) return res.status(403).json({ error: 'forbidden' })
-  await execute('DELETE FROM access_logs WHERE expires_at <= NOW()')
+  if (!canManageSecurityLogs(req.user)) return res.status(403).json({ error: 'forbidden' })
   const rows = await query(
     `SELECT id, username, module_type, target_type, target_id, target_title, ip,
             created_at, expires_at, TIMESTAMPDIFF(SECOND, NOW(), expires_at) AS remaining_seconds
      FROM access_logs ORDER BY created_at DESC LIMIT 500`,
   )
-  res.json({ logs: rows, canDelete: true })
-})
-
-app.delete('/api/admin/access-logs/:id', requireAuth, async (req, res) => {
-  if (!canManageAccessLogs(req.user)) return res.status(403).json({ error: 'forbidden' })
-  await execute('DELETE FROM access_logs WHERE id = ?', [Number(req.params.id)])
-  res.json({ ok: true })
-})
-
-app.delete('/api/admin/access-logs', requireAuth, async (req, res) => {
-  if (!canManageAccessLogs(req.user)) return res.status(403).json({ error: 'forbidden' })
-  if (req.query.scope === 'expired') {
-    await execute('DELETE FROM access_logs WHERE expires_at <= NOW()')
-  } else {
-    await execute('DELETE FROM access_logs')
-  }
-  res.json({ ok: true })
+  res.json({ logs: rows, canDelete: false, immutable: true })
 })
 
 if (fs.existsSync(DIST_DIR)) {
