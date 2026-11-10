@@ -2143,7 +2143,9 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
   }
   const matched = await matchModeration(`${title}\n${content}`)
   if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
-  const autoApprove = matched?.action !== 'review'
+  const autoApprove =
+    canModerateBoard(req.user, boardId) ||
+    hasPermission(req.user, 'forum.post.autoapprove')
   const result = await execute(
     `INSERT INTO forum_posts (board_id, author_id, title, content, attachments, tags, status)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,

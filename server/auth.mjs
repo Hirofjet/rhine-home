@@ -23,6 +23,7 @@ export const PERMISSION_KEYS = [
   'logs',
   'guestbook',
   'forum',
+  'forum.post.autoapprove',
   'members.manage',
   'members.grant',
   'access_logs',

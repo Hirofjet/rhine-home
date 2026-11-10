@@ -111,6 +111,18 @@ export function PermissionTree({
           label="论坛（全部板块）"
           disabled={disabled}
         />
+        <AdminCheckbox
+          checked={has('forum.post.autoapprove')}
+          onChange={(checked) => {
+            const next = value.filter((item) => item !== 'forum.post.autoapprove')
+            apply(checked ? [...next, 'forum.post.autoapprove'] : next)
+          }}
+          label="帖子免审（全局）"
+          disabled={disabled || forumParent}
+        />
+        <p className="font-mono text-[8px] leading-relaxed text-rhine-faint">
+          帖子默认需要管理员审核；只有勾选此项的成员可直接发布帖子。回复和留言不受此限制。
+        </p>
         <div className="flex flex-wrap gap-x-5 gap-y-2 pl-4">
           {boards.map((board) => {
             const boardKey = `forum.${board.id}`

@@ -298,6 +298,7 @@ export function MembersPanel({ user }: MembersPanelProps) {
           if (board) labels.push(`论坛·${board.name}`)
         })
     }
+    if (target.permissions.includes('forum.post.autoapprove')) labels.push('帖子免审')
     if (target.permissions.includes('members.manage')) labels.push('管理成员')
     if (target.permissions.includes('members.grant')) labels.push('授权权限')
     return labels.length ? labels.join(' · ') : '无'
