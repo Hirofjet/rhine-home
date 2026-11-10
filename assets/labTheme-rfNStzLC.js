@@ -1,0 +1,1 @@
+function e(e){return e===`rhine-dark`?`dark`:e===`archive`||e===`sakura`||e===`noctis`?e:`light`}function t(e){return e===`dark`?`rhine-dark`:e===`archive`||e===`sakura`||e===`noctis`?e:`rhine`}function n(e){return e===`light`||e===`dark`||e===`archive`||e===`sakura`||e===`noctis`}function r(e){return e===`light`||e===`dark`}export{e as i,r as n,n as r,t};
