@@ -42,6 +42,10 @@ export interface ApiUser {
   forumPoints?: number
   forumLevel?: number
   mfaEnabled?: boolean
+  genderVisibility?: ProfileVisibility
+  birthdayVisibility?: ProfileVisibility
+  bioVisibility?: ProfileVisibility
+  tagsVisibility?: ProfileVisibility
   banned?: boolean
   bannedUntil?: string | null
   bannedReason?: string
@@ -270,8 +274,9 @@ export interface ChatMessage {
   createdAt: string
 }
 
-export interface PublicProfile {
-  id: number
+export type ProfileVisibility = 'public' | 'friends' | 'private'
+
+export interface PublicProfile {  id: number
   username: string
   nickname?: string
   avatarUrl?: string
@@ -427,6 +432,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   contact_required: '匿名举报需要填写联系方式',
   consent_required: '请先阅读并同意用户协议与隐私政策',
   confirm_required: '请输入 DELETE 确认注销',
+  invalid_visibility: '可见范围不合法',
   invalid_appeal: '申诉说明不能为空',
   not_appealable: '当前状态不能申诉',
   term_exists: '该关键词已存在',
@@ -1414,6 +1420,10 @@ export const userApi = {
     birthday?: string
     bio?: string
     tags?: string[]
+    genderVisibility?: ProfileVisibility
+    birthdayVisibility?: ProfileVisibility
+    bioVisibility?: ProfileVisibility
+    tagsVisibility?: ProfileVisibility
   }) {
     return api<{ user: ApiUser }>('/api/profile', { method: 'PUT', body: input })
   },

@@ -27,6 +27,7 @@ import {
   type ChatMessage,
   type Conversation,
   type NotificationItem,
+  type ProfileVisibility,
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
 import { BirthdayPicker } from '../components/profile/BirthdayPicker'
@@ -39,6 +40,27 @@ const IMPORTANT_TYPES = new Set(['review', 'permission', 'ban', 'access'])
 
 const isTab = (value: string | null): value is Tab =>
   ['profile', 'messages', 'posts', 'follows', 'account'].includes(value ?? '')
+
+function VisibilitySelect({
+  value,
+  onChange,
+}: {
+  value: ProfileVisibility
+  onChange: (next: ProfileVisibility) => void
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value as ProfileVisibility)}
+      className="border border-rhine-line bg-rhine-abyss/60 px-2 py-1 font-mono text-[9px] text-rhine-dim outline-none"
+      title="可见范围"
+    >
+      <option value="public">所有人可见</option>
+      <option value="friends">好友可见</option>
+      <option value="private">仅自己</option>
+    </select>
+  )
+}
 
 export function ProfilePage() {
   const { user, loading, refresh, logout } = useSession()
@@ -63,6 +85,18 @@ export function ProfilePage() {
   const [birthday, setBirthday] = useState(user?.birthday ?? '')
   const [bio, setBio] = useState(user?.bio ?? '')
   const [tags, setTags] = useState((user?.tags ?? []).join(' '))
+  const [genderVisibility, setGenderVisibility] = useState<ProfileVisibility>(
+    user?.genderVisibility ?? 'private',
+  )
+  const [birthdayVisibility, setBirthdayVisibility] = useState<ProfileVisibility>(
+    user?.birthdayVisibility ?? 'private',
+  )
+  const [bioVisibility, setBioVisibility] = useState<ProfileVisibility>(
+    user?.bioVisibility ?? 'public',
+  )
+  const [tagsVisibility, setTagsVisibility] = useState<ProfileVisibility>(
+    user?.tagsVisibility ?? 'public',
+  )
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const avatarInput = useRef<HTMLInputElement | null>(null)
@@ -117,6 +151,10 @@ export function ProfilePage() {
     setBirthday(user.birthday ?? '')
     setBio(user.bio ?? '')
     setTags((user.tags ?? []).join(' '))
+    setGenderVisibility(user.genderVisibility ?? 'private')
+    setBirthdayVisibility(user.birthdayVisibility ?? 'private')
+    setBioVisibility(user.bioVisibility ?? 'public')
+    setTagsVisibility(user.tagsVisibility ?? 'public')
   }, [user])
 
   useEffect(() => {
@@ -208,6 +246,10 @@ export function ProfilePage() {
         birthday,
         bio,
         tags: tags.split(/[,，\s]+/).filter(Boolean),
+        genderVisibility,
+        birthdayVisibility,
+        bioVisibility,
+        tagsVisibility,
       })
       await refresh()
       setNotice('资料已保存')
@@ -560,14 +602,21 @@ export function ProfilePage() {
                 <option value="female">女</option>
                 <option value="other">其他</option>
               </select>
+              <VisibilitySelect value={genderVisibility} onChange={setGenderVisibility} />
             </label>
             <div className="space-y-1 sm:col-span-2">
-              <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">生日</span>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">生日</span>
+                <VisibilitySelect value={birthdayVisibility} onChange={setBirthdayVisibility} />
+              </div>
               <BirthdayPicker value={birthday} onChange={setBirthday} />
             </div>
           </div>
           <label className="block space-y-1">
-            <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">简介</span>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">简介</span>
+              <VisibilitySelect value={bioVisibility} onChange={setBioVisibility} />
+            </div>
             <textarea
               value={bio}
               onChange={(event) => setBio(event.target.value)}
@@ -576,7 +625,10 @@ export function ProfilePage() {
             />
           </label>
           <label className="block space-y-1">
-            <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">标签</span>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10px] tracking-[0.2em] text-rhine-faint">标签</span>
+              <VisibilitySelect value={tagsVisibility} onChange={setTagsVisibility} />
+            </div>
             <input
               value={tags}
               onChange={(event) => setTags(event.target.value)}

@@ -115,6 +115,15 @@ export function PublicUserPage() {
           <p className="mt-1 font-mono text-[10px] tracking-wider text-rhine-faint">
             @{profile.username} · {ROLE_LABELS[profile.role]} · 加入于 {formatDate(profile.createdAt)}
           </p>
+          {(profile.gender || profile.birthday) && (
+            <p className="mt-2 font-mono text-[10px] tracking-wider text-rhine-dim">
+              {profile.gender
+                ? `性别：${profile.gender === 'male' ? '男' : profile.gender === 'female' ? '女' : '其他'}`
+                : ''}
+              {profile.gender && profile.birthday ? ' · ' : ''}
+              {profile.birthday ? `生日：${profile.birthday}` : ''}
+            </p>
+          )}
           {profile.bio && (
             <p className="mt-2 text-sm leading-relaxed text-rhine-dim">{profile.bio}</p>
           )}

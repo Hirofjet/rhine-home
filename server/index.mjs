@@ -3642,6 +3642,19 @@ app.put('/api/profile', requireAuth, async (req, res) => {
   if (req.body?.tags !== undefined) {
     patch.tags = JSON.stringify(asTags(req.body.tags))
   }
+  for (const [field, column] of [
+    ['genderVisibility', 'gender_visibility'],
+    ['birthdayVisibility', 'birthday_visibility'],
+    ['bioVisibility', 'bio_visibility'],
+    ['tagsVisibility', 'tags_visibility'],
+  ]) {
+    if (req.body?.[field] === undefined) continue
+    const visibility = String(req.body[field])
+    if (!['public', 'friends', 'private'].includes(visibility)) {
+      return res.status(400).json({ error: 'invalid_visibility' })
+    }
+    patch[column] = visibility
+  }
   if (!Object.keys(patch).length) {
     return res.status(400).json({ error: 'nothing_to_update' })
   }
@@ -3801,6 +3814,9 @@ app.get('/api/users/:id', async (req, res) => {
     )
     isFollowing = rowsFollow.length > 0
   }
+  const friend = req.user && !self ? await areFriends(req.user.id, id) : false
+  const canView = (visibility) =>
+    self || visibility === 'public' || (visibility === 'friends' && friend)
   const posts = await query(
     `SELECT p.id, p.title, p.created_at, b.slug AS board_slug, b.name AS board_name
      FROM forum_posts p JOIN forum_boards b ON b.id = p.board_id
@@ -3814,11 +3830,11 @@ app.get('/api/users/:id', async (req, res) => {
       username: user.username,
       nickname: user.nickname || user.username,
       avatarUrl: user.avatarUrl,
-      bio: user.bio,
-      tags: user.tags,
+      bio: canView(user.bioVisibility) ? user.bio : '',
+      tags: canView(user.tagsVisibility) ? user.tags : [],
       role: roleLabel(user),
-      gender: self || req.user?.isSuper ? user.gender : '',
-      birthday: self || req.user?.isSuper ? user.birthday : '',
+      gender: canView(user.genderVisibility) ? user.gender : '',
+      birthday: canView(user.birthdayVisibility) ? user.birthday : '',
       createdAt: user.createdAt,
       banned: banActive(user),
       followers: Number(followers[0].n),

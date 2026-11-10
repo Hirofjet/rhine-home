@@ -41,7 +41,7 @@ export function PolicyPage() {
             </section>
             <section>
               <h2 className="text-lg font-bold text-rhine-ink">3. 公开范围</h2>
-              <p className="mt-2">用户名、昵称、头像、简介、标签、公开帖子与留言对访客可见；性别、生日默认仅本人和管理员可见；私信仅会话双方可见，举报处理时管理员可在必要范围内查看被举报快照。</p>
+              <p className="mt-2">用户名、昵称、头像、简介、标签、公开帖子与留言对访客可见；性别、生日、简介和标签可分别设置「所有人可见 / 好友可见 / 仅自己」；私信仅会话双方可见，举报处理时管理员可在必要范围内查看被举报快照。</p>
             </section>
             <section>
               <h2 className="text-lg font-bold text-rhine-ink">4. 保存期限</h2>

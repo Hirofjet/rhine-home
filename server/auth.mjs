@@ -153,6 +153,10 @@ export function normalizeUser(row) {
         return []
       }
     })(),
+    genderVisibility: row.gender_visibility ?? 'private',
+    birthdayVisibility: row.birthday_visibility ?? 'private',
+    bioVisibility: row.bio_visibility ?? 'public',
+    tagsVisibility: row.tags_visibility ?? 'public',
     forumTitle: row.forum_title ?? '',
     forumTitleLocked: Boolean(row.forum_title_locked),
     forumPoints: Number(row.forum_points ?? 0),
@@ -205,6 +209,10 @@ export function publicUser(user) {
     termsVersion: user.termsVersion || '',
     privacyVersion: user.privacyVersion || '',
     consentAt: user.consentAt || null,
+    genderVisibility: user.genderVisibility || 'private',
+    birthdayVisibility: user.birthdayVisibility || 'private',
+    bioVisibility: user.bioVisibility || 'public',
+    tagsVisibility: user.tagsVisibility || 'public',
     banned: banActive(user),
     bannedUntil: user.banned ? user.bannedUntil : null,
     bannedReason: user.banned ? user.bannedReason : '',

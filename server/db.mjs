@@ -507,6 +507,26 @@ async function ensureSchemaUpgrades() {
   await ensureColumn('users', 'terms_version', 'terms_version VARCHAR(32) NULL')
   await ensureColumn('users', 'privacy_version', 'privacy_version VARCHAR(32) NULL')
   await ensureColumn('users', 'consent_at', 'consent_at DATETIME NULL')
+  await ensureColumn(
+    'users',
+    'gender_visibility',
+    "gender_visibility ENUM('public','friends','private') NOT NULL DEFAULT 'private'",
+  )
+  await ensureColumn(
+    'users',
+    'birthday_visibility',
+    "birthday_visibility ENUM('public','friends','private') NOT NULL DEFAULT 'private'",
+  )
+  await ensureColumn(
+    'users',
+    'bio_visibility',
+    "bio_visibility ENUM('public','friends','private') NOT NULL DEFAULT 'public'",
+  )
+  await ensureColumn(
+    'users',
+    'tags_visibility',
+    "tags_visibility ENUM('public','friends','private') NOT NULL DEFAULT 'public'",
+  )
   await ensureColumn('email_codes', 'attempts', 'attempts TINYINT UNSIGNED NOT NULL DEFAULT 0')
   await pool.query("UPDATE users SET role_code = 'super' WHERE is_super = 1").catch(() => undefined)
   await ensureColumn('users', 'nickname', 'nickname VARCHAR(64) NULL')
