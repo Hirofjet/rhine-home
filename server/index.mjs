@@ -95,6 +95,8 @@ const today = () => new Date().toISOString().slice(0, 10)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const USERNAME_RE = /^[\w-]{3,32}$/
 const SLUG_RE = /^[a-z0-9-]{2,64}$/
+const TERMS_VERSION = '2026-11-11'
+const PRIVACY_VERSION = '2026-11-11'
 
 const asTags = (value) => {
   const list = Array.isArray(value)
@@ -280,7 +282,7 @@ const codeHash = (code) =>
   crypto.createHash('sha256').update(String(code)).digest('hex')
 
 async function issueCode(email, purpose) {
-  const code = String(Math.floor(100000 + Math.random() * 900000))
+  const code = String(crypto.randomInt(100000, 1000000))
   await execute(
     'INSERT INTO email_codes (email, purpose, code_hash, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
     [email, purpose, codeHash(code)],
@@ -291,16 +293,22 @@ async function issueCode(email, purpose) {
 
 async function consumeCode(email, purpose, code) {
   const rows = await query(
-    `SELECT id FROM email_codes
-     WHERE email = ? AND purpose = ? AND code_hash = ?
-       AND used_at IS NULL AND expires_at > NOW()
+    `SELECT id, code_hash, attempts FROM email_codes
+     WHERE email = ? AND purpose = ? AND used_at IS NULL AND expires_at > NOW()
      ORDER BY id DESC LIMIT 1`,
-    [email, purpose, codeHash(code)],
+    [email, purpose],
   )
   if (!rows.length) return false
-  await execute('UPDATE email_codes SET used_at = NOW() WHERE id = ?', [
-    rows[0].id,
-  ])
+  const row = rows[0]
+  if (Number(row.attempts) >= 5) {
+    await execute('UPDATE email_codes SET used_at = NOW() WHERE id = ?', [row.id])
+    return false
+  }
+  if (String(row.code_hash) !== codeHash(code)) {
+    await execute('UPDATE email_codes SET attempts = attempts + 1 WHERE id = ?', [row.id])
+    return false
+  }
+  await execute('UPDATE email_codes SET used_at = NOW() WHERE id = ?', [row.id])
   return true
 }
 
@@ -342,7 +350,40 @@ if ((process.env.AUTO_IMPORT_LEGACY ?? '1') === '1') {
 
 // ---------- Express ----------
 const app = express()
+app.disable('x-powered-by')
 app.set('trust proxy', config.trustProxy || false)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('X-XSS-Protection', '0')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  )
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+  if (req.secure && config.nodeEnv === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https: http:",
+      "media-src 'self' blob: https: http:",
+      "font-src 'self' data: https:",
+      "connect-src 'self' https: http: ws: wss:",
+      "frame-src 'self'",
+      "frame-ancestors 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; '),
+  )
+  next()
+})
 if (config.corsOrigin) {
   app.use(cors({ origin: config.corsOrigin.split(',').map((s) => s.trim()) }))
 }
@@ -365,6 +406,13 @@ app.use((req, res, next) => {
   }
   next()
 })
+app.use('/api', (req, res, next) => {
+  if (!rateLimit(`api:${req.ip}`, 60 * 1000, 300)) {
+    res.setHeader('Retry-After', '60')
+    return res.status(429).json({ error: 'too_many_requests' })
+  }
+  next()
+})
 
 // ============================================================
 // 账号 / 会话
@@ -384,7 +432,7 @@ app.post('/api/auth/email-code', async (req, res) => {
     return res.status(409).json({ error: 'email_taken' })
   }
   if (purpose === 'reset' && !existing.length) {
-    return res.status(404).json({ error: 'email_not_found' })
+    return res.json({ ok: true })
   }
   const code = await issueCode(email, purpose)
   res.json({
@@ -405,6 +453,12 @@ app.post('/api/auth/register', async (req, res) => {
   if (password.length < 6) {
     return res.status(400).json({ error: 'password_too_short' })
   }
+  if (req.body?.acceptTerms !== true) {
+    return res.status(400).json({ error: 'consent_required' })
+  }
+  if (!rateLimit(`register:${req.ip}`, 60 * 60 * 1000, 8)) {
+    return res.status(429).json({ error: 'too_many_requests' })
+  }
   const taken = await query(
     'SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1',
     [username, email],
@@ -419,11 +473,12 @@ app.post('/api/auth/register', async (req, res) => {
   }
   if (!(await consumeCode(email, 'register', code))) {
     return res.status(400).json({ error: 'invalid_code' })
-  }
-  const result = await execute(
-    `INSERT INTO users (username, email, email_verified, password_hash, is_super, permissions)
-     VALUES (?, ?, 1, ?, 0, '[]')`,
-    [username, email, hashPassword(password)],
+  }  const result = await execute(
+    `INSERT INTO users
+      (username, email, email_verified, password_hash, is_super, permissions,
+       terms_version, privacy_version, consent_at)
+     VALUES (?, ?, 1, ?, 0, '[]', ?, ?, NOW())`,
+    [username, email, hashPassword(password), TERMS_VERSION, PRIVACY_VERSION],
   )
   const rows = await query('SELECT * FROM users WHERE id = ?', [result.insertId])
   const user = normalizeUser(rows[0])
@@ -530,15 +585,34 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
   res.json({ user: publicUser(req.user) })
 })
 
+app.get('/api/auth/sessions', requireAuth, async (req, res) => {
+  const rows = await query(
+    'SELECT COUNT(*) AS total FROM sessions WHERE user_id = ? AND expires_at > NOW()',
+    [req.user.id],
+  )
+  res.json({ total: Number(rows[0]?.total ?? 0) })
+})
+
+app.delete('/api/auth/sessions', requireAuth, async (req, res) => {
+  await execute(
+    'DELETE FROM sessions WHERE user_id = ? AND token <> ?',
+    [req.user.id, tokenFromRequest(req)],
+  )
+  res.json({ ok: true })
+})
+
 app.post('/api/auth/password/reset', async (req, res) => {
   const email = asString(req.body?.email, 190).toLowerCase()
   const code = asString(req.body?.code, 12)
   const password = String(req.body?.password ?? '')
+  if (!rateLimit(`reset:${req.ip}`, 10 * 60 * 1000, 10)) {
+    return res.status(429).json({ error: 'too_many_requests' })
+  }
   if (!EMAIL_RE.test(email) || password.length < 6) {
     return res.status(400).json({ error: 'invalid_input' })
   }
   const rows = await query('SELECT id FROM users WHERE email = ? LIMIT 1', [email])
-  if (!rows.length) return res.status(404).json({ error: 'email_not_found' })
+  if (!rows.length) return res.json({ ok: true })
   if (!(await consumeCode(email, 'reset', code))) {
     return res.status(400).json({ error: 'invalid_code' })
   }
@@ -1272,9 +1346,7 @@ app.post('/api/messages', async (req, res) => {
   const matched = await matchModeration(`${name}\n${content}`)
   if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
   const status =
-    settings.guestbookRequireReview || matched?.action === 'review'
-      ? 'pending'
-      : 'approved'
+    matched?.action === 'review' ? 'pending' : 'approved'
   const token =
     guestTokenOf(req) ||
     asString(req.body?.token, 64) ||
@@ -2071,7 +2143,7 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
   }
   const matched = await matchModeration(`${title}\n${content}`)
   if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
-  const autoApprove = canModerateBoard(req.user, boardId) && matched?.action !== 'review'
+  const autoApprove = matched?.action !== 'review'
   const result = await execute(
     `INSERT INTO forum_posts (board_id, author_id, title, content, attachments, tags, status)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -2134,10 +2206,7 @@ app.post(
     }
     const matched = await matchModeration(content)
     if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
-    const autoApprove =
-      matched?.action !== 'review' &&
-      (canModerateBoard(req.user, Number(posts[0].board_id)) ||
-        !settings.repliesRequireReview)
+    const autoApprove = matched?.action !== 'review'
     const status = autoApprove ? 'approved' : 'pending'
     const result = await execute(
       `INSERT INTO forum_replies (post_id, author_id, parent_id, content, attachments, status)
@@ -3583,6 +3652,131 @@ app.put('/api/profile', requireAuth, async (req, res) => {
   )
   const rows = await query('SELECT * FROM users WHERE id = ?', [req.user.id])
   res.json({ user: publicUser(normalizeUser(rows[0])) })
+})
+
+app.get('/api/profile/export', requireAuth, async (req, res) => {
+  const userId = req.user.id
+  const [profileRows, posts, replies, notifications, messages, guestbook, reports] =
+    await Promise.all([
+      query('SELECT * FROM users WHERE id = ? LIMIT 1', [userId]),
+      query(
+        `SELECT id, board_id, title, content, tags, status, created_at
+         FROM forum_posts WHERE author_id = ? ORDER BY id ASC`,
+        [userId],
+      ),
+      query(
+        `SELECT id, post_id, content, status, created_at
+         FROM forum_replies WHERE author_id = ? ORDER BY id ASC`,
+        [userId],
+      ),
+      query(
+        `SELECT id, type, title, content, link, read_at, created_at
+         FROM notifications WHERE user_id = ? ORDER BY id ASC`,
+        [userId],
+      ),
+      query(
+        `SELECT id, sender_id, receiver_id, content, read_at, created_at
+         FROM direct_messages WHERE sender_id = ? OR receiver_id = ? ORDER BY id ASC`,
+        [userId, userId],
+      ),
+      query(
+        `SELECT id, name, content, status, created_at
+         FROM guest_messages WHERE user_id = ? ORDER BY id ASC`,
+        [userId],
+      ),
+      query(
+        `SELECT ticket, target_type, category, status, created_at
+         FROM content_reports WHERE reporter_id = ? ORDER BY id ASC`,
+        [userId],
+      ),
+    ])
+  const profile = profileRows[0] ? publicUser(normalizeUser(profileRows[0])) : null
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="rhine-home-export-${userId}.json"`,
+  )
+  res.json({
+    exportedAt: new Date().toISOString(),
+    policy: {
+      note: '账号导出包含公开资料、发布内容、通知、私信、留言与举报工单。安全日志按法定义务另行保存。',
+    },
+    profile,
+    posts,
+    replies,
+    notifications,
+    messages,
+    guestbook,
+    reports,
+  })
+})
+
+app.delete('/api/profile', requireAuth, async (req, res) => {
+  if (req.user.isSuper) {
+    return res.status(403).json({ error: 'cannot_delete_super' })
+  }
+  const password = String(req.body?.password ?? '')
+  const confirm = String(req.body?.confirm ?? '')
+  if (confirm !== 'DELETE') {
+    return res.status(400).json({ error: 'confirm_required' })
+  }
+  const rows = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [req.user.id])
+  if (!rows.length || !verifyPassword(password, rows[0].password_hash)) {
+    return res.status(400).json({ error: 'wrong_current_password' })
+  }
+  const oldEmail = String(rows[0].email ?? '')
+  const anonymousName = `deleted_${rows[0].id}`
+  await transaction(async (connection) => {
+    await connection.execute('DELETE FROM sessions WHERE user_id = ?', [req.user.id])
+    await connection.execute('DELETE FROM notifications WHERE user_id = ?', [req.user.id])
+    await connection.execute(
+      'DELETE FROM follows WHERE follower_id = ? OR following_id = ?',
+      [req.user.id, req.user.id],
+    )
+    await connection.execute(
+      'DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?',
+      [req.user.id, req.user.id],
+    )
+    await connection.execute(
+      'DELETE FROM direct_messages WHERE sender_id = ? OR receiver_id = ?',
+      [req.user.id, req.user.id],
+    )
+    await connection.execute('DELETE FROM guest_messages WHERE user_id = ?', [req.user.id])
+    await connection.execute('DELETE FROM forum_moderators WHERE user_id = ?', [req.user.id])
+    await connection.execute('DELETE FROM forum_invites WHERE user_id = ?', [req.user.id])
+    await connection.execute('DELETE FROM forum_access_requests WHERE user_id = ?', [
+      req.user.id,
+    ])
+    await connection.execute('DELETE FROM email_codes WHERE email = ?', [oldEmail])
+    await connection.execute(
+      `UPDATE content_reports
+       SET reporter_id = NULL, reporter_name = '已注销用户', reporter_contact = NULL
+       WHERE reporter_id = ?`,
+      [req.user.id],
+    )
+    await connection.execute(
+      `UPDATE users SET
+         username = ?, email = ?, email_verified = 0,
+         password_hash = ?, nickname = '已注销用户', avatar_url = '',
+         gender = '', birthday = '', bio = '', tags = '[]',
+         forum_title = '', forum_title_locked = 0, forum_points = 0, forum_level = 0,
+         mfa_enabled = 0, mfa_secret = NULL,
+         terms_version = NULL, privacy_version = NULL, consent_at = NULL,
+         status = 'disabled', is_super = 0, permissions = '[]'
+       WHERE id = ?`,
+      [
+        anonymousName,
+        `deleted+${req.user.id}@invalid.local`,
+        hashPassword(crypto.randomBytes(32).toString('hex')),
+        req.user.id,
+      ],
+    )
+  })
+  void auditRequest(req, {
+    action: 'account.delete',
+    status: 200,
+    detail: { anonymized: true },
+  })
+  res.json({ ok: true })
 })
 
 app.get('/api/users/:id', async (req, res) => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { contentApi, type SiteProject } from '../lib/api'
+import { readCachedContent } from '../lib/contentCache'
 import { projects as fallback, type Project, type ProjectStatus } from '../content'
 
 const toProject = (item: SiteProject): Project => ({
@@ -23,14 +24,25 @@ const toProject = (item: SiteProject): Project => ({
 
 /** 项目数据：优先读取后台管理的项目库，接口不可用时回退到本地示例。 */
 export function useSiteProjects(): Project[] {
-  const [items, setItems] = useState<Project[]>(fallback)
+  const [items, setItems] = useState<Project[]>(() => {
+    const cached = readCachedContent<SiteProject[]>('projects')
+    const initial = cached?.length ? cached.map(toProject) : fallback
+    return initial
+  })
   useEffect(() => {
     let alive = true
+    let retry = 0
     const load = () => {
       contentApi
         .projects()
         .then((list) => {
-          if (alive) setItems(list.map(toProject))
+          if (!alive) return
+          if (list.length === 0 && retry === 0) {
+            retry += 1
+            window.setTimeout(load, 800)
+            return
+          }
+          setItems(list.map(toProject))
         })
         .catch(() => undefined)
     }

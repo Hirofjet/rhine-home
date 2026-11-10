@@ -32,6 +32,7 @@ local-data/
 server/node_modules
 server/data
 server/uploads
+backups/
 
 # Editor directories and files
 .vscode/*

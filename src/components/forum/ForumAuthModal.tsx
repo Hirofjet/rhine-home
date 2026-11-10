@@ -47,6 +47,7 @@ function ForumAuthModalBody({
   const [notice, setNotice] = useState('')
   const [devCode, setDevCode] = useState('')
   const [cooldown, setCooldown] = useState(0)
+  const [accepted, setAccepted] = useState(false)
   const timerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -102,6 +103,10 @@ function ForumAuthModalBody({
       setError('两次输入的密码不一致')
       return
     }
+    if (tab === 'register' && !accepted) {
+      setError('请先阅读并同意用户协议与隐私政策')
+      return
+    }
     try {
       setBusy(true)
       if (tab === 'login') {
@@ -116,6 +121,7 @@ function ForumAuthModalBody({
           email: email.trim(),
           code: code.trim(),
           password,
+          acceptTerms: true,
         })
         // 注册后直接用返回的令牌登录
         localStorage.setItem('rhine:token', data.token)
@@ -308,10 +314,31 @@ function ForumAuthModalBody({
                 </p>
               )}
 
+              {tab === 'register' && (
+                <label className="flex items-start gap-2 font-mono text-[9px] leading-relaxed tracking-wider text-rhine-dim">
+                  <input
+                    type="checkbox"
+                    checked={accepted}
+                    onChange={(event) => setAccepted(event.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    我已阅读并同意
+                    <a href="/terms" target="_blank" rel="noreferrer" className="mx-1 text-rhine-cyan underline underline-offset-2">
+                      用户协议
+                    </a>
+                    和
+                    <a href="/privacy" target="_blank" rel="noreferrer" className="mx-1 text-rhine-cyan underline underline-offset-2">
+                      隐私政策
+                    </a>
+                    。
+                  </span>
+                </label>
+              )}
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={busy}
+                disabled={busy || (tab === 'register' && !accepted)}
                 className={`${buttonClass} w-full`}
               >
                 {busy

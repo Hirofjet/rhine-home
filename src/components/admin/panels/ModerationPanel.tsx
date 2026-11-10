@@ -101,32 +101,9 @@ export function ModerationPanel() {
                 />
                 紧急停止发布（帖子 / 回复 / 留言 / 私信）
               </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.repliesRequireReview}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      repliesRequireReview: event.target.checked,
-                    }))
-                  }
-                />
-                普通用户回复先审后发
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.guestbookRequireReview}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      guestbookRequireReview: event.target.checked,
-                    }))
-                  }
-                />
-                留言板先审后发
-              </label>
+              <p className="border border-rhine-line/50 bg-rhine-abyss/30 px-2 py-1.5 font-mono text-[9px] leading-relaxed text-rhine-faint">
+                普通内容直接发布；只有命中「转人工审核」敏感词的内容进入审核队列，命中「直接拒绝」的内容立即拦截。
+              </p>
             </div>
             <AdminButton onClick={() => void saveSettings()}>保存设置</AdminButton>
           </div>

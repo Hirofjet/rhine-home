@@ -44,6 +44,9 @@ const LegalPage = lazy(() =>
 const ComplaintsPage = lazy(() =>
   import('./pages/ComplaintsPage').then((m) => ({ default: m.ComplaintsPage })),
 )
+const PolicyPage = lazy(() =>
+  import('./pages/PolicyPage').then((m) => ({ default: m.PolicyPage })),
+)
 const RegulatorPage = lazy(() =>
   import('./pages/RegulatorPage').then((m) => ({ default: m.RegulatorPage })),
 )
@@ -155,6 +158,8 @@ export default function App() {
               <Route path="/u/:id" element={<Page><PublicUserPage /></Page>} />
               <Route path="/legal" element={<Page><LegalPage /></Page>} />
               <Route path="/complaints" element={<Page><ComplaintsPage /></Page>} />
+              <Route path="/privacy" element={<Page><PolicyPage /></Page>} />
+              <Route path="/terms" element={<Page><PolicyPage /></Page>} />
               <Route path="/regulator" element={<Page><RegulatorPage /></Page>} />
               <Route path="/login" element={<Page><LoginPage /></Page>} />
               <Route path={`${ADMIN_PATH}/*`} element={<Page><AdminPage /></Page>} />

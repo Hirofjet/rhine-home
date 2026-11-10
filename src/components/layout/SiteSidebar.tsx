@@ -484,6 +484,12 @@ function SiteFooter() {
         <Link to="/legal" className="text-rhine-cyan hover:text-rhine-gold">
           版权与开源声明
         </Link>
+        <Link to="/privacy" className="text-rhine-cyan hover:text-rhine-gold">
+          隐私政策
+        </Link>
+        <Link to="/terms" className="text-rhine-cyan hover:text-rhine-gold">
+          用户协议
+        </Link>
         <Link to="/complaints" className="text-rhine-cyan hover:text-rhine-gold">
           投诉举报
         </Link>

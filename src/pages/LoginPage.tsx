@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { KeyRound, LogIn, Mail, UserPlus } from 'lucide-react'
 import { useSession } from '../components/auth/useSession'
 import { authApi } from '../lib/api'
@@ -23,6 +23,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false)
   const [mfaCode, setMfaCode] = useState('')
   const [mfaNeeded, setMfaNeeded] = useState(false)
+  const [accepted, setAccepted] = useState(false)
 
   if (user) {
     return (
@@ -88,6 +89,10 @@ export function LoginPage() {
 
   const submitRegister = async () => {
     if (!username.trim() || !email.trim() || !code.trim() || !password || busy) return
+    if (!accepted) {
+      setError('请先阅读并同意用户协议与隐私政策。')
+      return
+    }
     if (password !== confirm) {
       setError('两次输入的密码不一致。')
       return
@@ -100,6 +105,7 @@ export function LoginPage() {
         email: email.trim(),
         code: code.trim(),
         password,
+        acceptTerms: true,
       })
       localStorage.setItem('rhine:token', data.token)
       window.dispatchEvent(new Event('rhine:session'))
@@ -261,12 +267,31 @@ export function LoginPage() {
                 placeholder="确认密码"
                 className={inputClass}
               />
+              <label className="mt-3 flex items-start gap-2 text-[10px] leading-relaxed text-rhine-dim">
+                <input
+                  type="checkbox"
+                  checked={accepted}
+                  onChange={(event) => setAccepted(event.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  我已阅读并同意
+                  <Link to="/terms" className="mx-1 text-rhine-cyan underline underline-offset-2">
+                    用户协议
+                  </Link>
+                  和
+                  <Link to="/privacy" className="mx-1 text-rhine-cyan underline underline-offset-2">
+                    隐私政策
+                  </Link>
+                  。
+                </span>
+              </label>
               {notice && <p className="mt-3 font-mono text-[10px] text-rhine-cyan">{notice}</p>}
               {error && <p className="mt-3 font-mono text-[10px] text-rhine-red">{error}</p>}
               <button
                 type="button"
                 onClick={() => void submitRegister()}
-                disabled={busy}
+                disabled={busy || !accepted}
                 className="mt-4 flex w-full items-center justify-center gap-2 border border-rhine-gold/60 bg-rhine-gold/10 px-4 py-2.5 font-mono text-[10px] tracking-[0.2em] text-rhine-gold disabled:opacity-50"
               >
                 <UserPlus className="h-3.5 w-3.5" /> {busy ? 'CREATING ACCOUNT' : 'REGISTER'}

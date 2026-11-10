@@ -425,6 +425,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   target_not_found: '被举报内容不存在或已删除',
   invalid_report: '举报信息不完整',
   contact_required: '匿名举报需要填写联系方式',
+  consent_required: '请先阅读并同意用户协议与隐私政策',
+  confirm_required: '请输入 DELETE 确认注销',
   invalid_appeal: '申诉说明不能为空',
   not_appealable: '当前状态不能申诉',
   term_exists: '该关键词已存在',
@@ -501,6 +503,9 @@ export const authApi = {
   mfaStatus() {
     return api<{ enabled: boolean }>('/api/admin/me/mfa')
   },
+  revokeOtherSessions() {
+    return api<{ ok: boolean }>('/api/auth/sessions', { method: 'DELETE' })
+  },
   mfaSetup() {
     return api<{ secret: string; uri: string; issuer: string }>('/api/admin/me/mfa/setup', {
       method: 'POST',
@@ -528,7 +533,13 @@ export const authApi = {
       auth: false,
     })
   },
-  register(input: { username: string; email: string; code: string; password: string }) {
+  register(input: {
+    username: string
+    email: string
+    code: string
+    password: string
+    acceptTerms: boolean
+  }) {
     return api<{ token: string; user: ApiUser }>('/api/auth/register', {
       method: 'POST',
       body: input,
@@ -1379,6 +1390,12 @@ export const userApi = {
   },
   unblock(id: number) {
     return api<{ ok: boolean }>(`/api/users/${id}/block`, { method: 'DELETE' })
+  },
+  exportData() {
+    return api<Record<string, unknown>>('/api/profile/export')
+  },
+  deleteAccount(input: { password: string; confirm: string }) {
+    return api<{ ok: boolean }>('/api/profile', { method: 'DELETE', body: input })
   },
   followers(id: number) {
     return api<{

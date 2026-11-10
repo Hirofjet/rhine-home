@@ -106,6 +106,7 @@ const TABLES = [
     email VARCHAR(190) NOT NULL,
     purpose ENUM('register','reset') NOT NULL,
     code_hash CHAR(64) NOT NULL,
+    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
     expires_at DATETIME NOT NULL,
     used_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -503,6 +504,10 @@ async function ensureSchemaUpgrades() {
   await ensureColumn('users', 'forum_level', 'forum_level INT NOT NULL DEFAULT 0')
   await ensureColumn('users', 'mfa_secret', 'mfa_secret VARCHAR(64) NULL')
   await ensureColumn('users', 'mfa_enabled', 'mfa_enabled TINYINT(1) NOT NULL DEFAULT 0')
+  await ensureColumn('users', 'terms_version', 'terms_version VARCHAR(32) NULL')
+  await ensureColumn('users', 'privacy_version', 'privacy_version VARCHAR(32) NULL')
+  await ensureColumn('users', 'consent_at', 'consent_at DATETIME NULL')
+  await ensureColumn('email_codes', 'attempts', 'attempts TINYINT UNSIGNED NOT NULL DEFAULT 0')
   await pool.query("UPDATE users SET role_code = 'super' WHERE is_super = 1").catch(() => undefined)
   await ensureColumn('users', 'nickname', 'nickname VARCHAR(64) NULL')
   await ensureColumn('users', 'gender', 'gender VARCHAR(16) NULL')

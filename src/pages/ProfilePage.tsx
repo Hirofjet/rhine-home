@@ -5,11 +5,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Bell,
   CheckCheck,
+  Download,
   KeyRound,
   LogOut,
   Mail,
   MessageSquare,
   Send,
+  ShieldAlert,
   Trash2,
   Upload,
   UserRound,
@@ -103,6 +105,8 @@ export function ProfilePage() {
   const [emailCode, setEmailCode] = useState('')
   const [emailDevCode, setEmailDevCode] = useState('')
   const [emailCooldown, setEmailCooldown] = useState(0)
+  const [dataBusy, setDataBusy] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [emailBusy, setEmailBusy] = useState(false)
 
   useEffect(() => {
@@ -250,6 +254,61 @@ export function ProfilePage() {
       setChatMessages(data.messages)
     } catch (err) {
       setError(errorMessage(err))
+    }
+  }
+
+  const exportData = async () => {
+    setDataBusy(true)
+    setError('')
+    try {
+      const data = await userApi.exportData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json;charset=utf-8',
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `rhine-home-export-${user?.id ?? 'account'}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+      setNotice('账号数据已导出')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const revokeOtherSessions = async () => {
+    setDataBusy(true)
+    try {
+      await authApi.revokeOtherSessions()
+      setNotice('其他设备的登录状态已退出')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const deleteAccount = async () => {    if (deleteBusy) return
+    const password = window.prompt('注销会删除或匿名化账号数据。请输入当前密码继续：')
+    if (!password) return
+    const confirm = window.prompt('此操作不可撤销。请输入 DELETE 确认：')
+    if (confirm !== 'DELETE') {
+      setNotice('已取消注销')
+      return
+    }
+    setDeleteBusy(true)
+    setError('')
+    try {
+      await userApi.deleteAccount({ password, confirm })
+      await logout()
+      navigate('/')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -932,6 +991,54 @@ export function ProfilePage() {
                 className="border border-rhine-cyan/60 bg-rhine-cyan/10 px-4 py-2 font-mono text-[11px] text-rhine-cyan"
               >
                 {emailBusy ? '绑定中…' : '绑定新邮箱'}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3 border border-rhine-line/70 bg-rhine-panel/30 p-4">
+            <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
+              <ShieldAlert className="h-3 w-3" /> 隐私与数据
+            </p>
+            <p className="font-mono text-[10px] leading-relaxed text-rhine-dim">
+              你可以导出账号数据，或注销账号。注销后资料、私信、留言与通知会被删除，
+              公开内容会匿名化；安全日志按法定义务保留。
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void exportData()}
+                disabled={dataBusy}
+                className="flex items-center gap-1.5 border border-rhine-cyan/50 px-3 py-2 font-mono text-[10px] text-rhine-cyan disabled:opacity-40"
+              >
+                <Download className="h-3 w-3" /> {dataBusy ? '导出中…' : '导出数据'}
+              </button>
+              <Link
+                to="/privacy"
+                className="border border-rhine-line px-3 py-2 font-mono text-[10px] text-rhine-dim hover:text-rhine-gold"
+              >
+                隐私政策
+              </Link>
+              <Link
+                to="/terms"
+                className="border border-rhine-line px-3 py-2 font-mono text-[10px] text-rhine-dim hover:text-rhine-gold"
+              >
+                用户协议
+              </Link>
+              <button
+                type="button"
+                onClick={() => void revokeOtherSessions()}
+                disabled={dataBusy}
+                className="border border-rhine-line px-3 py-2 font-mono text-[10px] text-rhine-dim disabled:opacity-40"
+              >
+                退出其他设备
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteAccount()}
+                disabled={deleteBusy}
+                className="border border-rhine-red/50 px-3 py-2 font-mono text-[10px] text-rhine-red disabled:opacity-40"
+              >
+                <Trash2 className="h-3 w-3" /> {deleteBusy ? '注销中…' : '注销账号'}
               </button>
             </div>
           </div>

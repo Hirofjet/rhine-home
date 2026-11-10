@@ -47,6 +47,11 @@ export function invalidateContentCache() {
   }
 }
 
+/** 同步读取上一次成功缓存，用于首屏避免空白（不判断 TTL）。 */
+export function readCachedContent<T>(key: string): T | null {
+  return read<T>(key)?.data ?? null
+}
+
 /**
  * fresh：直接返回本地数据。
  * stale：重新请求；请求失败时回退旧数据。
@@ -61,7 +66,8 @@ export async function cachedContent<T>(
   if (cached && Date.now() - cached.at < maxAge) return cached.data
   try {
     const data = await fetcher()
-    write(key, data)
+    // 空数组通常是后端启动/迁移中的临时结果，缓存后会造成 5 分钟空白。
+    if (!Array.isArray(data) || data.length > 0) write(key, data)
     return data
   } catch (error) {
     if (cached) return cached.data
