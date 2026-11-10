@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/rhine-home/favicon.ico" sizes="any" />
+    <link rel="shortcut icon" href="/rhine-home/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/rhine-home/favicon.svg?v=2" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/rhine-home/icons/favicon-32.png?v=2" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/rhine-home/icons/icon-48.png?v=2" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/rhine-home/icons/icon-96.png?v=2" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/rhine-home/icons/apple-touch-icon.png?v=2" />
+    <link rel="manifest" href="/rhine-home/site.webmanifest?v=2" />
+    <meta name="application-name" content="Hirofjet//HOME" />
+    <meta name="msapplication-TileColor" content="#05070b" />
+    <meta name="msapplication-TileImage" content="/rhine-home/icons/icon-192.png" />
+    <meta name="msapplication-config" content="/rhine-home/browserconfig.xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#05070b" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <script>
+      // 在首屏绘制前应用主题，避免刷新时闪回默认配色
+      ;(() => {
+        try {
+          const theme = localStorage.getItem('rhine:theme')
+          if (
+            theme === 'rhine' ||
+            theme === 'rhine-dark' ||
+            theme === 'archive' ||
+            theme === 'sakura' ||
+            theme === 'noctis'
+          ) {
+            document.documentElement.dataset.theme = theme
+          } else {
+            document.documentElement.dataset.theme = 'rhine'
+          }
+          const brand = localStorage.getItem('rhine:brand')
+          if (brand && !/sample/i.test(brand)) document.title = `${brand} · 个人主页`
+        } catch {
+          /* ignore */
+        }
+      })()
+    </script>
+    <meta
+      name="description"
+      content="Hirofjet 的个人主页：干员档案、能力模块、项目档案、日志与联络终端。"
+    />
+    <link rel="canonical" href="https://www.hirofjet.cn/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Hirofjet//HOME" />
+    <meta property="og:title" content="Hirofjet//HOME · 个人主页" />
+    <meta
+      property="og:description"
+      content="Hirofjet 的个人主页：干员档案、能力模块、项目档案、日志与联络终端。"
+    />
+    <meta property="og:url" content="https://www.hirofjet.cn/" />
+    <meta property="og:image" content="https://www.hirofjet.cn/icons/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Hirofjet//HOME · 个人主页" />
+    <meta
+      name="twitter:description"
+      content="Hirofjet 的个人主页：干员档案、能力模块、项目档案、日志与联络终端。"
+    />
+    <meta name="twitter:image" content="https://www.hirofjet.cn/icons/icon-512.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Hirofjet//HOME",
+        "alternateName": "Hirofjet 个人主页",
+        "url": "https://www.hirofjet.cn/",
+        "description": "Hirofjet 的个人主页：干员档案、能力模块、项目档案、日志与联络终端。"
+      }
+    </script>
+    <title>Hirofjet//HOME · 个人主页</title>
+    <script type="module" crossorigin src="/rhine-home/assets/index-DpsVIw20.js"></script>
+    <link rel="modulepreload" crossorigin href="/rhine-home/assets/rolldown-runtime-COiEfhsA.js">
+    <link rel="modulepreload" crossorigin href="/rhine-home/assets/motion-C3bNEsxJ.js">
+    <link rel="modulepreload" crossorigin href="/rhine-home/assets/react-Ctfhj6dy.js">
+    <link rel="modulepreload" crossorigin href="/rhine-home/assets/createLucideIcon-ByH2FHPG.js">
+    <link rel="stylesheet" crossorigin href="/rhine-home/assets/index-D4G_2_xv.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
