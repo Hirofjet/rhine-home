@@ -704,6 +704,56 @@ async function ensureSchemaUpgrades() {
   }
 }
 
+async function backfillCategoryMasterPermissions() {
+  const [masterRows] = await pool.query(
+    `SELECT DISTINCT m.user_id AS userId, b.access
+     FROM forum_moderators m JOIN forum_boards b ON b.id = m.board_id
+     WHERE m.role = 'master'`,
+  )
+  const [identityRows] = await pool.query(
+    `SELECT id AS userId,
+       CASE role_code
+         WHEN 'normal_master' THEN 'public'
+         WHEN 'core_master' THEN 'core'
+         WHEN 'special_master' THEN 'special'
+       END AS access
+     FROM users
+     WHERE role_code IN ('normal_master', 'core_master', 'special_master')`,
+  )
+  const byUser = new Map()
+  const add = (userId, access) => {
+    if (!access) return
+    if (!byUser.has(Number(userId))) byUser.set(Number(userId), new Set())
+    byUser.get(Number(userId)).add(access)
+  }
+  for (const row of masterRows) add(row.userId, row.access)
+  for (const row of identityRows) add(row.userId, row.access)
+  if (!byUser.size) return
+  const [boards] = await pool.query('SELECT id, access FROM forum_boards')
+  for (const [userId, accesses] of byUser) {
+    const [rows] = await pool.query('SELECT permissions FROM users WHERE id = ?', [userId])
+    let permissions = []
+    try {
+      permissions = JSON.parse(rows[0]?.permissions ?? '[]')
+    } catch {
+      permissions = []
+    }
+    if (!Array.isArray(permissions)) permissions = []
+    const next = new Set(permissions)
+    for (const access of accesses) {
+      next.add(`forum.category.${access}.master`)
+      for (const board of boards) {
+        if (board.access === access) next.add(`forum.${Number(board.id)}`)
+      }
+    }
+    if (next.size === permissions.length) continue
+    await pool.query('UPDATE users SET permissions = ? WHERE id = ?', [
+      JSON.stringify([...next]),
+      userId,
+    ])
+  }
+}
+
 export async function initSchema() {
   for (const sql of TABLES) await pool.query(sql)
   await ensureSchemaUpgrades()
@@ -729,6 +779,7 @@ export async function initSchema() {
         ('只读审计', '安全日志只读', JSON_ARRAY('admin.overview','security.logs','review.logs'))`,
     )
   }
+  await backfillCategoryMasterPermissions()
 }
 
 export async function ping() {

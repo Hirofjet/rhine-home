@@ -262,8 +262,11 @@ async function ensureCategoryBoardPermissions(user) {
   const missing = boards
     .map((board) => `forum.${Number(board.id)}`)
     .filter((permission) => !user.permissions.includes(permission))
-  if (!missing.length) return user
-  const next = [...new Set([...user.permissions, ...missing])]
+  const categoryKeys = accesses
+    .map((access) => `forum.category.${access}.master`)
+    .filter((key) => !user.permissions.includes(key))
+  if (!missing.length && !categoryKeys.length) return user
+  const next = [...new Set([...user.permissions, ...categoryKeys, ...missing])]
   await execute('UPDATE users SET permissions = ? WHERE id = ?', [
     JSON.stringify(next),
     user.id,
