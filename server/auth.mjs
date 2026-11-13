@@ -19,14 +19,30 @@ import { config } from './config.mjs'
 import { query, execute } from './db.mjs'
 
 export const PERMISSION_KEYS = [
+  'admin.overview',
+  'home.edit',
+  'archive.articles',
+  'archive.photos',
+  'archive.videos',
   'projects',
   'logs',
   'guestbook',
   'forum',
+  'forum.maintenance',
+  'forum.members',
+  'forum.announcements',
+  'forum.create',
+  'forum.review',
+  'forum.access',
   'forum.post.autoapprove',
+  'review.logs',
+  'reports.manage',
+  'moderation.manage',
   'members.manage',
   'members.grant',
   'access_logs',
+  'security.logs',
+  'themes.manage',
   'security.readonly',
 ]
 
@@ -68,14 +84,40 @@ const ROLE_CLASS = {
 }
 
 const ROLE_BASE_PERMISSIONS = {
-  senior: ['projects', 'logs', 'guestbook', 'forum', 'members.manage', 'members.grant', 'access_logs'],
-  forum_master: ['forum', 'guestbook'],
-  core_master: ['guestbook'],
-  core_admin: ['guestbook'],
-  special_master: ['guestbook'],
-  special_admin: ['guestbook'],
-  normal_master: ['guestbook'],
-  normal_admin: ['guestbook'],
+  senior: [
+    'admin.overview',
+    'projects',
+    'logs',
+    'guestbook',
+    'forum',
+    'forum.maintenance',
+    'forum.members',
+    'forum.announcements',
+    'forum.review',
+    'forum.access',
+    'review.logs',
+    'reports.manage',
+    'moderation.manage',
+    'access_logs',
+    'security.logs',
+    'themes.manage',
+  ],
+  forum_master: [
+    'admin.overview',
+    'forum',
+    'forum.maintenance',
+    'forum.members',
+    'forum.announcements',
+    'forum.review',
+    'forum.access',
+    'guestbook',
+  ],
+  core_master: ['admin.overview', 'guestbook'],
+  core_admin: ['admin.overview', 'guestbook'],
+  special_master: ['admin.overview', 'guestbook'],
+  special_admin: ['admin.overview', 'guestbook'],
+  normal_master: ['admin.overview', 'guestbook'],
+  normal_admin: ['admin.overview', 'guestbook'],
   regulator: ['security.readonly'],
   member: [],
 }
@@ -92,7 +134,15 @@ export function permissionsForRole(role) {
 }
 
 export const isForumPermission = (permission) =>
-  permission === 'forum' || /^forum\.\d+$/.test(permission) || /^forum\.\d+\.(post|reply)\.(publish|pin|hide|delete|review)$/.test(permission)
+  permission === 'forum' ||
+  permission === 'forum.maintenance' ||
+  permission === 'forum.members' ||
+  permission === 'forum.announcements' ||
+  permission === 'forum.create' ||
+  permission === 'forum.review' ||
+  permission === 'forum.access' ||
+  /^forum\.\d+$/.test(permission) ||
+  /^forum\.\d+\.(post|reply)\.(publish|pin|hide|delete|review)$/.test(permission)
 
 export const hasForumAction = (user, boardId, action) => {
   if (!user) return false
@@ -233,8 +283,6 @@ export function roleLabel(user) {
 export function hasPermission(user, permission) {
   if (!user) return false
   if (user.isSuper) return true
-  // 主页资料与档案包含个人信息，只允许 admin 修改
-  if (permission.startsWith('archive')) return false
   if (user.permissions.includes(permission)) return true
   if (permission.startsWith('archive.')) {
     return user.permissions.includes('archive')
@@ -254,9 +302,20 @@ export function isStaff(user) {
     user.permissions.includes('members.grant') ||
     user.permissions.some(
       (p) =>
+        p === 'admin.overview' ||
+        p === 'home.edit' ||
+        p.startsWith('archive.') ||
         p === 'projects' ||
         p === 'logs' ||
         p === 'guestbook' ||
+        p === 'reports.manage' ||
+        p === 'moderation.manage' ||
+        p === 'review.logs' ||
+        p === 'security.logs' ||
+        p === 'access_logs' ||
+        p === 'themes.manage' ||
+        p === 'security.readonly' ||
+        p === 'forum' ||
         isForumPermission(p),
     )
   )

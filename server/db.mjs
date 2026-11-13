@@ -295,12 +295,40 @@ const TABLES = [
 
   `CREATE TABLE IF NOT EXISTS forum_title_rules (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    board_id BIGINT UNSIGNED NULL,
     level INT NOT NULL,
     min_points INT NOT NULL DEFAULT 0,
     title VARCHAR(64) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_forum_title_level (level)
+    UNIQUE KEY uk_forum_title_board_level (board_id, level),
+    KEY idx_forum_title_board (board_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS forum_member_titles (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    board_id BIGINT UNSIGNED NOT NULL,
+    level INT NOT NULL DEFAULT 0,
+    title VARCHAR(64) NULL,
+    locked TINYINT(1) NOT NULL DEFAULT 0,
+    points INT NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_member_board_title (user_id, board_id),
+    KEY idx_member_title_board (board_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS identity_templates (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(64) NOT NULL,
+    description VARCHAR(255) NULL,
+    permissions JSON NOT NULL,
+    created_by BIGINT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_identity_template_name (name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS direct_messages (
@@ -542,6 +570,13 @@ async function ensureSchemaUpgrades() {
     "tags_visibility ENUM('public','friends','private') NOT NULL DEFAULT 'public'",
   )
   await ensureColumn('email_codes', 'attempts', 'attempts TINYINT UNSIGNED NOT NULL DEFAULT 0')
+  await ensureColumn('forum_title_rules', 'board_id', 'board_id BIGINT UNSIGNED NULL')
+  await pool.query('ALTER TABLE forum_title_rules DROP INDEX uk_forum_title_level').catch(() => undefined)
+  await pool
+    .query(
+      'ALTER TABLE forum_title_rules ADD UNIQUE KEY uk_forum_title_board_level (board_id, level)',
+    )
+    .catch(() => undefined)
   await pool.query("UPDATE users SET role_code = 'super' WHERE is_super = 1").catch(() => undefined)
   await ensureColumn('users', 'nickname', 'nickname VARCHAR(64) NULL')
   await ensureColumn('users', 'gender', 'gender VARCHAR(16) NULL')
@@ -671,6 +706,17 @@ export async function initSchema() {
       `INSERT INTO forum_boards (slug, name, description, sort) VALUES
         ('general', '综合讨论', '随便聊聊', 10),
         ('works', '作品展示', '分享你的作品与创作', 20)`,
+    )
+  }
+  const [templateRows] = await pool.query(
+    'SELECT COUNT(*) AS total FROM identity_templates',
+  )
+  if (Number(templateRows[0]?.total ?? 0) === 0) {
+    await pool.query(
+      `INSERT IGNORE INTO identity_templates (name, description, permissions) VALUES
+        ('内容审核员', '举报、内容安全与待审内容', JSON_ARRAY('admin.overview','reports.manage','moderation.manage','forum.review','review.logs')),
+        ('论坛维护员', '论坛创建、维护、成员与公告', JSON_ARRAY('admin.overview','forum.maintenance','forum.members','forum.announcements','forum.review')),
+        ('只读审计', '安全日志只读', JSON_ARRAY('admin.overview','security.logs','review.logs'))`,
     )
   }
 }

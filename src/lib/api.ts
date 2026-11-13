@@ -186,6 +186,8 @@ export interface Board {
   postCount: number
   lastPostAt: string | null
   pendingCount?: number
+  replyCount?: number
+  activeUsers?: number
   canModerate?: boolean
 }
 
@@ -892,12 +894,14 @@ export interface AuditLogEntry {
 
 export interface SecurityLogQuery {
   q?: string
+  action?: string
   method?: string
   status?: string
   from?: string
   to?: string
   page?: number
   limit?: number
+  export?: boolean
 }
 
 export interface SecurityLogPage<T> {
@@ -927,6 +931,17 @@ export const securityLogApi = {
     return api<SecurityLogPage<AuditLogEntry>>(
       `/api/admin/security/audit-logs${securityLogQuery(input)}`,
     )
+  },
+  async exportAudit(input: SecurityLogQuery = {}) {
+    const token = getToken()
+    const response = await fetch(
+      `${API_BASE}/api/admin/security/audit-logs${securityLogQuery({ ...input, export: true })}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      },
+    )
+    if (!response.ok) throw new Error('export_failed')
+    return response.blob()
   },
 }
 
@@ -1027,6 +1042,54 @@ export const adminApi = {
   forumBoards() {
     return api<{ boards: Board[] }>('/api/admin/forum/boards')
   },
+  forumMemberCandidates(query = '') {
+    return api<{
+      users: Array<{
+        id: number
+        username: string
+        nickname: string
+        email: string
+        identity: string
+        role: string
+        permissions: string[]
+      }>
+    }>(`/api/admin/forum/member-candidates?q=${encodeURIComponent(query)}`)
+  },
+  identityTemplates() {
+    return api<{
+      templates: Array<{
+        id: number
+        name: string
+        description: string
+        permissions: string[]
+        createdAt: string
+      }>
+    }>('/api/admin/identity-templates')
+  },
+  createIdentityTemplate(data: { name: string; description?: string; permissions: string[] }) {
+    return api<{ id: number }>('/api/admin/identity-templates', {
+      method: 'POST',
+      body: data,
+    })
+  },
+  updateIdentityTemplate(
+    id: number,
+    data: { name: string; description?: string; permissions: string[] },
+  ) {
+    return api<{ ok: boolean }>(`/api/admin/identity-templates/${id}`, {
+      method: 'PUT',
+      body: data,
+    })
+  },
+  removeIdentityTemplate(id: number) {
+    return api<{ ok: boolean }>(`/api/admin/identity-templates/${id}`, { method: 'DELETE' })
+  },
+  applyIdentityTemplate(id: number, userId: number) {
+    return api<{ ok: boolean }>(`/api/admin/identity-templates/${id}/apply`, {
+      method: 'POST',
+      body: { userId },
+    })
+  },
   forumModerators() {
     return api<{
       moderators: Array<{
@@ -1052,10 +1115,22 @@ export const adminApi = {
       method: 'DELETE',
     })
   },
-  forumTitleRules() {
+  saveForumTitleRules(rules: Array<{ level: number; minPoints: number; title: string }>, boardId?: number) {
+    return api<{ ok: boolean }>('/api/admin/forum/title-rules', {
+      method: 'PUT',
+      body: { rules, boardId },
+    })
+  },
+  grantBoardTitle(boardId: number, userId: number, title: string, locked = true) {
+    return api<{ ok: boolean }>(`/api/admin/forum/boards/${boardId}/users/${userId}/title`, {
+      method: 'POST',
+      body: { title, locked },
+    })
+  },
+  forumTitleRules(boardId?: number) {
     return api<{
       rules: Array<{ id: number; level: number; minPoints: number; title: string }>
-    }>('/api/admin/forum/title-rules')
+    }>(`/api/admin/forum/title-rules${boardId ? `?boardId=${boardId}` : ''}`)
   },
   forumUsers() {
     return api<{
@@ -1070,12 +1145,6 @@ export const adminApi = {
         forumLevel?: number
       }>
     }>('/api/admin/forum/users')
-  },
-  saveForumTitleRules(rules: Array<{ level: number; minPoints: number; title: string }>) {
-    return api<{ ok: boolean }>('/api/admin/forum/title-rules', {
-      method: 'PUT',
-      body: { rules },
-    })
   },
   grantForumTitle(userId: number, title: string, locked = true) {
     return api<{ ok: boolean }>(`/api/admin/forum/users/${userId}/title`, {
@@ -1519,9 +1588,19 @@ export function isStaffUser(user: ApiUser | null): boolean {
   if (user.isSuper) return true
   return user.permissions.some(
     (p) =>
+      p === 'admin.overview' ||
+      p === 'home.edit' ||
+      p.startsWith('archive.') ||
       p === 'projects' ||
       p === 'logs' ||
       p === 'guestbook' ||
+      p === 'reports.manage' ||
+      p === 'moderation.manage' ||
+      p === 'review.logs' ||
+      p === 'security.logs' ||
+      p === 'access_logs' ||
+      p === 'themes.manage' ||
+      p === 'security.readonly' ||
       p === 'forum' ||
       p.startsWith('forum.') ||
       p === 'members.manage' ||

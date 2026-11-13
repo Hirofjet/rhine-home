@@ -293,7 +293,7 @@ export function OverviewPanel({ user, onNavigate }: OverviewPanelProps) {
       en: 'THREADS',
       value: counts.posts,
       icon: MessageSquare,
-      target: 'forum-public',
+      target: 'forum-maintenance',
       tone: 'text-rhine-cyan',
       line: 'from-rhine-cyan/70',
     },

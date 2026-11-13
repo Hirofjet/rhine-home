@@ -167,7 +167,14 @@ export default function App() {
               <Route path="/terms" element={<Page><PolicyPage /></Page>} />
               <Route path="/regulator" element={<Page><RegulatorPage /></Page>} />
               <Route path="/login" element={<Page><LoginPage /></Page>} />
-              <Route path={`${ADMIN_PATH}/*`} element={<Page><AdminPage /></Page>} />
+              <Route
+                path={`${ADMIN_PATH}/*`}
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AdminPage />
+                  </Suspense>
+                }
+              />
               <Route
                 path="/app/*"
                 element={

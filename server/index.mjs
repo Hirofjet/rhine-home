@@ -201,28 +201,18 @@ const requirePermission = (permission) => (req, res, next) => {
 }
 
 const requireMembersManage = (req, res, next) => {
-  if (req.user?.isSuper || req.user?.permissions.includes('members.manage')) {
-    return next()
-  }
-  res.status(403).json({ error: 'forbidden' })
+  if (req.user?.isSuper) return next()
+  res.status(403).json({ error: 'super_only' })
 }
 
 const requireMembersGrant = (req, res, next) => {
-  if (req.user?.isSuper || req.user?.permissions.includes('members.grant')) {
-    return next()
-  }
-  res.status(403).json({ error: 'forbidden' })
+  if (req.user?.isSuper) return next()
+  res.status(403).json({ error: 'super_only' })
 }
 
 const requireUserAdmin = (req, res, next) => {
-  if (
-    req.user?.isSuper ||
-    req.user?.permissions.includes('members.manage') ||
-    req.user?.permissions.includes('members.grant')
-  ) {
-    return next()
-  }
-  res.status(403).json({ error: 'forbidden' })
+  if (req.user?.isSuper) return next()
+  res.status(403).json({ error: 'super_only' })
 }
 
 const requireForumAccess = (req, res, next) => {
@@ -852,6 +842,92 @@ app.put(
   },
 )
 
+app.get('/api/admin/identity-templates', requireAuth, requireMembersManage, async (_req, res) => {
+  const rows = await query(
+    'SELECT id, name, description, permissions, created_at AS createdAt FROM identity_templates ORDER BY id ASC',
+  )
+  res.json({
+    templates: rows.map((row) => {
+      let permissions = []
+      try {
+        permissions = typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions
+      } catch {
+        permissions = []
+      }
+      return { ...row, permissions: Array.isArray(permissions) ? permissions : [] }
+    }),
+  })
+})
+
+app.post('/api/admin/identity-templates', requireAuth, requireMembersManage, async (req, res) => {
+  const name = asString(req.body?.name, 64)
+  const description = asString(req.body?.description, 255)
+  const permissions = sanitizePermissions(req.body?.permissions, req.user)
+  if (!name) return res.status(400).json({ error: 'invalid_name' })
+  try {
+    const result = await execute(
+      'INSERT INTO identity_templates (name, description, permissions, created_by) VALUES (?, ?, ?, ?)',
+      [name, description, JSON.stringify(permissions), req.user.id],
+    )
+    res.status(201).json({ id: Number(result.insertId) })
+  } catch {
+    res.status(409).json({ error: 'template_exists' })
+  }
+})
+
+app.put('/api/admin/identity-templates/:id', requireAuth, requireMembersManage, async (req, res) => {
+  const id = Number(req.params.id)
+  const name = asString(req.body?.name, 64)
+  const description = asString(req.body?.description, 255)
+  const permissions = sanitizePermissions(req.body?.permissions, req.user)
+  if (!id || !name) return res.status(400).json({ error: 'invalid_input' })
+  await execute(
+    'UPDATE identity_templates SET name = ?, description = ?, permissions = ? WHERE id = ?',
+    [name, description, JSON.stringify(permissions), id],
+  )
+  res.json({ ok: true })
+})
+
+app.delete('/api/admin/identity-templates/:id', requireAuth, requireMembersManage, async (req, res) => {
+  await execute('DELETE FROM identity_templates WHERE id = ?', [Number(req.params.id)])
+  res.json({ ok: true })
+})
+
+app.post(
+  '/api/admin/identity-templates/:id/apply',
+  requireAuth,
+  requireMembersManage,
+  async (req, res) => {
+    const templateId = Number(req.params.id)
+    const userId = Number(req.body?.userId)
+    const targets = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [userId])
+    const target = normalizeUser(targets[0])
+    if (!target) return res.status(404).json({ error: 'user_not_found' })
+    if (target.isSuper || userId === req.user.id) {
+      return res.status(403).json({ error: 'cannot_modify_super' })
+    }
+    const templates = await query('SELECT * FROM identity_templates WHERE id = ? LIMIT 1', [
+      templateId,
+    ])
+    if (!templates.length) return res.status(404).json({ error: 'template_not_found' })
+    let permissions = []
+    try {
+      permissions =
+        typeof templates[0].permissions === 'string'
+          ? JSON.parse(templates[0].permissions)
+          : templates[0].permissions
+    } catch {
+      permissions = []
+    }
+    await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+      JSON.stringify(sanitizePermissions(permissions, req.user)),
+      userId,
+    ])
+    await notify(userId, 'permission', '后台身份模板已应用', templates[0].name, '/admin')
+    res.json({ ok: true })
+  },
+)
+
 app.put('/api/admin/users/:id/identity', requireAuth, async (req, res) => {
   if (!req.user.isSuper) return res.status(403).json({ error: 'super_only' })
   const id = Number(req.params.id)
@@ -1291,7 +1367,9 @@ app.get('/api/site/home', async (_req, res) => {
 })
 
 app.put('/api/site/home', requireAuth, async (req, res) => {
-  if (!req.user.isSuper) return res.status(403).json({ error: 'forbidden' })
+  if (!(req.user.isSuper || hasPermission(req.user, 'home.edit'))) {
+    return res.status(403).json({ error: 'forbidden' })
+  }
   const content = sanitizeHomeContent(req.body)
   if (!content) return res.status(400).json({ error: 'invalid_input' })
   await execute(
@@ -1620,7 +1698,10 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
   const posts = await query(
     `SELECT p.id, p.title, p.created_at, p.updated_at, p.tags, p.pinned,
             COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.id AS author_id, u.avatar_url AS author_avatar,
-            u.forum_title AS author_title, u.forum_level AS author_level,
+            COALESCE((SELECT fmt.title FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_title) AS author_title,
+            COALESCE((SELECT fmt.level FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_level) AS author_level,
             (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
      FROM forum_posts p JOIN users u ON u.id = p.author_id
      WHERE p.board_id = ? AND p.status = 'approved'
@@ -1651,7 +1732,10 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   const id = Number(req.params.id)
   const rows = await query(
     `SELECT p.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar,
-            u.forum_title AS author_title, u.forum_level AS author_level,
+            COALESCE((SELECT fmt.title FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_title) AS author_title,
+            COALESCE((SELECT fmt.level FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_level) AS author_level,
             b.slug AS board_slug, b.name AS board_name
      FROM forum_posts p
      JOIN users u ON u.id = p.author_id
@@ -1663,8 +1747,13 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   const post = rows[0]
   const replies = await query(
     `SELECT r.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar,
-            u.forum_title AS author_title, u.forum_level AS author_level
-     FROM forum_replies r JOIN users u ON u.id = r.author_id
+            COALESCE((SELECT fmt.title FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_title) AS author_title,
+            COALESCE((SELECT fmt.level FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_level) AS author_level
+     FROM forum_replies r
+     JOIN users u ON u.id = r.author_id
+     JOIN forum_posts p ON p.id = r.post_id
      WHERE r.post_id = ? AND r.status = 'approved'
      ORDER BY r.created_at ASC LIMIT 300`,
     [id],
@@ -1775,7 +1864,7 @@ async function refreshForumActivity(userId) {
     )
     const points = Number(stats[0]?.posts ?? 0) * 5 + Number(stats[0]?.replies ?? 0)
     const rules = await query(
-      'SELECT level, min_points, title FROM forum_title_rules ORDER BY min_points DESC, level DESC',
+      'SELECT level, min_points, title FROM forum_title_rules WHERE board_id IS NULL ORDER BY min_points DESC, level DESC',
     )
     const matched = rules.find((rule) => points >= Number(rule.min_points))
     const level = matched ? Number(matched.level) : 0
@@ -1790,6 +1879,37 @@ async function refreshForumActivity(userId) {
     )
   } catch (error) {
     console.error('[activity]', error.message)
+  }
+}
+
+/** 按单个论坛重算成员等级/头衔，不影响其他论坛。 */
+async function refreshBoardMemberTitle(userId, boardId) {
+  if (!userId || !boardId) return
+  try {
+    const stats = await query(
+      `SELECT
+         (SELECT COUNT(*) FROM forum_posts WHERE author_id = ? AND board_id = ? AND status = 'approved') AS posts,
+         (SELECT COUNT(*) FROM forum_replies r JOIN forum_posts p ON p.id = r.post_id
+           WHERE r.author_id = ? AND p.board_id = ? AND r.status = 'approved' AND p.status = 'approved') AS replies`,
+      [userId, boardId, userId, boardId],
+    )
+    const points = Number(stats[0]?.posts ?? 0) * 5 + Number(stats[0]?.replies ?? 0)
+    const rules = await query(
+      `SELECT level, min_points, title FROM forum_title_rules
+       WHERE board_id = ? OR board_id IS NULL
+       ORDER BY (board_id = ?) DESC, min_points DESC, level DESC`,
+      [boardId, boardId],
+    )
+    const matched = rules.find((rule) => points >= Number(rule.min_points))
+    await execute(
+      `INSERT INTO forum_member_titles (user_id, board_id, level, title, points, locked)
+       VALUES (?, ?, ?, ?, ?, 0)
+       ON DUPLICATE KEY UPDATE level = VALUES(level), points = VALUES(points),
+         title = IF(locked = 1, title, VALUES(title))`,
+      [userId, boardId, matched ? Number(matched.level) : 0, matched?.title ?? '', points],
+    )
+  } catch (error) {
+    console.error('[board-title]', error.message)
   }
 }
 
@@ -1809,15 +1929,22 @@ const REPORT_TARGETS = new Set(['post', 'reply', 'message', 'user', 'guestbook',
 const canReadReports = (user) =>
   Boolean(
     user?.isSuper ||
-      ['super', 'senior', 'admin'].includes(user?.identity) ||
-      user?.permissions?.includes('members.manage') ||
-      user?.permissions?.includes('security.readonly'),
+      user?.permissions?.includes('reports.manage') ||
+      user?.permissions?.includes('security.readonly') ||
+      user?.permissions?.includes('members.manage'),
   )
 
 const canHandleReports = (user) =>
   Boolean(
     user?.isSuper ||
-      ['super', 'senior', 'admin'].includes(user?.identity) ||
+      user?.permissions?.includes('reports.manage') ||
+      user?.permissions?.includes('members.manage'),
+  )
+
+const canModerateContent = (user) =>
+  Boolean(
+    user?.isSuper ||
+      user?.permissions?.includes('moderation.manage') ||
       user?.permissions?.includes('members.manage'),
   )
 
@@ -2102,7 +2229,7 @@ app.post('/api/admin/reports/:id', requireAuth, async (req, res) => {
 })
 
 app.get('/api/admin/moderation/settings', requireAuth, async (req, res) => {
-  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  if (!canModerateContent(req.user)) return res.status(403).json({ error: 'forbidden' })
   const settings = await moderationSettings()
   const terms = await query(
     'SELECT id, term, action, enabled, created_at FROM moderation_terms ORDER BY id ASC',
@@ -2111,7 +2238,7 @@ app.get('/api/admin/moderation/settings', requireAuth, async (req, res) => {
 })
 
 app.put('/api/admin/moderation/settings', requireAuth, async (req, res) => {
-  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  if (!canModerateContent(req.user)) return res.status(403).json({ error: 'forbidden' })
   const settings = {
     emergencyStop: Boolean(req.body?.emergencyStop),
     repliesRequireReview: req.body?.repliesRequireReview !== false,
@@ -2134,7 +2261,7 @@ app.put('/api/admin/moderation/settings', requireAuth, async (req, res) => {
 })
 
 app.post('/api/admin/moderation/terms', requireAuth, async (req, res) => {
-  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  if (!canModerateContent(req.user)) return res.status(403).json({ error: 'forbidden' })
   const term = String(req.body?.term ?? '').trim().slice(0, 80)
   const action = req.body?.action === 'block' ? 'block' : 'review'
   if (!term) return res.status(400).json({ error: 'invalid_term' })
@@ -2151,7 +2278,7 @@ app.post('/api/admin/moderation/terms', requireAuth, async (req, res) => {
 })
 
 app.delete('/api/admin/moderation/terms/:id', requireAuth, async (req, res) => {
-  if (!canHandleReports(req.user)) return res.status(403).json({ error: 'forbidden' })
+  if (!canModerateContent(req.user)) return res.status(403).json({ error: 'forbidden' })
   await execute('DELETE FROM moderation_terms WHERE id = ?', [Number(req.params.id)])
   invalidateModerationCache()
   res.json({ ok: true })
@@ -2199,7 +2326,10 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
       autoApprove ? 'approved' : 'pending',
     ],
   )
-  if (autoApprove) await refreshForumActivity(req.user.id)
+  if (autoApprove) {
+    await refreshForumActivity(req.user.id)
+    await refreshBoardMemberTitle(req.user.id, boardId)
+  }
   if (!autoApprove) {
     void notifyStaff(
       'review',
@@ -2272,7 +2402,10 @@ app.post(
         `/forum/post/${postId}`,
       )
     }
-    if (autoApprove) await refreshForumActivity(req.user.id)
+    if (autoApprove) {
+      await refreshForumActivity(req.user.id)
+      await refreshBoardMemberTitle(req.user.id, Number(posts[0].board_id))
+    }
     if (!autoApprove) {
       void notifyStaff(
         'review',
@@ -2382,6 +2515,13 @@ app.get('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req, 
     `SELECT b.*,
       (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.status <> 'deleted') AS post_count,
       (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'pending') AS pending_count,
+      (SELECT COUNT(*) FROM forum_replies r JOIN forum_posts p2 ON p2.id = r.post_id
+        WHERE p2.board_id = b.id AND r.status = 'approved') AS reply_count,
+      (SELECT COUNT(DISTINCT p3.author_id) FROM forum_posts p3
+        WHERE p3.board_id = b.id AND p3.status = 'approved') +
+      (SELECT COUNT(DISTINCT r2.author_id) FROM forum_replies r2
+        JOIN forum_posts p4 ON p4.id = r2.post_id
+        WHERE p4.board_id = b.id AND r2.status = 'approved') AS active_users,
       (SELECT MAX(p.created_at) FROM forum_posts p WHERE p.board_id = b.id AND p.status = 'approved') AS last_post_at
      FROM forum_boards b ORDER BY last_post_at DESC, b.id DESC`,
   )
@@ -2389,6 +2529,8 @@ app.get('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req, 
     boards: rows.map((row) => ({
       ...boardPublic(row),
       pendingCount: Number(row.pending_count ?? 0),
+      replyCount: Number(row.reply_count ?? 0),
+      activeUsers: Number(row.active_users ?? 0),
       canModerate: canModerateBoard(req.user, Number(row.id)),
     })),
   })
@@ -2402,6 +2544,8 @@ app.post('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req,
   const canCreate =
     req.user.isSuper ||
     hasPermission(req.user, 'forum') ||
+    hasPermission(req.user, 'forum.maintenance') ||
+    hasPermission(req.user, 'forum.create') ||
     ['senior', 'forum_master'].includes(req.user.identity) ||
     (['core_master', 'special_master', 'normal_master'].includes(req.user.identity) &&
       roleClassValue === requestedAccess)
@@ -2693,6 +2837,7 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
       [approve ? 'approved' : 'rejected', note, req.user.id, id],
     )
     await refreshForumActivity(Number(rows[0].author_id))
+    if (approve) await refreshBoardMemberTitle(Number(rows[0].author_id), boardId)
     if (Number(rows[0].author_id) !== req.user.id) {
       await notify(
         Number(rows[0].author_id),
@@ -2719,6 +2864,7 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
       [approve ? 'approved' : 'rejected', note, req.user.id, id],
     )
     await refreshForumActivity(Number(rows[0].author_id))
+    if (approve) await refreshBoardMemberTitle(Number(rows[0].author_id), boardId)
     if (Number(rows[0].author_id) !== req.user.id) {
       await notify(
         Number(rows[0].author_id),
@@ -2812,10 +2958,19 @@ app.get(
   '/api/admin/forum/title-rules',
   requireAuth,
   requireForumAccess,
-  async (_req, res) => {
-    const rules = await query(
-      'SELECT id, level, min_points AS minPoints, title FROM forum_title_rules ORDER BY min_points ASC, level ASC',
-    )
+  async (req, res) => {
+    const boardId = Number(req.query.boardId) || null
+    if (boardId && !canModerateBoard(req.user, boardId)) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const rules = boardId
+      ? await query(
+          'SELECT id, level, min_points AS minPoints, title FROM forum_title_rules WHERE board_id = ? ORDER BY min_points ASC, level ASC',
+          [boardId],
+        )
+      : await query(
+          'SELECT id, level, min_points AS minPoints, title FROM forum_title_rules WHERE board_id IS NULL ORDER BY min_points ASC, level ASC',
+        )
     res.json({ rules })
   },
 )
@@ -2825,6 +2980,14 @@ app.put(
   requireAuth,
   requireForumAccess,
   async (req, res) => {
+    const boardId = Number(req.body?.boardId) || null
+    if (boardId) {
+      if (!canModerateBoard(req.user, boardId)) {
+        return res.status(403).json({ error: 'forbidden' })
+      }
+    } else if (!(req.user.isSuper || hasPermission(req.user, 'forum'))) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
     const input = Array.isArray(req.body?.rules) ? req.body.rules : []
     const rules = input
       .map((rule) => ({
@@ -2838,16 +3001,56 @@ app.put(
       return res.status(400).json({ error: 'invalid_rules' })
     }
     await transaction(async (connection) => {
-      await connection.execute('DELETE FROM forum_title_rules')
+      if (boardId) {
+        await connection.execute('DELETE FROM forum_title_rules WHERE board_id = ?', [boardId])
+      } else {
+        await connection.execute('DELETE FROM forum_title_rules WHERE board_id IS NULL')
+      }
       for (const rule of rules) {
         await connection.execute(
-          'INSERT INTO forum_title_rules (level, min_points, title) VALUES (?, ?, ?)',
-          [rule.level, rule.minPoints, rule.title],
+          'INSERT INTO forum_title_rules (board_id, level, min_points, title) VALUES (?, ?, ?, ?)',
+          [boardId, rule.level, rule.minPoints, rule.title],
         )
       }
     })
-    const users = await query("SELECT id FROM users WHERE status = 'active'")
-    for (const user of users) await refreshForumActivity(Number(user.id))
+    if (boardId) {
+      const members = await query(
+        'SELECT DISTINCT user_id FROM forum_member_titles WHERE board_id = ?',
+        [boardId],
+      )
+      for (const member of members) {
+        await refreshBoardMemberTitle(Number(member.user_id), boardId)
+      }
+    } else {
+      const users = await query("SELECT id FROM users WHERE status = 'active'")
+      for (const user of users) await refreshForumActivity(Number(user.id))
+    }
+    res.json({ ok: true })
+  },
+)
+
+app.post(
+  '/api/admin/forum/boards/:id/users/:userId/title',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const boardId = Number(req.params.id)
+    const userId = Number(req.params.userId)
+    if (!boardId || !userId || !canModerateBoard(req.user, boardId)) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const title = asString(req.body?.title, 64)
+    const locked = req.body?.locked !== false && Boolean(title)
+    const boards = await query('SELECT id FROM forum_boards WHERE id = ?', [boardId])
+    if (!boards.length) return res.status(404).json({ error: 'board_not_found' })
+    await execute(
+      `INSERT INTO forum_member_titles (user_id, board_id, level, title, locked, points)
+       VALUES (?, ?, 0, ?, ?, 0)
+       ON DUPLICATE KEY UPDATE title = VALUES(title), locked = VALUES(locked)`,
+      [userId, boardId, title, locked ? 1 : 0],
+    )
+    if (!locked) await refreshBoardMemberTitle(userId, boardId)
+    await notify(userId, 'permission', '论坛头衔已更新', title || '已恢复该论坛自动等级头衔', '/profile')
     res.json({ ok: true })
   },
 )
@@ -2910,14 +3113,14 @@ app.delete(
   requireAuth,
   requireForumAccess,
   async (req, res) => {
-    if (!(req.user.isSuper || hasPermission(req.user, 'forum'))) {
-      return res.status(403).json({ error: 'forbidden' })
-    }
     const rows = await query('SELECT board_id FROM announcements WHERE id = ?', [
       Number(req.params.id),
     ])
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
-    if (rows[0].board_id && !canModerateBoard(req.user, Number(rows[0].board_id))) {
+    const allowed = rows[0].board_id
+      ? canModerateBoard(req.user, Number(rows[0].board_id))
+      : req.user.isSuper || hasPermission(req.user, 'forum')
+    if (!allowed) {
       return res.status(403).json({ error: 'forbidden' })
     }
     await execute('DELETE FROM announcements WHERE id = ?', [Number(req.params.id)])
@@ -3117,6 +3320,39 @@ app.post(
 // ============================================================
 // 板块管理员绑定（总管理员 1 位 / 管理员 4 位 / 每人最多 4 个板块）
 // ============================================================
+app.get('/api/admin/forum/member-candidates', requireAuth, requireForumAccess, async (req, res) => {
+  const keyword = asString(req.query.q, 64).toLowerCase()
+  const rows = await query(
+    "SELECT * FROM users WHERE status = 'active' ORDER BY id ASC LIMIT 1000",
+  )
+  const users = rows
+    .map(normalizeUser)
+    .filter((item) => {
+      if (!item || item.isSuper) return false
+      if (['senior', 'forum_master'].includes(item.identity)) return false
+      if (item.permissions.includes('forum') || item.permissions.includes('members.manage')) {
+        return false
+      }
+      if (!keyword) return true
+      return (
+        item.username.toLowerCase().includes(keyword) ||
+        String(item.nickname ?? '').toLowerCase().includes(keyword) ||
+        String(item.email ?? '').toLowerCase().includes(keyword)
+      )
+    })
+    .slice(0, 500)
+    .map((item) => ({
+      id: item.id,
+      username: item.username,
+      nickname: item.nickname,
+      email: item.email,
+      identity: item.identity,
+      role: roleLabel(item),
+      permissions: item.permissions,
+    }))
+  res.json({ users })
+})
+
 app.get('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (req, res) => {
   const rows = await query(
     `SELECT m.*, b.name AS board_name, b.access,
@@ -3129,6 +3365,8 @@ app.get('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (r
   const visible = rows.filter(
     (row) =>
       req.user.isSuper ||
+      hasPermission(req.user, 'forum') ||
+      hasPermission(req.user, 'forum.members') ||
       ['senior', 'forum_master'].includes(req.user.identity) ||
       canModerateBoard(req.user, Number(row.board_id)),
   )
@@ -3154,11 +3392,21 @@ app.post('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (
   if (!boards.length) return res.status(404).json({ error: 'board_not_found' })
   const allowed =
     req.user.isSuper ||
+    hasPermission(req.user, 'forum') ||
+    hasPermission(req.user, 'forum.members') ||
     ['senior', 'forum_master'].includes(req.user.identity) ||
     canModerateBoard(req.user, boardId)
   if (!allowed) return res.status(403).json({ error: 'forbidden' })
-  const users = await query('SELECT id FROM users WHERE id = ?', [userId])
+  const users = await query('SELECT * FROM users WHERE id = ?', [userId])
   if (!users.length) return res.status(404).json({ error: 'user_not_found' })
+  const targetUser = normalizeUser(users[0])
+  if (
+    targetUser.isSuper ||
+    ['senior', 'forum_master'].includes(targetUser.identity) ||
+    targetUser.permissions.includes('forum')
+  ) {
+    return res.status(400).json({ error: 'high_level_member_not_assignable' })
+  }
 
   const existing = await query(
     'SELECT * FROM forum_moderators WHERE board_id = ? AND user_id = ?',
@@ -3182,7 +3430,7 @@ app.post('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (
     'SELECT COUNT(*) AS n FROM forum_moderators WHERE user_id = ?',
     [userId],
   )
-  if (Number(count[0]?.n ?? 0) >= 4) return res.status(409).json({ error: 'board_limit' })
+  void count
 
   await execute(
     'INSERT INTO forum_moderators (board_id, user_id, role) VALUES (?, ?, ?)',
@@ -3220,6 +3468,8 @@ app.delete('/api/admin/forum/moderators/:id', requireAuth, requireForumAccess, a
   const boardId = Number(rows[0].board_id)
   const allowed =
     req.user.isSuper ||
+    hasPermission(req.user, 'forum') ||
+    hasPermission(req.user, 'forum.members') ||
     ['senior', 'forum_master'].includes(req.user.identity) ||
     canModerateBoard(req.user, boardId)
   if (!allowed) return res.status(403).json({ error: 'forbidden' })
@@ -4087,7 +4337,7 @@ app.get('/api/users/:id/following', async (req, res) => {
 // ============================================================
 // 概览
 // ============================================================
-app.get('/api/admin/overview', requireAuth, requireStaff, async (req, res) => {
+app.get('/api/admin/overview', requireAuth, requirePermission('admin.overview'), async (req, res) => {
   const user = req.user
   const canForum = user.isSuper || user.permissions.some(isForumPermission)
   const canMembers =
@@ -4240,10 +4490,7 @@ app.get('/api/themes', async (_req, res) => {
 
 function canManageThemes(user) {
   return Boolean(
-    user?.isSuper ||
-      ['super', 'senior', 'admin'].includes(user?.identity) ||
-      user?.permissions?.includes('members.manage') ||
-      user?.permissions?.includes('access_logs'),
+    user?.isSuper || user?.permissions?.includes('themes.manage'),
   )
 }
 
@@ -4285,10 +4532,10 @@ app.delete('/api/admin/themes/:id', requireAuth, async (req, res) => {
 function canManageSecurityLogs(user) {
   return Boolean(
     user?.isSuper ||
-      ['super', 'senior', 'admin'].includes(user?.identity) ||
+      user?.permissions?.includes('security.logs') ||
+      user?.permissions?.includes('review.logs') ||
       user?.permissions?.includes('access_logs') ||
-      user?.permissions?.includes('security.readonly') ||
-      user?.permissions?.includes('members.manage'),
+      user?.permissions?.includes('security.readonly'),
   )
 }
 
@@ -4397,6 +4644,40 @@ app.get(
       params.push(`${to} 00:00:00`)
     }
     const where = clauses.length ? clauses.join(' AND ') : '1=1'
+    if (['1', 'true', 'csv'].includes(String(req.query.export ?? ''))) {
+      const exportRows = await query(
+        `SELECT id, created_at, actor_username, action, target_type, target_id,
+                target_label, status, ip, path
+         FROM security_audit_logs WHERE ${where}
+         ORDER BY id DESC LIMIT 5000`,
+        params,
+      )
+      const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
+      const header = 'id,created_at,actor,action,target_type,target_id,target_label,status,ip,path'
+      const lines = exportRows.map((row) =>
+        [
+          row.id,
+          row.created_at,
+          row.actor_username,
+          row.action,
+          row.target_type,
+          row.target_id,
+          row.target_label,
+          row.status,
+          row.ip,
+          row.path,
+        ]
+          .map(escape)
+          .join(','),
+      )
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="audit-logs-${new Date().toISOString().slice(0, 10)}.csv"`,
+      )
+      res.send(`\uFEFF${header}\n${lines.join('\n')}`)
+      return
+    }
     const count = await query(
       `SELECT COUNT(*) AS total FROM security_audit_logs WHERE ${where}`,
       params,

@@ -57,29 +57,38 @@ export function MembersPanel({ user }: MembersPanelProps) {
   const [banDays, setBanDays] = useState('7')
   const [banPermanent, setBanPermanent] = useState(false)
   const [banReason, setBanReason] = useState('')
+  const [templates, setTemplates] = useState<
+    Array<{ id: number; name: string; description: string; permissions: string[] }>
+  >([])
+  const [templateTarget, setTemplateTarget] = useState('')
+  const [templateId, setTemplateId] = useState('')
+  const [templateName, setTemplateName] = useState('')
+  const [templateDescription, setTemplateDescription] = useState('')
+  const [templatePermissions, setTemplatePermissions] = useState<string[]>([])
 
-  const actorCanManage =
-    user.isSuper || user.permissions.includes('members.manage')
-  const actorCanGrant =
-    user.isSuper || user.permissions.includes('members.grant')
+  const actorCanManage = user.isSuper
+  const actorCanGrant = user.isSuper
 
   const load = useCallback(async () => {
-    const [usersData, boardsData] = await Promise.all([
+    const [usersData, boardsData, templateData] = await Promise.all([
       adminApi.users(),
       forumApi.boards(),
+      adminApi.identityTemplates(),
     ])
     setUsers(usersData.users)
     setBoards(boardsData.boards)
+    setTemplates(templateData.templates)
     setError('')
   }, [])
 
   useEffect(() => {
     let alive = true
-    Promise.all([adminApi.users(), forumApi.boards()])
-      .then(([usersData, boardsData]) => {
+    Promise.all([adminApi.users(), forumApi.boards(), adminApi.identityTemplates()])
+      .then(([usersData, boardsData, templateData]) => {
         if (!alive) return
         setUsers(usersData.users)
         setBoards(boardsData.boards)
+        setTemplates(templateData.templates)
       })
       .catch((err: unknown) => {
         if (alive) setError(errorMessage(err))
@@ -261,6 +270,71 @@ export function MembersPanel({ user }: MembersPanelProps) {
     } catch (err) {
       setError(errorMessage(err))
     }
+  }
+
+  const saveTemplate = async () => {
+    if (!templateName.trim()) {
+      setError('模板名称不能为空')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      if (templateId) {
+        await adminApi.updateIdentityTemplate(Number(templateId), {
+          name: templateName.trim(),
+          description: templateDescription.trim(),
+          permissions: templatePermissions,
+        })
+        setNotice('身份模板已更新')
+      } else {
+        await adminApi.createIdentityTemplate({
+          name: templateName.trim(),
+          description: templateDescription.trim(),
+          permissions: templatePermissions,
+        })
+        setNotice('身份模板已创建')
+      }
+      setTemplateId('')
+      setTemplateName('')
+      setTemplateDescription('')
+      setTemplatePermissions([])
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyTemplate = async () => {
+    if (!templateId || !templateTarget) {
+      setError('请选择成员和身份模板')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await adminApi.applyIdentityTemplate(Number(templateId), Number(templateTarget))
+      setNotice('身份模板已应用，成员权限已同步')
+      await load()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startEditTemplate = (template: {
+    id: number
+    name: string
+    description: string
+    permissions: string[]
+  }) => {
+    setTemplateId(String(template.id))
+    setTemplateName(template.name)
+    setTemplateDescription(template.description)
+    setTemplatePermissions(template.permissions)
   }
 
   const filteredUsers = users.filter((target) => {
@@ -460,6 +534,110 @@ export function MembersPanel({ user }: MembersPanelProps) {
 
         <div className="mt-4 border-t border-rhine-line/50 pt-3 font-mono text-[9px] leading-relaxed tracking-wider text-rhine-faint">
           管理类账号之间互不可操作，仅超级用户例外。
+        </div>
+      </AdminPanel>
+
+      <AdminPanel title="快捷赋予身份 / 身份模板" subtitle="IDENTITY TEMPLATES">
+        <p className="mb-3 font-mono text-[9px] leading-relaxed text-rhine-faint">
+          仅超级管理员可用。模板保存一组权限；应用后会覆盖目标成员的后台权限。成员很多时可用搜索选择目标。
+        </p>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="space-y-2">
+            <p className="font-mono text-[9px] tracking-[0.2em] text-rhine-gold">已有模板</p>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={templateId}
+                onChange={(event) => setTemplateId(event.target.value)}
+                className="min-w-40 flex-1 border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[10px] text-rhine-dim"
+              >
+                <option value="">选择模板</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}（{template.permissions.length} 项）
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  const found = templates.find((item) => String(item.id) === templateId)
+                  if (found) startEditTemplate(found)
+                }}
+                className="border border-rhine-line px-2 py-1.5 font-mono text-[9px] text-rhine-dim"
+              >
+                编辑
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={templateTarget}
+                onChange={(event) => setTemplateTarget(event.target.value)}
+                className="min-w-40 flex-1 border border-rhine-line bg-rhine-abyss/70 px-2 py-1.5 font-mono text-[10px] text-rhine-dim"
+              >
+                <option value="">选择成员</option>
+                {users
+                  .filter((item) => !item.isSuper)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nickname} @{item.username}
+                    </option>
+                  ))}
+              </select>
+              <AdminButton onClick={() => void applyTemplate()} disabled={busy}>
+                <ShieldCheck className="h-3 w-3" /> 应用模板
+              </AdminButton>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {templates.map((template) => (
+                <span key={template.id} className="border border-rhine-line/50 px-2 py-1 font-mono text-[8px] text-rhine-faint">
+                  {template.name} · {template.permissions.length}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2 border border-rhine-line/50 p-3">
+            <p className="font-mono text-[9px] tracking-[0.2em] text-rhine-gold">
+              {templateId ? '编辑模板' : '新增模板'}
+            </p>
+            <AdminField label="模板名称">
+              <AdminInput
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                placeholder="例如：内容审核员"
+              />
+            </AdminField>
+            <AdminField label="说明">
+              <AdminInput
+                value={templateDescription}
+                onChange={(event) => setTemplateDescription(event.target.value)}
+              />
+            </AdminField>
+            <PermissionTree
+              value={templatePermissions}
+              onChange={setTemplatePermissions}
+              boards={boards}
+              allowMemberPermissions
+            />
+            <div className="flex gap-2">
+              <AdminButton onClick={() => void saveTemplate()} disabled={busy}>
+                {templateId ? '保存模板' : '创建模板'}
+              </AdminButton>
+              {templateId && (
+                <AdminButton
+                  variant="ghost"
+                  onClick={() => {
+                    setTemplateId('')
+                    setTemplateName('')
+                    setTemplateDescription('')
+                    setTemplatePermissions([])
+                  }}
+                >
+                  新建
+                </AdminButton>
+              )}
+            </div>
+          </div>
         </div>
       </AdminPanel>
 

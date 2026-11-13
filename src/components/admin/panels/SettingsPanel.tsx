@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { KeyRound } from 'lucide-react'
-import { authApi, errorMessage, ROLE_LABELS, type ApiUser } from '../../../lib/api'
+import {
+  authApi,
+  errorMessage,
+  forumApi,
+  ROLE_LABELS,
+  type ApiUser,
+  type Board,
+} from '../../../lib/api'
+import { PERMISSION_LABELS } from '../../../lib/adminPermissions'
+import { PermissionTree } from '../PermissionTree'
 import {
   AdminButton,
   AdminError,
@@ -21,6 +30,14 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
   const [mfaSetup, setMfaSetup] = useState<{ secret: string; uri: string } | null>(null)
   const [mfaCode, setMfaCode] = useState('')
   const [mfaPassword, setMfaPassword] = useState('')
+  const [boards, setBoards] = useState<Board[]>([])
+
+  useEffect(() => {
+    forumApi
+      .boards()
+      .then((data) => setBoards(data.boards))
+      .catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     authApi
@@ -99,15 +116,32 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
             邮箱：<span className="text-rhine-ink">{user.email}</span>
           </p>
           <p>
-            角色：<span className="text-rhine-gold">{ROLE_LABELS[user.role]}</span>
+            管理员头衔：<span className="text-rhine-gold">{ROLE_LABELS[user.role]}</span>
           </p>
           <p>
-            权限：
+            权限数量：
             <span className="text-rhine-ink">
-              {user.isSuper ? '全部（超级用户）' : user.permissions.join(' / ') || '无'}
+              {user.isSuper ? '全部（超级用户）' : user.permissions.length}
             </span>
           </p>
         </div>
+      </AdminPanel>
+
+      <AdminPanel title="权限信息" subtitle="MY PERMISSIONS">
+        <div className="mb-3 flex flex-wrap items-center gap-2 border border-rhine-gold/30 bg-rhine-gold/[0.04] p-3">
+          <span className="font-mono text-[9px] tracking-[0.2em] text-rhine-gold">ADMIN TITLE</span>
+          <span className="text-sm text-rhine-ink">{ROLE_LABELS[user.role]}</span>
+          <span className="font-mono text-[9px] text-rhine-faint">
+            {user.identity ?? 'member'} · {user.isSuper ? '全部权限' : `${user.permissions.length} 项权限`}
+          </span>
+        </div>
+        <PermissionTree
+          value={user.isSuper ? Object.keys(PERMISSION_LABELS) : user.permissions}
+          onChange={() => undefined}
+          boards={boards}
+          allowMemberPermissions={false}
+          disabled
+        />
       </AdminPanel>
 
       <AdminPanel

@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { cx } from '../../lib/cx'
-import { hasPerm, type ApiUser } from '../../lib/api'
+import type { ApiUser } from '../../lib/api'
+import { canAccessPanel, type AdminPanelKey } from '../../lib/adminPermissions'
 import { ArticlesPanel } from './panels/ArticlesPanel'
 import { ForumAnnouncementsPanel } from './panels/ForumAnnouncementsPanel'
-import { ForumClassPanel } from './panels/ForumClassPanel'
-import { ForumTitlesPanel } from './panels/ForumTitlesPanel'
-import { CreateForumPanel } from './panels/CreateForumPanel'
-import { IdentityPanel } from './panels/IdentityPanel'
+import { ForumMaintenancePanel } from './panels/ForumMaintenancePanel'
+import { ForumMembersPanel } from './panels/ForumMembersPanel'
 import { GuestbookPanel } from './panels/GuestbookPanel'
 import { LogsPanel } from './panels/LogsPanel'
 import { MembersPanel } from './panels/MembersPanel'
@@ -20,34 +19,12 @@ import { ReportsPanel } from './panels/ReportsPanel'
 import { ReviewPanel } from './panels/ReviewPanel'
 import { ReviewAccessPanel } from './panels/ReviewAccessPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
+import { ReviewLogsPanel } from './panels/ReviewLogsPanel'
 import { SecurityLogsPanel } from './panels/SecurityLogsPanel'
 import { ThemesPanel } from './panels/ThemesPanel'
 import { VideosPanel } from './panels/VideosPanel'
 
-type PanelKey =
-  | 'overview'
-  | 'home-profile'
-  | 'projects'
-  | 'articles'
-  | 'photos'
-  | 'videos'
-  | 'logs'
-  | 'guestbook'
-  | 'forum-announcements'
-  | 'forum-create'
-  | 'forum-public'
-  | 'forum-special'
-  | 'forum-core'
-  | 'forum-titles'
-  | 'review-access'
-  | 'review-posts'
-  | 'members'
-  | 'identities'
-  | 'reports'
-  | 'moderation'
-  | 'security-logs'
-  | 'themes'
-  | 'settings'
+type PanelKey = AdminPanelKey
 
 interface MenuItem {
   key: PanelKey
@@ -64,116 +41,82 @@ interface AdminDashboardProps {
 export function AdminDashboard({ user }: AdminDashboardProps) {
   const [panel, setPanel] = useState<PanelKey>('overview')
 
-  const forumAccess =
-    user.isSuper ||
-    user.permissions.some((p) => p === 'forum' || p.startsWith('forum.'))
-  const memberAccess =
-    user.isSuper ||
-    user.permissions.includes('members.manage') ||
-    user.permissions.includes('members.grant')
-  const accessLogsAccess =
-    user.isSuper ||
-    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
-    user.permissions.includes('access_logs') ||
-    user.permissions.includes('members.manage')
-  const reportsAccess =
-    user.isSuper ||
-    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
-    user.permissions.includes('members.manage') ||
-    user.permissions.includes('security.readonly')
-
   const groups = useMemo(() => {
-    const list: Array<{ title: string; items: MenuItem[] }> = [
-      { title: '总览', items: [{ key: 'overview', label: '概览', labelEn: 'OVERVIEW' }] },
-    ]
+    const item = (key: AdminPanelKey, label: string, labelEn: string, subgroup?: string): MenuItem => ({
+      key,
+      label,
+      labelEn,
+      subgroup,
+    })
+    const list: Array<{ title: string; items: MenuItem[] }> = []
+    const push = (title: string, items: MenuItem[]) => {
+      if (items.length) list.push({ title, items })
+    }
 
+    if (canAccessPanel(user, 'overview')) {
+      push('总览', [item('overview', '概览', 'OVERVIEW')])
+    }
+    if (canAccessPanel(user, 'home-profile')) {
+      push('主页', [item('home-profile', '主页资料', 'PROFILE')])
+    }
+    push(
+      '档案',
+      [
+        canAccessPanel(user, 'articles') ? item('articles', '文章', 'ARTICLES') : null,
+        canAccessPanel(user, 'photos') ? item('photos', '照片', 'PHOTOS') : null,
+        canAccessPanel(user, 'videos') ? item('videos', '视频', 'VIDEOS') : null,
+      ].filter(Boolean) as MenuItem[],
+    )
+    push('项目', canAccessPanel(user, 'projects') ? [item('projects', '项目库', 'PROJECTS')] : [])
+    push('日志', canAccessPanel(user, 'logs') ? [item('logs', '日志', 'LOGS')] : [])
+
+    push('论坛', [
+      canAccessPanel(user, 'forum-maintenance')
+        ? item('forum-maintenance', '论坛创建与维护', 'MAINTAIN', '论坛管理')
+        : null,
+      canAccessPanel(user, 'forum-members')
+        ? item('forum-members', '论坛成员管理', 'MEMBERS', '论坛管理')
+        : null,
+      canAccessPanel(user, 'forum-announcements')
+        ? item('forum-announcements', '论坛公告', 'ANNOUNCEMENTS', '论坛管理')
+        : null,
+      canAccessPanel(user, 'review-access')
+        ? item('review-access', '特殊/核心申请', 'APPLICATIONS', '审核平台')
+        : null,
+      canAccessPanel(user, 'review-posts')
+        ? item('review-posts', '待审帖子', 'PENDING', '审核平台')
+        : null,
+      canAccessPanel(user, 'review-logs')
+        ? item('review-logs', '审核日志', 'AUDIT LOGS', '审核平台')
+        : null,
+    ].filter(Boolean) as MenuItem[])
+
+    push('互动', canAccessPanel(user, 'guestbook') ? [item('guestbook', '留言板', 'GUESTBOOK')] : [])
     if (user.isSuper) {
-      list.push({
-        title: '主页',
-        items: [{ key: 'home-profile', label: '主页资料', labelEn: 'PROFILE' }],
-      })
+      push('成员', [item('members', '成员与权限', 'MEMBERS & PERMISSIONS')])
     }
-
-    const archive: MenuItem[] = []
-    if (hasPerm(user, 'archive.articles')) {
-      archive.push({ key: 'articles', label: '文章', labelEn: 'ARTICLES' })
-    }
-    if (hasPerm(user, 'archive.photos')) {
-      archive.push({ key: 'photos', label: '照片', labelEn: 'PHOTOS' })
-    }
-    if (hasPerm(user, 'archive.videos')) {
-      archive.push({ key: 'videos', label: '视频', labelEn: 'VIDEOS' })
-    }
-    if (archive.length) list.push({ title: '档案', items: archive })
-
-    if (user.isSuper || hasPerm(user, 'projects')) {
-      list.push({
-        title: '项目',
-        items: [{ key: 'projects', label: '项目库', labelEn: 'PROJECTS' }],
-      })
-    }
-
-    if (hasPerm(user, 'logs')) {
-      list.push({
-        title: '日志',
-        items: [{ key: 'logs', label: '日志', labelEn: 'LOGS' }],
-      })
-    }
-
-    const forum: MenuItem[] = []
-    if (forumAccess) {
-      forum.push(
-        { key: 'forum-announcements', label: '主页公告', labelEn: 'ANNOUNCEMENTS', subgroup: '论坛管理' },
-        { key: 'forum-create', label: '创建论坛', labelEn: 'CREATE', subgroup: '论坛管理' },
-        { key: 'forum-public', label: '普通论坛', labelEn: 'PUBLIC', subgroup: '论坛管理' },
-        { key: 'forum-special', label: '特殊论坛', labelEn: 'SPECIAL', subgroup: '论坛管理' },
-        { key: 'forum-core', label: '核心论坛', labelEn: 'CORE', subgroup: '论坛管理' },
-        { key: 'forum-titles', label: '头衔等级', labelEn: 'TITLES', subgroup: '论坛管理' },
-        { key: 'review-access', label: '特殊申请', labelEn: 'APPLICATIONS', subgroup: '审核平台' },
-        { key: 'review-posts', label: '待审帖子', labelEn: 'PENDING', subgroup: '审核平台' },
-      )
-    }
-    if (forum.length) list.push({ title: '论坛', items: forum })
-
-    if (hasPerm(user, 'guestbook')) {
-      list.push({
-        title: '互动',
-        items: [{ key: 'guestbook', label: '留言板', labelEn: 'GUESTBOOK' }],
-      })
-    }
-
-    if (memberAccess) {
-      list.push({
-        title: '成员',
-        items: [
-          { key: 'members', label: '成员与权限', labelEn: 'MEMBERS' },
-          { key: 'identities', label: '身份管理', labelEn: 'IDENTITIES' },
-        ],
-      })
-    }
-
-    if (reportsAccess) {
-      list.push({
-        title: '安全',
-        items: [
-          { key: 'reports', label: '举报处理', labelEn: 'REPORTS' },
-          { key: 'moderation', label: '内容安全', labelEn: 'MODERATION' },
-        ],
-      })
-    }
+    push(
+      '安全',
+      [
+        canAccessPanel(user, 'reports') ? item('reports', '举报处理', 'REPORTS') : null,
+        canAccessPanel(user, 'moderation') ? item('moderation', '内容安全', 'MODERATION') : null,
+      ].filter(Boolean) as MenuItem[],
+    )
 
     const settingsItems: MenuItem[] = []
-    if (accessLogsAccess) {
-      settingsItems.push({ key: 'security-logs', label: '安全日志', labelEn: 'SECURITY LOGS' })
-      settingsItems.push({ key: 'themes', label: '主题颜色', labelEn: 'THEMES' })
+    if (canAccessPanel(user, 'security-logs')) {
+      settingsItems.push(item('security-logs', '安全日志', 'SECURITY LOGS'))
     }
-    settingsItems.push({ key: 'settings', label: '设置', labelEn: 'SETTINGS' })
-    list.push({ title: '设置', items: settingsItems })
+    if (canAccessPanel(user, 'themes')) {
+      settingsItems.push(item('themes', '主题颜色', 'THEMES'))
+    }
+    settingsItems.push(item('settings', '设置', 'SETTINGS'))
+    push('设置', settingsItems)
     return list
-  }, [user, forumAccess, memberAccess, accessLogsAccess, reportsAccess])
+  }, [user])
 
   const allowedKeys = groups.flatMap((group) => group.items.map((item) => item.key))
-  const current = allowedKeys.includes(panel) ? panel : 'overview'
+  const current = allowedKeys.includes(panel) ? panel : (allowedKeys[0] ?? 'settings')
 
   return (
     <div className="min-h-screen bg-rhine-abyss text-rhine-ink">
@@ -272,24 +215,19 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
               {current === 'logs' && <LogsPanel />}
               {current === 'guestbook' && <GuestbookPanel />}
               {current === 'forum-announcements' && <ForumAnnouncementsPanel />}
-              {current === 'forum-create' && <CreateForumPanel />}
-              {current === 'forum-public' && <ForumClassPanel access="public" />}
-              {current === 'forum-special' && <ForumClassPanel access="special" />}
-              {current === 'forum-core' && <ForumClassPanel access="core" />}
-              {current === 'forum-titles' && <ForumTitlesPanel />}
+              {current === 'forum-maintenance' && <ForumMaintenancePanel />}
+              {current === 'forum-members' && <ForumMembersPanel />}
               {current === 'review-access' && <ReviewAccessPanel />}
               {current === 'review-posts' && <ReviewPanel postsOnly />}
+              {current === 'review-logs' && <ReviewLogsPanel />}
               {current === 'members' && <MembersPanel user={user} />}
-              {current === 'identities' && <IdentityPanel actor={user} />}
               {current === 'reports' && <ReportsPanel />}
               {current === 'moderation' && <ModerationPanel />}
               {current === 'security-logs' && <SecurityLogsPanel />}
               {current === 'themes' && (
                 <ThemesPanel
                   canDelete={
-                    user.isSuper ||
-                    ['super', 'senior', 'admin'].includes(user.identity ?? '') ||
-                    user.permissions.includes('members.manage')
+                    user.isSuper || user.permissions.includes('themes.manage')
                   }
                 />
               )}

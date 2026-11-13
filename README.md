@@ -1,7 +1,7 @@
 # RHINE//HOME
 
 > 莱茵生命风格的个人主页、档案库、论坛、留言板与管理系统。  
-> 当前版本：**v2.8.0**
+> 当前版本：**v2.9.0**
 
 RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它把「个人档案」「内容发布」「论坛社交」「3D 档案库」和「后台治理」放在同一套视觉与权限体系中，既保留二次元终端风格的界面，也提供可长期维护的数据与权限结构。
 
@@ -84,17 +84,21 @@ RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它�
 | 普通用户 | 注册、发帖、回复、关注、私信 |
 | 访客 | 浏览公开内容，不可发帖/关注 |
 
-权限树覆盖：
+权限树覆盖（可搜索、按类别筛选、批量选择）：
 
 ```text
-archive / archive.articles / archive.photos / archive.videos
-logs
-projects
-forum / forum.<boardId>
-members.manage / members.grant
-guestbook
-access_logs
+admin.overview / home.edit
+archive.articles / archive.photos / archive.videos
+projects / logs / guestbook
+forum / forum.maintenance / forum.members / forum.announcements
+forum.create / forum.review / forum.access / forum.post.autoapprove
+forum.<boardId> / forum.<boardId>.post.* / forum.<boardId>.reply.*
+reports.manage / moderation.manage / review.logs
+security.logs / access_logs / security.readonly / themes.manage
+members.manage / members.grant（仅超管）
 ```
+
+详见 [后台权限与论坛管理](docs/ADMIN_PERMISSIONS.md)。
 
 规则：
 
@@ -158,11 +162,11 @@ access_logs
 
 ## 论坛头衔与活跃等级
 
-- 主题审核通过 +5 分，回复 +1 分；
-- 管理员在后台「论坛管理 → 头衔等级」配置等级、最低积分与头衔；
-- 达到条件的成员自动获得对应头衔；
-- 论坛管理员可手动锁定头衔；锁定后自动规则不会覆盖；
-- 帖子、回复、公开资料与 3D 论坛内容显示头衔和等级。
+- 全局「头衔等级」导航已删除；
+- 每个论坛在「论坛创建与维护」的选中论坛卡片中独立维护等级、最低积分和头衔；
+- 每个论坛可以单独发放/锁定成员头衔；
+- 发帖和回复按所在论坛规则计算，公开帖子/回复优先显示该论坛头衔；
+- 没有论坛专属头衔时回退到全局自动头衔。
 
 ## 内容缓存
 
@@ -349,6 +353,7 @@ npm start
 | v2.7.1 | 性别/生日/简介/标签逐项可见范围 |
 | v2.7.2 | 帖子默认审核、回复/留言直达与帖子免审授权 |
 | v2.8.0 | 管理员专用 PWA、App 推送通知与 GitHub Pages 发布 |
+| v2.9.0 | 后台权限重构、论坛维护合并、审核日志与成员模板 |
 
 `logs/` 已覆盖 v0.1.0–v2.4.2，自 v2.4.0 起随仓库维护；每篇均包含作者署名。
 
