@@ -34,6 +34,9 @@ export const PERMISSION_KEYS = [
   'forum.create',
   'forum.review',
   'forum.access',
+  'forum.category.public.master',
+  'forum.category.core.master',
+  'forum.category.special.master',
   'forum.post.autoapprove',
   'review.logs',
   'reports.manage',
@@ -141,6 +144,9 @@ export const isForumPermission = (permission) =>
   permission === 'forum.create' ||
   permission === 'forum.review' ||
   permission === 'forum.access' ||
+  permission === 'forum.category.public.master' ||
+  permission === 'forum.category.core.master' ||
+  permission === 'forum.category.special.master' ||
   /^forum\.\d+$/.test(permission) ||
   /^forum\.\d+\.(post|reply)\.(publish|pin|hide|delete|review)$/.test(permission)
 

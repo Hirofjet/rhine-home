@@ -1067,6 +1067,23 @@ export const adminApi = {
       }>
     }>(`/api/admin/forum/member-candidates?q=${encodeURIComponent(query)}`)
   },
+  forumMemberAuthority() {
+    return api<{
+      categories: BoardAccess[]
+      autoApproveBoards: Array<{
+        id: number
+        name: string
+        slug: string
+        access: BoardAccess
+      }>
+    }>('/api/admin/forum/member-authority')
+  },
+  setCategoryMaster(userId: number, access: BoardAccess, enabled: boolean) {
+    return api<{ ok: boolean; enabled: boolean }>(
+      `/api/admin/forum/members/${userId}/category-master`,
+      { method: 'PUT', body: { access, enabled } },
+    )
+  },
   identityTemplates() {
     return api<{
       templates: Array<{
@@ -1122,10 +1139,10 @@ export const adminApi = {
       body: data,
     })
   },
-  setPostAutoApprove(userId: number, enabled: boolean) {
+  setPostAutoApprove(userId: number, boardId: number, enabled: boolean) {
     return api<{ ok: boolean; enabled: boolean }>(
       `/api/admin/forum/members/${userId}/post-autoapprove`,
-      { method: 'PUT', body: { enabled } },
+      { method: 'PUT', body: { enabled, boardId } },
     )
   },
   removeModerator(id: number) {

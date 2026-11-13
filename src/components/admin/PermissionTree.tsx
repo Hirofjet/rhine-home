@@ -54,6 +54,9 @@ const FORUM_GLOBAL: PermissionItem[] = [
   { key: 'forum.members', label: '论坛成员管理' },
   { key: 'forum.announcements', label: '论坛公告' },
   { key: 'forum.create', label: '创建论坛' },
+  { key: 'forum.category.public.master', label: '普通论坛总管理' },
+  { key: 'forum.category.core.master', label: '核心论坛总管理' },
+  { key: 'forum.category.special.master', label: '特殊论坛总管理' },
   { key: 'forum.review', label: '待审帖子' },
   { key: 'forum.access', label: '特殊/核心论坛申请' },
   { key: 'forum.post.autoapprove', label: '帖子免审' },
@@ -65,6 +68,7 @@ const BOARD_ACTIONS = [
   { key: 'post.hide', label: '隐藏' },
   { key: 'post.delete', label: '删帖' },
   { key: 'post.review', label: '审帖' },
+  { key: 'post.autoapprove', label: '本论坛免审' },
   { key: 'reply.delete', label: '删回复' },
   { key: 'reply.review', label: '审回复' },
 ]

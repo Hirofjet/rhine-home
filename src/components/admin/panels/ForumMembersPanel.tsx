@@ -52,7 +52,7 @@ export function ForumMembersPanel() {
   const [query, setQuery] = useState('')
   const [memberQuery, setMemberQuery] = useState('')
   const [selectedUser, setSelectedUser] = useState<Candidate | null>(null)
-  const [category, setCategory] = useState('all')
+  const [category, setCategory] = useState<BoardAccess | 'all'>('all')
   const [adminType, setAdminType] = useState<'master' | 'admin'>('admin')
   const [boardQuery, setBoardQuery] = useState('')
   const [boardId, setBoardId] = useState('')
@@ -61,19 +61,37 @@ export function ForumMembersPanel() {
   const [busy, setBusy] = useState(false)
   const [autoQuery, setAutoQuery] = useState('')
   const [autoUser, setAutoUser] = useState<Candidate | null>(null)
+  const [autoBoardId, setAutoBoardId] = useState('')
+  const [autoAuthority, setAutoAuthority] = useState<
+    Array<{ id: number; name: string; access: BoardAccess }>
+  >([])
+  const [managedCategories, setManagedCategories] = useState<BoardAccess[]>([])
   const [autoBusy, setAutoBusy] = useState(false)
   const [autoNotice, setAutoNotice] = useState('')
 
   const load = useCallback(async () => {
     try {
-      const [boardData, moderatorData, candidateData] = await Promise.all([
+      const [boardData, moderatorData, candidateData, authorityData] = await Promise.all([
         adminApi.forumBoards(),
         adminApi.forumModerators(),
         adminApi.forumMemberCandidates(''),
+        adminApi.forumMemberAuthority(),
       ])
       setBoards(boardData.boards)
       setModerators(moderatorData.moderators)
       setCandidates(candidateData.users)
+      setManagedCategories(authorityData.categories)
+      setAutoAuthority(authorityData.autoApproveBoards)
+      setAutoBoardId((current) =>
+        authorityData.autoApproveBoards.some((item) => String(item.id) === current)
+          ? current
+          : String(authorityData.autoApproveBoards[0]?.id ?? ''),
+      )
+      setCategory((current) =>
+        current !== 'all' && authorityData.categories.includes(current)
+          ? current
+          : (authorityData.categories[0] ?? 'public'),
+      )
       setError('')
     } catch (err) {
       setError(errorMessage(err))
@@ -98,8 +116,24 @@ export function ForumMembersPanel() {
   }, [candidates, memberQuery])
 
   const categoryBoards = useMemo(
-    () => boards.filter((board) => category === 'all' || board.access === category),
-    [boards, category],
+    () =>
+      boards.filter(
+        (board) =>
+          managedCategories.includes(board.access) &&
+          (category === 'all' || board.access === category),
+      ),
+    [boards, category, managedCategories],
+  )
+  const categoryOptions = useMemo(
+    () => [
+      ...(managedCategories.length === 3
+        ? [{ value: 'all', label: '全部类别' }]
+        : []),
+      ...CATEGORY_OPTIONS.filter((item) =>
+        managedCategories.includes(item.value as BoardAccess),
+      ),
+    ],
+    [managedCategories],
   )
   const boardOptions = categoryBoards.filter((board) => {
     const keyword = boardQuery.trim().toLowerCase()
@@ -150,6 +184,7 @@ export function ForumMembersPanel() {
       }
       let ok = 0
       let failed = 0
+      const successCategories = new Set<BoardAccess>()
       for (const board of targets) {
         try {
           await adminApi.assignModerator({
@@ -158,8 +193,14 @@ export function ForumMembersPanel() {
             role: adminType,
           })
           ok += 1
+          successCategories.add(board.access)
         } catch {
           failed += 1
+        }
+      }
+      if (adminType === 'master') {
+        for (const access of successCategories) {
+          await adminApi.setCategoryMaster(selectedUser.id, access, true).catch(() => undefined)
         }
       }
       setNotice(
@@ -190,21 +231,19 @@ export function ForumMembersPanel() {
   const cardClass = 'border border-rhine-line/60 bg-rhine-panel/30 p-3'
 
   const setAutoApprove = async (enabled: boolean) => {
-    if (!autoUser) return
+    if (!autoUser || !autoBoardId) return
     setAutoBusy(true)
     setAutoNotice('')
     try {
-      await adminApi.setPostAutoApprove(autoUser.id, enabled)
+      await adminApi.setPostAutoApprove(autoUser.id, Number(autoBoardId), enabled)
       setAutoNotice(
         enabled
-          ? `已授予 ${autoUser.nickname} 帖子免审`
-          : `已撤销 ${autoUser.nickname} 的帖子免审`,
+          ? `已授予 ${autoUser.nickname} 在所选论坛的帖子免审`
+          : `已撤销 ${autoUser.nickname} 在所选论坛的帖子免审`,
       )
       const data = await adminApi.forumMemberCandidates('')
       setCandidates(data.users)
-      setAutoUser(
-        data.users.find((item) => item.id === autoUser.id) ?? null,
-      )
+      setAutoUser(data.users.find((item) => item.id === autoUser.id) ?? null)
     } catch (err) {
       setAutoNotice(errorMessage(err))
     } finally {
@@ -212,12 +251,20 @@ export function ForumMembersPanel() {
     }
   }
 
+  const autoPermission = `forum.${autoBoardId}.post.autoapprove`
+
   return (
     <div className="space-y-4">
       <AdminError message={error} />
       <AdminNotice message={notice} />
 
       <AdminPanel title="论坛成员管理" subtitle="FORUM MEMBERS">
+        {managedCategories.length === 0 ? (
+          <p className="border border-rhine-gold/30 bg-rhine-gold/[0.04] p-3 font-mono text-[10px] leading-relaxed text-rhine-dim">
+            你没有任何论坛类别的总管理权限，不能授予或删除论坛成员身份。
+            你仍可在下方「帖子免审授权」中为你管理的具体论坛授予本论坛免审。
+          </p>
+        ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           <div className={cardClass}>
             <p className="mb-2 flex items-center gap-1.5 font-mono text-[9px] tracking-[0.2em] text-rhine-gold">
@@ -266,10 +313,10 @@ export function ForumMembersPanel() {
               <AdminField label="论坛类别">
                 <select
                   value={category}
-                  onChange={(event) => setCategory(event.target.value)}
+                  onChange={(event) => setCategory(event.target.value as BoardAccess | 'all')}
                   className="h-9 w-full border border-rhine-line bg-rhine-abyss/70 px-2 font-mono text-xs text-rhine-ink"
                 >
-                  {CATEGORY_OPTIONS.map((item) => (
+                  {categoryOptions.map((item) => (
                     <option key={item.value} value={item.value}>{item.label}</option>
                   ))}
                 </select>
@@ -330,6 +377,7 @@ export function ForumMembersPanel() {
             </div>
           </div>
         </div>
+        )}
       </AdminPanel>
 
       <AdminPanel title="帖子免审授权" subtitle="POST AUTO-APPROVE">
@@ -339,7 +387,20 @@ export function ForumMembersPanel() {
         {autoNotice && <AdminNotice message={autoNotice} />}
         <div className="grid gap-3 lg:grid-cols-2">
           <div className={cardClass}>
-            <div className="flex items-center gap-2 border border-rhine-line bg-rhine-abyss/50 px-2 py-1.5">
+            <AdminField label="论坛（仅列出你可管理的板块）">
+              <select
+                value={autoBoardId}
+                onChange={(event) => setAutoBoardId(event.target.value)}
+                className="h-9 w-full border border-rhine-line bg-rhine-abyss/70 px-2 font-mono text-xs text-rhine-ink"
+              >
+                {autoAuthority.map((board) => (
+                  <option key={board.id} value={board.id}>
+                    {BOARD_ACCESS_LABELS[board.access]} · {board.name}
+                  </option>
+                ))}
+              </select>
+            </AdminField>
+            <div className="mt-2 flex items-center gap-2 border border-rhine-line bg-rhine-abyss/50 px-2 py-1.5">
               <Search className="h-3 w-3 text-rhine-faint" />
               <input
                 value={autoQuery}
@@ -370,8 +431,8 @@ export function ForumMembersPanel() {
                     }`}
                   >
                     <span className="min-w-0 truncate text-xs">{item.nickname} @{item.username}</span>
-                    {item.permissions.includes('forum.post.autoapprove') && (
-                      <AdminBadge tone="green">免审</AdminBadge>
+                    {item.permissions.includes(autoPermission) && (
+                      <AdminBadge tone="green">本论坛免审</AdminBadge>
                     )}
                   </button>
                 ))}
@@ -382,30 +443,31 @@ export function ForumMembersPanel() {
               <p className="font-mono text-[9px] text-rhine-faint">当前成员</p>
               <p className="mt-1 text-sm text-rhine-ink">{autoUser?.nickname || '未选择'}</p>
               <p className="mt-1 font-mono text-[10px] text-rhine-dim">
-                {autoUser?.permissions.includes('forum.post.autoapprove')
-                  ? '当前：帖子免审'
-                  : '当前：发帖需审核'}
+                {autoUser?.permissions.includes(autoPermission)
+                  ? '当前：该论坛帖子免审'
+                  : '当前：该论坛发帖需审核'}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <AdminButton
                 onClick={() => void setAutoApprove(true)}
-                disabled={autoBusy || !autoUser || autoUser.permissions.includes('forum.post.autoapprove')}
+                disabled={autoBusy || !autoUser || autoUser.permissions.includes(autoPermission)}
               >
-                授予帖子免审
+                授予本论坛免审
               </AdminButton>
               <AdminButton
                 variant="ghost"
                 onClick={() => void setAutoApprove(false)}
-                disabled={autoBusy || !autoUser || !autoUser.permissions.includes('forum.post.autoapprove')}
+                disabled={autoBusy || !autoUser || !autoUser.permissions.includes(autoPermission)}
               >
-                撤销免审
+                撤销本论坛免审
               </AdminButton>
             </div>
           </div>
         </div>
       </AdminPanel>
 
+      {managedCategories.length > 0 && (
       <AdminPanel title="现有论坛成员" subtitle="CURRENT MEMBERS">
         <div className="mb-2 flex items-center gap-2 border border-rhine-line bg-rhine-abyss/50 px-2 py-1.5">
           <Search className="h-3 w-3 text-rhine-faint" />
@@ -446,6 +508,7 @@ export function ForumMembersPanel() {
           )}
         </div>
       </AdminPanel>
+      )}
     </div>
   )
 }

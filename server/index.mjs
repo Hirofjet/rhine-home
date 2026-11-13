@@ -231,6 +231,47 @@ const requireVerifiedEmail = (req, res, next) => {
 const canModerateBoard = (user, boardId) =>
   hasPermission(user, `forum.${boardId}`)
 
+const CATEGORY_MASTER_ROLE = {
+  public: 'normal_master',
+  core: 'core_master',
+  special: 'special_master',
+}
+
+/** 论坛类别总管理：不是普通 forum.* 权限，而是类别级授权/身份。 */
+const canManageCategory = (user, access) => {
+  if (!user) return false
+  if (user.isSuper || user.permissions.includes('forum')) return true
+  if (['senior', 'forum_master'].includes(user.identity)) return true
+  if (CATEGORY_MASTER_ROLE[access] === user.identity) return true
+  return user.permissions.includes(`forum.category.${access}.master`)
+}
+
+async function ensureCategoryBoardPermissions(user) {
+  if (!user || user.isSuper) return user
+  const accesses = Object.entries(CATEGORY_MASTER_ROLE)
+    .filter(
+      ([access, identity]) =>
+        user.identity === identity ||
+        user.permissions.includes(`forum.category.${access}.master`),
+    )
+    .map(([access]) => access)
+  if (!accesses.length) return user
+  const boards = await query('SELECT id, access FROM forum_boards WHERE access IN (?)', [
+    accesses,
+  ])
+  const missing = boards
+    .map((board) => `forum.${Number(board.id)}`)
+    .filter((permission) => !user.permissions.includes(permission))
+  if (!missing.length) return user
+  const next = [...new Set([...user.permissions, ...missing])]
+  await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+    JSON.stringify(next),
+    user.id,
+  ])
+  user.permissions = next
+  return user
+}
+
 /** 非超管不能操作「同样拥有管理权限」的账号 */
 function canManageTarget(actor, target) {
   if (target.isSuper) return actor.isSuper
@@ -508,6 +549,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ error: 'invalid_credentials' })
   }
   const user = normalizeUser(rows[0])
+  await ensureCategoryBoardPermissions(user)
   if (banActive(user)) {
     const until = user.bannedUntil
       ? new Date(String(user.bannedUntil).replace(' ', 'T'))
@@ -2313,7 +2355,8 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
   const autoApprove =
     canModerateBoard(req.user, boardId) ||
     isStaff(req.user) ||
-    hasPermission(req.user, 'forum.post.autoapprove')
+    hasPermission(req.user, 'forum.post.autoapprove') ||
+    hasPermission(req.user, `forum.${boardId}.post.autoapprove`)
   const result = await execute(
     `INSERT INTO forum_posts (board_id, author_id, title, content, attachments, tags, status)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -2532,7 +2575,7 @@ app.get('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req, 
       pendingCount: Number(row.pending_count ?? 0),
       replyCount: Number(row.reply_count ?? 0),
       activeUsers: Number(row.active_users ?? 0),
-      canModerate: canModerateBoard(req.user, Number(row.id)),
+      canModerate: canModerateBoard(req.user, Number(row.id)) || canManageCategory(req.user, row.access),
     })),
   })
 })
@@ -2541,16 +2584,8 @@ app.post('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req,
   const requestedAccess = ['public', 'special', 'core'].includes(req.body?.access)
     ? req.body.access
     : 'public'
-  const roleClassValue = roleClass(req.user.identity)
-  const canCreate =
-    req.user.isSuper ||
-    hasPermission(req.user, 'forum') ||
-    hasPermission(req.user, 'forum.maintenance') ||
-    hasPermission(req.user, 'forum.create') ||
-    ['senior', 'forum_master'].includes(req.user.identity) ||
-    (['core_master', 'special_master', 'normal_master'].includes(req.user.identity) &&
-      roleClassValue === requestedAccess)
-  if (!canCreate) return res.status(403).json({ error: 'forbidden' })
+  const canCreate = canManageCategory(req.user, requestedAccess)
+  if (!canCreate) return res.status(403).json({ error: 'category_master_required' })
   const name = asString(req.body?.name, 100)
   const slug = asString(req.body?.slug, 64).toLowerCase()
   const description = asString(req.body?.description, 500)
@@ -3321,6 +3356,24 @@ app.post(
 // ============================================================
 // 板块管理员绑定（总管理员 1 位 / 管理员 4 位 / 每人最多 4 个板块）
 // ============================================================
+app.get('/api/admin/forum/member-authority', requireAuth, requireForumAccess, async (req, res) => {
+  const rows = await query('SELECT id, name, slug, access FROM forum_boards ORDER BY id ASC')
+  const categories = ['public', 'core', 'special'].filter((access) =>
+    canManageCategory(req.user, access),
+  )
+  res.json({
+    categories,
+    autoApproveBoards: rows
+      .filter((board) => canModerateBoard(req.user, Number(board.id)))
+      .map((board) => ({
+        id: Number(board.id),
+        name: board.name,
+        slug: board.slug,
+        access: board.access,
+      })),
+  })
+})
+
 app.get('/api/admin/forum/member-candidates', requireAuth, requireForumAccess, async (req, res) => {
   const keyword = asString(req.query.q, 64).toLowerCase()
   const rows = await query(
@@ -3355,18 +3408,57 @@ app.get('/api/admin/forum/member-candidates', requireAuth, requireForumAccess, a
 })
 
 app.put(
+  '/api/admin/forum/members/:id/category-master',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    const access = ['public', 'core', 'special'].includes(req.body?.access)
+      ? req.body.access
+      : ''
+    const enabled = req.body?.enabled === true
+    if (!access || !canManageCategory(req.user, access)) {
+      return res.status(403).json({ error: 'category_master_required' })
+    }
+    const userId = Number(req.params.id)
+    const rows = await query('SELECT id, permissions FROM users WHERE id = ? LIMIT 1', [userId])
+    if (!rows.length) return res.status(404).json({ error: 'user_not_found' })
+    let permissions = []
+    try {
+      permissions = JSON.parse(rows[0].permissions ?? '[]')
+    } catch {
+      permissions = []
+    }
+    if (!Array.isArray(permissions)) permissions = []
+    const key = `forum.category.${access}.master`
+    const next = permissions.filter((item) => item !== key)
+    if (enabled) next.push(key)
+    if (enabled) {
+      const boardRows = await query('SELECT id FROM forum_boards WHERE access = ?', [access])
+      for (const board of boardRows) {
+        const boardKey = `forum.${Number(board.id)}`
+        if (!next.includes(boardKey)) next.push(boardKey)
+      }
+    }
+    await execute('UPDATE users SET permissions = ? WHERE id = ?', [JSON.stringify(next), userId])
+    res.json({ ok: true, enabled })
+  },
+)
+
+app.put(
   '/api/admin/forum/members/:id/post-autoapprove',
   requireAuth,
   requireForumAccess,
   async (req, res) => {
-    if (
-      !req.user.isSuper &&
-      !hasPermission(req.user, 'forum') &&
-      !hasPermission(req.user, 'forum.members')
-    ) {
-      return res.status(403).json({ error: 'forbidden' })
-    }
+    const boardId = Number(req.body?.boardId)
     const userId = Number(req.params.id)
+    const boards = await query('SELECT id, access FROM forum_boards WHERE id = ? LIMIT 1', [boardId])
+    if (!boards.length) return res.status(400).json({ error: 'invalid_board' })
+    if (
+      !canModerateBoard(req.user, boardId) &&
+      !canManageCategory(req.user, boards[0].access)
+    ) {
+      return res.status(403).json({ error: 'board_master_required' })
+    }
     const enabled = req.body?.enabled === true
     const rows = await query('SELECT id, permissions FROM users WHERE id = ? LIMIT 1', [userId])
     if (!rows.length) return res.status(404).json({ error: 'user_not_found' })
@@ -3377,15 +3469,16 @@ app.put(
       permissions = []
     }
     if (!Array.isArray(permissions)) permissions = []
-    const next = permissions.filter((item) => item !== 'forum.post.autoapprove')
-    if (enabled) next.push('forum.post.autoapprove')
+    const key = `forum.${boardId}.post.autoapprove`
+    const next = permissions.filter((item) => item !== key)
+    if (enabled) next.push(key)
     await execute('UPDATE users SET permissions = ? WHERE id = ?', [JSON.stringify(next), userId])
     await auditRequest(req, {
       action: 'forum.post_autoapprove.grant',
       targetType: 'user',
       targetId: userId,
       status: 200,
-      detail: { enabled },
+      detail: { enabled, boardId },
     })
     res.json({ ok: true, enabled })
   },
@@ -3428,13 +3521,8 @@ app.post('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (
   const role = req.body?.role === 'master' ? 'master' : 'admin'
   const boards = await query('SELECT * FROM forum_boards WHERE id = ?', [boardId])
   if (!boards.length) return res.status(404).json({ error: 'board_not_found' })
-  const allowed =
-    req.user.isSuper ||
-    hasPermission(req.user, 'forum') ||
-    hasPermission(req.user, 'forum.members') ||
-    ['senior', 'forum_master'].includes(req.user.identity) ||
-    canModerateBoard(req.user, boardId)
-  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  const allowed = canManageCategory(req.user, boards[0].access)
+  if (!allowed) return res.status(403).json({ error: 'category_master_required' })
   const users = await query('SELECT * FROM users WHERE id = ?', [userId])
   if (!users.length) return res.status(404).json({ error: 'user_not_found' })
   const targetUser = normalizeUser(users[0])
@@ -3504,13 +3592,10 @@ app.delete('/api/admin/forum/moderators/:id', requireAuth, requireForumAccess, a
   ])
   if (!rows.length) return res.status(404).json({ error: 'not_found' })
   const boardId = Number(rows[0].board_id)
-  const allowed =
-    req.user.isSuper ||
-    hasPermission(req.user, 'forum') ||
-    hasPermission(req.user, 'forum.members') ||
-    ['senior', 'forum_master'].includes(req.user.identity) ||
-    canModerateBoard(req.user, boardId)
-  if (!allowed) return res.status(403).json({ error: 'forbidden' })
+  const boardRows = await query('SELECT access FROM forum_boards WHERE id = ? LIMIT 1', [boardId])
+  if (!boardRows.length) return res.status(404).json({ error: 'board_not_found' })
+  const allowed = canManageCategory(req.user, boardRows[0].access)
+  if (!allowed) return res.status(403).json({ error: 'category_master_required' })
   await execute('DELETE FROM forum_moderators WHERE id = ?', [Number(req.params.id)])
   const remaining = await query(
     'SELECT id FROM forum_moderators WHERE user_id = ? AND board_id = ? LIMIT 1',
@@ -3530,6 +3615,41 @@ app.delete('/api/admin/forum/moderators/:id', requireAuth, requireForumAccess, a
       JSON.stringify(permissions.filter((p) => p !== `forum.${boardId}`)),
       Number(rows[0].user_id),
     ])
+    const masters = await query(
+      `SELECT m.id FROM forum_moderators m
+       JOIN forum_boards b ON b.id = m.board_id
+       WHERE m.user_id = ? AND m.role = 'master' AND b.access = ? LIMIT 1`,
+      [Number(rows[0].user_id), boardRows[0].access],
+    )
+    if (!masters.length) {
+      await execute(
+        `UPDATE users
+         SET permissions = JSON_REMOVE(permissions, JSON_UNQUOTE(JSON_SEARCH(permissions, 'one', ?)))
+         WHERE id = ?`,
+        [
+          `forum.category.${boardRows[0].access}.master`,
+          Number(rows[0].user_id),
+        ],
+      ).catch(async () => {
+        const targetRows = await query('SELECT permissions FROM users WHERE id = ?', [
+          Number(rows[0].user_id),
+        ])
+        let targetPermissions = []
+        try {
+          targetPermissions = JSON.parse(targetRows[0]?.permissions ?? '[]')
+        } catch {
+          targetPermissions = []
+        }
+        await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+          JSON.stringify(
+            targetPermissions.filter(
+              (p) => p !== `forum.category.${boardRows[0].access}.master`,
+            ),
+          ),
+          Number(rows[0].user_id),
+        ])
+      })
+    }
   }
   res.json({ ok: true })
 })

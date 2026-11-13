@@ -56,7 +56,26 @@ interface BoardPost {
 
 function canManageBoard(user: ReturnType<typeof useSession>['user'], board: Board) {
   if (!user) return false
-  return user.isSuper || user.permissions.includes('forum') || board.canModerate === true
+  return (
+    user.isSuper ||
+    user.permissions.includes('forum') ||
+    board.canModerate === true ||
+    canManageCategory(user, board.access)
+  )
+}
+
+const CATEGORY_IDENTITY: Record<BoardAccess, string> = {
+  public: 'normal_master',
+  core: 'core_master',
+  special: 'special_master',
+}
+
+function canManageCategory(user: ReturnType<typeof useSession>['user'], access: BoardAccess) {
+  if (!user) return false
+  if (user.isSuper || user.permissions.includes('forum')) return true
+  if (['senior', 'forum_master'].includes(user.identity ?? '')) return true
+  if (user.identity === CATEGORY_IDENTITY[access]) return true
+  return user.permissions.includes(`forum.category.${access}.master`)
 }
 
 export function ForumMaintenancePanel() {
@@ -78,11 +97,7 @@ export function ForumMaintenancePanel() {
     [manageable, category],
   )
   const selected = selectedId ? manageable.find((board) => board.id === selectedId) ?? null : null
-  const canCreate =
-    user?.isSuper ||
-    user?.permissions.includes('forum') ||
-    user?.permissions.includes('forum.maintenance') ||
-    user?.permissions.includes('forum.create')
+  const canCreate = canManageCategory(user, category)
 
   const loadBoards = useCallback(async () => {
     try {
@@ -111,7 +126,11 @@ export function ForumMaintenancePanel() {
     await loadBoards()
   }
 
-  const counts = CATEGORIES.map((item) => ({
+  const counts = CATEGORIES.filter(
+    (item) =>
+      canManageCategory(user, item) ||
+      manageable.some((board) => board.access === item),
+  ).map((item) => ({
     item,
     label: BOARD_ACCESS_LABELS[item],
     count: manageable.filter((board) => board.access === item).length,

@@ -23,7 +23,7 @@
 | 日志内容 | `logs` |
 | 留言板 | `guestbook` |
 | 论坛创建与维护 | `forum.maintenance`、`forum` 或具体 `forum.<id>` |
-| 论坛成员管理 | `forum.members` 或 `forum` |
+| 论坛成员管理 | 对应类别总管理 `forum.category.<access>.master`；`forum` 为全部论坛 |
 | 论坛公告 | `forum.announcements` 或 `forum` |
 | 待审帖子 | `forum.review` 或 `forum` |
 | 特殊/核心申请 | `forum.access` 或 `forum` |
@@ -61,6 +61,7 @@
 
 「论坛 → 论坛成员管理」：
 
+0. 只有对应类别总管理能进入身份授予；子管理员只能授予本论坛免审；
 1. 搜索并选择成员；
 2. 选择论坛类别（全部 / 普通 / 特殊 / 核心）；
 3. 选择管理员类型（总管理员 / 子管理员）；
