@@ -9,6 +9,7 @@ const EMPTY: SecurityLogQuery = {
   action: '',
   from: '',
   to: '',
+  scope: 'review',
 }
 
 export function ReviewLogsPanel() {
@@ -25,7 +26,7 @@ export function ReviewLogsPanel() {
     let alive = true
     setLoading(true)
     securityLogApi
-      .audit({ ...applied, page, limit: 30 })
+      .audit({ ...applied, scope: 'review', page, limit: 30 })
       .then((data) => {
         if (!alive) return
         setLogs(data.logs)

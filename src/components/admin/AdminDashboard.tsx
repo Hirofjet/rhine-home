@@ -119,7 +119,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
   const current = allowedKeys.includes(panel) ? panel : (allowedKeys[0] ?? 'settings')
 
   return (
-    <div className="min-h-screen bg-rhine-abyss text-rhine-ink">
+    <div className="admin-density min-h-screen bg-rhine-abyss text-rhine-ink">
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 z-[60] opacity-[0.035]"
@@ -154,7 +154,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
       </div>
 
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row">
-        <aside className="hidden lg:block lg:w-56 lg:shrink-0">
+        <aside className="hidden lg:block lg:w-64 lg:shrink-0">
           <div className="border border-rhine-line/60 bg-rhine-panel/30 p-2 lg:sticky lg:top-20">
             <nav className="flex gap-4 overflow-x-auto pb-1 lg:flex-col lg:gap-5">
               {groups.map((group) => (
@@ -181,7 +181,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
                             : 'border-l-transparent text-rhine-dim hover:border-l-rhine-line hover:bg-rhine-abyss/40 hover:text-rhine-ink',
                         )}
                       >
-                        <span className="text-xs">{item.label}</span>
+                        <span className="whitespace-nowrap text-xs">{item.label}</span>
                         <span className="font-mono text-[8px] tracking-[0.2em] opacity-60">
                           {item.labelEn}
                         </span>

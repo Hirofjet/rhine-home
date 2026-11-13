@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Download } from 'lucide-react'
 import {
   securityLogApi,
   type AuditLogEntry,
@@ -77,6 +78,26 @@ export function SecurityLogsPanel() {
     setFilters(EMPTY_FILTERS)
     setApplied(EMPTY_FILTERS)
     setPage(1)
+  }
+
+  const exportCurrent = async () => {
+    try {
+      const blob =
+        tab === 'requests'
+          ? await securityLogApi.exportRequests({ ...applied })
+          : await securityLogApi.exportAudit({ ...applied })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download =
+        tab === 'requests'
+          ? `request-logs-${new Date().toISOString().slice(0, 10)}.csv`
+          : `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('导出失败，请重试。')
+    }
   }
 
   const pages = Math.max(1, Math.ceil(total / 30))
@@ -167,6 +188,13 @@ export function SecurityLogsPanel() {
             className="border border-rhine-line px-3 py-2 font-mono text-[9px] text-rhine-dim"
           >
             重置
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportCurrent()}
+            className="inline-flex items-center gap-1 border border-rhine-line px-3 py-2 font-mono text-[9px] text-rhine-dim hover:text-rhine-gold"
+          >
+            <Download className="h-3 w-3" /> 导出当前筛选
           </button>
           <span className="ml-auto self-center font-mono text-[9px] text-rhine-faint">
             {total} RECORDS

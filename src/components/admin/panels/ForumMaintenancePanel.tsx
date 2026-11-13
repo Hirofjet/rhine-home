@@ -2,12 +2,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  ArrowLeft,
+  ArrowRight,
   Megaphone,
   MessageSquare,
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
 } from 'lucide-react'
 import {
@@ -31,9 +32,11 @@ import {
 
 export const BOARD_ACCESS_LABELS: Record<BoardAccess, string> = {
   public: '普通论坛',
-  special: '特殊论坛',
   core: '核心论坛',
+  special: '特殊论坛',
 }
+
+const CATEGORIES: BoardAccess[] = ['public', 'core', 'special']
 
 interface Rule {
   level: number
@@ -53,56 +56,33 @@ interface BoardPost {
 
 function canManageBoard(user: ReturnType<typeof useSession>['user'], board: Board) {
   if (!user) return false
-  return (
-    user.isSuper ||
-    user.permissions.includes('forum') ||
-    board.canModerate === true
-  )
+  return user.isSuper || user.permissions.includes('forum') || board.canModerate === true
 }
 
 export function ForumMaintenancePanel() {
   const { user } = useSession()
   const [boards, setBoards] = useState<Board[]>([])
+  const [category, setCategory] = useState<BoardAccess>('public')
+  const [categoryTouched, setCategoryTouched] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [posts, setPosts] = useState<BoardPost[]>([])
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [rules, setRules] = useState<Rule[]>([])
-  const [forumUsers, setForumUsers] = useState<
-    Array<{ id: number; username: string; nickname: string; forumTitle?: string }>
-  >([])
-  const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
-
-  const [annTitle, setAnnTitle] = useState('')
-  const [annContent, setAnnContent] = useState('')
-  const [titleTarget, setTitleTarget] = useState('')
-  const [grantTitle, setGrantTitle] = useState('')
-  const [grantLocked, setGrantLocked] = useState(true)
-
-  const [editOpen, setEditOpen] = useState(false)
-  const [editName, setEditName] = useState('')
-  const [editDescription, setEditDescription] = useState('')
-  const [editTags, setEditTags] = useState('')
-  const [newName, setNewName] = useState('')
-  const [newSlug, setNewSlug] = useState('')
-  const [newDescription, setNewDescription] = useState('')
-  const [newTags, setNewTags] = useState('')
 
   const manageable = useMemo(
     () => boards.filter((board) => canManageBoard(user, board)),
     [boards, user],
   )
-  const selected = manageable.find((board) => board.id === selectedId) ?? manageable[0] ?? null
-  const filtered = manageable.filter((board) => {
-    const keyword = query.trim().toLowerCase()
-    return (
-      !keyword ||
-      board.name.toLowerCase().includes(keyword) ||
-      board.slug.toLowerCase().includes(keyword)
-    )
-  })
+  const categoryBoards = useMemo(
+    () => manageable.filter((board) => board.access === category),
+    [manageable, category],
+  )
+  const selected = selectedId ? manageable.find((board) => board.id === selectedId) ?? null : null
+  const canCreate =
+    user?.isSuper ||
+    user?.permissions.includes('forum') ||
+    user?.permissions.includes('forum.maintenance') ||
+    user?.permissions.includes('forum.create')
 
   const loadBoards = useCallback(async () => {
     try {
@@ -114,7 +94,293 @@ export function ForumMaintenancePanel() {
     }
   }, [])
 
-  const loadBoard = useCallback(async (board: Board) => {
+  useEffect(() => {
+    void loadBoards()
+  }, [loadBoards])
+
+  useEffect(() => {
+    if (manageable.length === 0 || categoryTouched) return
+    if (categoryBoards.length > 0) return
+    const next = CATEGORIES.find((item) =>
+      manageable.some((board) => board.access === item),
+    )
+    if (next && next !== category) setCategory(next)
+  }, [manageable, categoryBoards.length, category, categoryTouched])
+
+  const refresh = async () => {
+    await loadBoards()
+  }
+
+  const counts = CATEGORIES.map((item) => ({
+    item,
+    label: BOARD_ACCESS_LABELS[item],
+    count: manageable.filter((board) => board.access === item).length,
+  }))
+
+  if (selected) {
+    return (
+      <BoardDetail
+        board={selected}
+        user={user}
+        onBack={() => {
+          setSelectedId(null)
+          void loadBoards()
+        }}
+        onNotice={setNotice}
+        notice={notice}
+        error={error}
+        setError={setError}
+        busy={busy}
+        setBusy={setBusy}
+      />
+    )
+  }
+
+  const totalPosts = categoryBoards.reduce((sum, board) => sum + board.postCount, 0)
+  const totalReplies = categoryBoards.reduce((sum, board) => sum + (board.replyCount ?? 0), 0)
+  const totalPending = categoryBoards.reduce((sum, board) => sum + (board.pendingCount ?? 0), 0)
+  const maxPosts = Math.max(1, ...categoryBoards.map((board) => board.postCount))
+
+  return (
+    <div className="space-y-4">
+      <AdminError message={error} />
+      <AdminNotice message={notice} />
+
+      <AdminPanel
+        title="论坛创建与维护"
+        subtitle={`${BOARD_ACCESS_LABELS[category]} · CATEGORY WORKSPACE`}
+        actions={
+          <AdminButton variant="ghost" onClick={() => void refresh()} disabled={busy}>
+            <RefreshCw className="h-3 w-3" /> 刷新
+          </AdminButton>
+        }
+      >
+        <div className="mb-4 grid grid-cols-3 gap-2 border border-rhine-line/60 bg-rhine-abyss/30 p-2">
+          {counts.map(({ item, label, count }) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => {
+                setCategory(item)
+                setCategoryTouched(true)
+                setSelectedId(null)
+              }}
+              className={`border px-3 py-3 text-left transition-colors ${
+                category === item
+                  ? 'border-rhine-gold bg-rhine-gold/10 text-rhine-gold'
+                  : 'border-rhine-line/60 text-rhine-dim hover:border-rhine-gold/50'
+              }`}
+            >
+              <span className="block font-mono text-[9px] tracking-[0.2em]">{label}</span>
+              <span className="mt-1 block text-xl">{count}</span>
+              <span className="font-mono text-[9px] opacity-60">个论坛</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <div className="border border-rhine-line/60 p-3">
+            <p className="font-mono text-[9px] text-rhine-faint">当前类别论坛</p>
+            <p className="mt-1 text-xl text-rhine-gold">{categoryBoards.length}</p>
+          </div>
+          <div className="border border-rhine-line/60 p-3">
+            <p className="font-mono text-[9px] text-rhine-faint">帖子 / 回复</p>
+            <p className="mt-1 text-xl text-rhine-cyan">
+              {totalPosts} / {totalReplies}
+            </p>
+          </div>
+          <div className="border border-rhine-line/60 p-3">
+            <p className="font-mono text-[9px] text-rhine-faint">待审内容</p>
+            <p className="mt-1 text-xl text-rhine-red">{totalPending}</p>
+          </div>
+        </div>
+
+        <div className="mb-4 flex h-32 items-end gap-2 border border-rhine-line/60 p-3">
+          {categoryBoards.map((board) => (
+            <div key={board.id} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+              <span
+                className="w-full bg-rhine-gold/60"
+                style={{ height: `${Math.max(6, (board.postCount / maxPosts) * 85)}px` }}
+                title={`${board.name}: ${board.postCount} 帖 / ${board.replyCount ?? 0} 回`}
+              />
+              <span className="w-full truncate text-center font-mono text-[9px] text-rhine-faint">
+                {board.name}
+              </span>
+            </div>
+          ))}
+          {categoryBoards.length === 0 && (
+            <span className="text-xs text-rhine-faint">当前类别暂无你有权限管理的论坛</span>
+          )}
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {categoryBoards.map((board) => (
+            <article
+              key={board.id}
+              className="group border border-rhine-line/70 bg-rhine-panel/40 p-4 transition-colors hover:border-rhine-gold/50"
+            >
+              <button type="button" className="w-full text-left" onClick={() => setSelectedId(board.id)}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[9px] tracking-wider text-rhine-gold">
+                    {BOARD_ACCESS_LABELS[board.access]}
+                  </span>
+                  <span className="font-mono text-[9px] text-rhine-faint">{board.postCount} 帖</span>
+                </div>
+                <h3 className="mt-3 text-lg font-semibold text-rhine-ink">{board.name}</h3>
+                <p className="mt-1 min-h-8 text-xs leading-relaxed text-rhine-dim">
+                  {board.description || '暂无描述'}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {(board.tags ?? []).map((tag) => (
+                    <span
+                      key={tag}
+                      className="border border-rhine-line px-1.5 py-0.5 font-mono text-[9px] text-rhine-faint"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-rhine-line/50 pt-3 font-mono text-[10px] text-rhine-cyan">
+                  <span>进入板块后台</span>
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </div>
+              </button>
+            </article>
+          ))}
+          {categoryBoards.length === 0 && (
+            <div className="border border-dashed border-rhine-line/70 p-8 text-center font-mono text-xs text-rhine-faint md:col-span-2 xl:col-span-3">
+              当前类别暂无你有权限管理的论坛
+            </div>
+          )}
+        </div>
+      </AdminPanel>
+
+      {canCreate && (
+        <AdminPanel
+          title={`在「${BOARD_ACCESS_LABELS[category]}」创建论坛`}
+          subtitle="CREATE FORUM"
+        >
+          <p className="mb-3 font-mono text-[9px] leading-relaxed text-rhine-faint">
+            当前滑块类别为 {BOARD_ACCESS_LABELS[category]}，此处创建的论坛固定归入该类别。
+          </p>
+          <CreateBoardForm
+            access={category}
+            onCreated={async (id) => {
+              setNotice(`已在「${BOARD_ACCESS_LABELS[category]}」创建论坛`)
+              await loadBoards()
+              setSelectedId(id)
+            }}
+          />
+        </AdminPanel>
+      )}
+    </div>
+  )
+}
+
+function CreateBoardForm({
+  access,
+  onCreated,
+}: {
+  access: BoardAccess
+  onCreated: (id: number) => void | Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [description, setDescription] = useState('')
+  const [tags, setTags] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const create = async () => {
+    if (!name.trim() || !slug.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      const data = await adminApi.createBoard({
+        name: name.trim(),
+        slug: slug.trim().toLowerCase(),
+        description: description.trim(),
+        access,
+        tags: tags.split(/[,，\s]+/).filter(Boolean),
+      })
+      setName('')
+      setSlug('')
+      setDescription('')
+      setTags('')
+      await onCreated(data.id)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AdminField label="名称 / NAME">
+          <AdminInput value={name} onChange={(event) => setName(event.target.value)} />
+        </AdminField>
+        <AdminField label="Slug / URL">
+          <AdminInput value={slug} onChange={(event) => setSlug(event.target.value)} />
+        </AdminField>
+        <AdminField label="标签 / TAGS">
+          <AdminInput value={tags} onChange={(event) => setTags(event.target.value)} />
+        </AdminField>
+        <AdminField label="类别 / ACCESS">
+          <AdminInput value={BOARD_ACCESS_LABELS[access]} disabled />
+        </AdminField>
+      </div>
+      <AdminField label="描述 / DESCRIPTION">
+        <AdminTextarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} />
+      </AdminField>
+      <AdminError message={error} />
+      <AdminButton onClick={() => void create()} disabled={busy || !name.trim() || !slug.trim()}>
+        <Plus className="h-3 w-3" /> 在「{BOARD_ACCESS_LABELS[access]}」创建
+      </AdminButton>
+    </div>
+  )
+}
+
+function BoardDetail({
+  board,
+  user,
+  onBack,
+  notice,
+  onNotice,
+  error,
+  setError,
+  busy,
+  setBusy,
+}: {
+  board: Board
+  user: ReturnType<typeof useSession>['user']
+  onBack: () => void
+  notice: string
+  onNotice: (value: string) => void
+  error: string
+  setError: (value: string) => void
+  busy: boolean
+  setBusy: (value: boolean) => void
+}) {
+  const [posts, setPosts] = useState<BoardPost[]>([])
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [rules, setRules] = useState<Rule[]>([])
+  const [users, setUsers] = useState<
+    Array<{ id: number; username: string; nickname: string; forumTitle?: string }>
+  >([])
+  const [annTitle, setAnnTitle] = useState('')
+  const [annContent, setAnnContent] = useState('')
+  const [titleTarget, setTitleTarget] = useState('')
+  const [grantTitle, setGrantTitle] = useState('')
+  const [grantLocked, setGrantLocked] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(board.name)
+  const [description, setDescription] = useState(board.description)
+  const [tags, setTags] = useState((board.tags ?? []).join(', '))
+  const [query, setQuery] = useState('')
+
+  const load = useCallback(async () => {
     try {
       const [postData, annData, ruleData, userData] = await Promise.all([
         adminApi.boardPosts(board.id),
@@ -131,51 +397,30 @@ export function ForumMaintenancePanel() {
           title: rule.title,
         })),
       )
-      setForumUsers(userData.users)
+      setUsers(userData.users)
+      setError('')
     } catch (err) {
       setError(errorMessage(err))
     }
-  }, [])
+  }, [board.id, setError])
 
   useEffect(() => {
-    void loadBoards()
-  }, [loadBoards])
-  useEffect(() => {
-    if (selected) void loadBoard(selected)
-  }, [selected, loadBoard])
-  useEffect(() => {
-    if (!selectedId && manageable.length) setSelectedId(manageable[0].id)
-  }, [manageable, selectedId])
-
-  const totals = useMemo(
-    () => ({
-      forums: manageable.length,
-      posts: manageable.reduce((sum, board) => sum + board.postCount, 0),
-      replies: manageable.reduce((sum, board) => sum + (board.replyCount ?? 0), 0),
-      pending: manageable.reduce((sum, board) => sum + (board.pendingCount ?? 0), 0),
-      active: manageable.reduce((sum, board) => sum + (board.activeUsers ?? 0), 0),
-    }),
-    [manageable],
-  )
-
-  const refresh = async () => {
-    await loadBoards()
-    if (selected) await loadBoard(selected)
-  }
+    void load()
+  }, [load])
 
   const publishAnnouncement = async () => {
-    if (!selected || !annTitle.trim() || !annContent.trim()) return
+    if (!annTitle.trim() || !annContent.trim()) return
     setBusy(true)
     try {
       await adminApi.createAnnouncement({
-        boardId: selected.id,
+        boardId: board.id,
         title: annTitle.trim(),
         content: annContent.trim(),
       })
       setAnnTitle('')
       setAnnContent('')
-      setNotice('板块公告已发布')
-      await loadBoard(selected)
+      onNotice('板块公告已发布')
+      await load()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -187,8 +432,8 @@ export function ForumMaintenancePanel() {
     setBusy(true)
     try {
       await adminApi.removeAnnouncement(id)
-      setNotice('公告已删除')
-      if (selected) await loadBoard(selected)
+      onNotice('公告已删除')
+      await load()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -197,7 +442,6 @@ export function ForumMaintenancePanel() {
   }
 
   const saveRules = async () => {
-    if (!selected) return
     setBusy(true)
     try {
       await adminApi.saveForumTitleRules(
@@ -208,10 +452,10 @@ export function ForumMaintenancePanel() {
             minPoints: Number(rule.minPoints),
             title: rule.title.trim(),
           })),
-        selected.id,
+        board.id,
       )
-      setNotice(`「${selected.name}」等级头衔规则已保存`)
-      await loadBoard(selected)
+      onNotice(`「${board.name}」等级/头衔规则已保存`)
+      await load()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -220,18 +464,13 @@ export function ForumMaintenancePanel() {
   }
 
   const grantMemberTitle = async () => {
-    if (!selected || !titleTarget) return
+    if (!titleTarget) return
     setBusy(true)
     try {
-      await adminApi.grantBoardTitle(
-        selected.id,
-        Number(titleTarget),
-        grantTitle.trim(),
-        grantLocked,
-      )
-      setNotice(grantTitle.trim() ? '论坛头衔已发放' : '已恢复该论坛自动头衔')
+      await adminApi.grantBoardTitle(board.id, Number(titleTarget), grantTitle.trim(), grantLocked)
+      onNotice(grantTitle.trim() ? '论坛头衔已发放' : '已恢复该论坛自动头衔')
       setGrantTitle('')
-      await loadBoard(selected)
+      await load()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -239,24 +478,16 @@ export function ForumMaintenancePanel() {
     }
   }
 
-  const createBoard = async () => {
-    if (!selected || !newName.trim() || !newSlug.trim()) return
+  const saveBoard = async () => {
     setBusy(true)
     try {
-      const data = await adminApi.createBoard({
-        name: newName.trim(),
-        slug: newSlug.trim().toLowerCase(),
-        description: newDescription.trim(),
-        access: selected.access,
-        tags: newTags.split(/[,，\s]+/).filter(Boolean),
+      await adminApi.updateBoard(board.id, {
+        name: name.trim(),
+        description: description.trim(),
+        tags: tags.split(/[,，\s]+/).filter(Boolean),
       })
-      setNewName('')
-      setNewSlug('')
-      setNewDescription('')
-      setNewTags('')
-      setNotice(`已在「${BOARD_ACCESS_LABELS[selected.access]}」类别创建论坛`)
-      await loadBoards()
-      setSelectedId(data.id)
+      setEditing(false)
+      onNotice('论坛信息已更新')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -264,26 +495,12 @@ export function ForumMaintenancePanel() {
     }
   }
 
-  const openEdit = () => {
-    if (!selected) return
-    setEditName(selected.name)
-    setEditDescription(selected.description)
-    setEditTags((selected.tags ?? []).join(', '))
-    setEditOpen(true)
-  }
-
-  const saveEdit = async () => {
-    if (!selected) return
+  const moderate = async (id: number, action: 'pin' | 'unpin' | 'hide' | 'restore' | 'delete') => {
     setBusy(true)
     try {
-      await adminApi.updateBoard(selected.id, {
-        name: editName.trim(),
-        description: editDescription.trim(),
-        tags: editTags.split(/[,，\s]+/).filter(Boolean),
-      })
-      setEditOpen(false)
-      setNotice('论坛信息已更新')
-      await loadBoards()
+      await adminApi.moderatePost(id, action)
+      onNotice('帖子状态已更新')
+      await load()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -291,349 +508,216 @@ export function ForumMaintenancePanel() {
     }
   }
 
-  const bars = selected
-    ? [
-        ['帖子', selected.postCount, 'bg-rhine-gold'],
-        ['回复', selected.replyCount ?? 0, 'bg-rhine-cyan'],
-        ['待审', selected.pendingCount ?? 0, 'bg-rhine-red'],
-        ['活跃用户', selected.activeUsers ?? 0, 'bg-rhine-green'],
-      ]
-    : []
-  const maxBar = Math.max(1, ...bars.map(([, value]) => Number(value)))
+  const replies = posts.reduce((sum, post) => sum + post.replyCount, 0)
+  const filteredUsers = users.filter((item) => {
+    const keyword = query.trim().toLowerCase()
+    return (
+      !keyword ||
+      item.username.toLowerCase().includes(keyword) ||
+      item.nickname.toLowerCase().includes(keyword)
+    )
+  })
 
   return (
     <div className="space-y-4">
       <AdminError message={error} />
       <AdminNotice message={notice} />
-
       <AdminPanel
-        title="论坛创建与维护"
-        subtitle="FORUM MAINTENANCE"
+        title={`${board.name} · ${BOARD_ACCESS_LABELS[board.access]}`}
+        subtitle="BOARD CONTROL"
         actions={
-          <AdminButton variant="ghost" onClick={() => void refresh()} disabled={busy}>
-            <RefreshCw className="h-3 w-3" /> 刷新
+          <AdminButton variant="ghost" onClick={onBack}>
+            <ArrowLeft className="h-3 w-3" /> 返回类别
           </AdminButton>
         }
       >
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
-          {[
-            ['论坛数量', totals.forums, 'text-rhine-gold'],
-            ['帖子总数', totals.posts, 'text-rhine-cyan'],
-            ['回复总数', totals.replies, 'text-rhine-green'],
-            ['待审内容', totals.pending, 'text-rhine-red'],
-            ['活跃用户', totals.active, 'text-rhine-gold'],
-          ].map(([label, value, color]) => (
-            <div key={String(label)} className="border border-rhine-line/60 p-3">
-              <p className="font-mono text-[9px] text-rhine-faint">{label}</p>
-              <p className={`mt-1 text-xl ${color}`}>{Number(value).toLocaleString('zh-CN')}</p>
-            </div>
-          ))}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="border border-rhine-line/60 p-3">
+            <p className="font-mono text-[9px] text-rhine-faint">帖子</p>
+            <p className="text-xl text-rhine-gold">{posts.length}</p>
+          </div>
+          <div className="border border-rhine-line/60 p-3">
+            <p className="font-mono text-[9px] text-rhine-faint">回复</p>
+            <p className="text-xl text-rhine-cyan">{replies}</p>
+          </div>
+          <div className="border border-rhine-line/60 p-3">
+            <p className="font-mono text-[9px] text-rhine-faint">待审</p>
+            <p className="text-xl text-rhine-red">{board.pendingCount ?? 0}</p>
+          </div>
         </div>
-
-        <div className="mt-4 flex items-center gap-2 border border-rhine-line/60 bg-rhine-abyss/30 px-2 py-1.5">
-          <Search className="h-3 w-3 text-rhine-faint" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索论坛名或 slug"
-            className="w-full bg-transparent font-mono text-[10px] text-rhine-ink outline-none"
-          />
-          <span className="shrink-0 font-mono text-[9px] text-rhine-faint">
-            {filtered.length}/{manageable.length}
-          </span>
-        </div>
-
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
-          {filtered.map((board) => {
-            const active = board.id === selected?.id
-            return (
-              <button
-                key={board.id}
-                type="button"
-                onClick={() => setSelectedId(board.id)}
-                className={`min-w-36 shrink-0 border p-2 text-left transition-colors ${
-                  active
-                    ? 'border-rhine-gold bg-rhine-gold/10'
-                    : 'border-rhine-line/60 bg-rhine-panel/30 hover:border-rhine-gold/50'
-                }`}
-              >
-                <span className="font-mono text-[8px] tracking-wider text-rhine-faint">
-                  {BOARD_ACCESS_LABELS[board.access]}
-                </span>
-                <span className="mt-1 block truncate text-xs text-rhine-ink">{board.name}</span>
-                <span className="mt-1 block font-mono text-[9px] text-rhine-dim">
-                  {board.postCount} 帖 · {board.replyCount ?? 0} 回 · {board.activeUsers ?? 0} 人
-                </span>
-              </button>
-            )
-          })}
-          {filtered.length === 0 && (
-            <p className="py-3 text-xs text-rhine-faint">没有可管理的论坛</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Link
+            to={`/forum/${board.slug}`}
+            className="inline-flex items-center gap-1 border border-rhine-line px-2 py-1.5 font-mono text-[10px] text-rhine-dim hover:text-rhine-gold"
+          >
+            <MessageSquare className="h-3 w-3" /> 打开论坛
+          </Link>
+          {(user?.isSuper || user?.permissions.includes('forum')) && (
+            <AdminButton variant="ghost" onClick={() => setEditing((value) => !value)}>
+              <Pencil className="h-3 w-3" /> 编辑论坛
+            </AdminButton>
           )}
         </div>
-
-        {selected ? (
-          <div className="mt-3 border border-rhine-line/60 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="font-mono text-[9px] text-rhine-gold">
-                  {BOARD_ACCESS_LABELS[selected.access]} · #{selected.id}
-                </p>
-                <h3 className="mt-1 text-lg text-rhine-ink">{selected.name}</h3>
-                <p className="mt-1 text-xs text-rhine-dim">{selected.description || '暂无描述'}</p>
-              </div>
-              {(user?.isSuper || user?.permissions.includes('forum')) && (
-                <AdminButton variant="ghost" onClick={openEdit}>
-                  <Pencil className="h-3 w-3" /> 编辑论坛
-                </AdminButton>
-              )}
+        {editing && (
+          <div className="mt-3 space-y-2 border border-rhine-line/50 p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <AdminField label="名称">
+                <AdminInput value={name} onChange={(event) => setName(event.target.value)} />
+              </AdminField>
+              <AdminField label="标签">
+                <AdminInput value={tags} onChange={(event) => setTags(event.target.value)} />
+              </AdminField>
             </div>
-
-            <div className="mt-4 flex h-26 items-end gap-4 border border-rhine-line/40 p-3">
-              {bars.map(([label, value, color]) => (
-                <div key={String(label)} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-                  <span
-                    className={`w-full ${color}`}
-                    style={{ height: `${Math.max(8, (Number(value) / maxBar) * 70)}px` }}
-                  />
-                  <span className="font-mono text-[8px] text-rhine-faint">{label}</span>
-                  <span className="font-mono text-[9px] text-rhine-dim">{value}</span>
-                </div>
-              ))}
+            <AdminField label="描述">
+              <AdminTextarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} />
+            </AdminField>
+            <div className="flex gap-2">
+              <AdminButton onClick={() => void saveBoard()} disabled={busy}>保存</AdminButton>
+              <AdminButton variant="ghost" onClick={() => setEditing(false)}>取消</AdminButton>
             </div>
-
-            {editOpen && (
-              <div className="mt-3 space-y-2 border border-rhine-line/50 bg-rhine-abyss/30 p-3">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <AdminField label="名称">
-                    <AdminInput value={editName} onChange={(event) => setEditName(event.target.value)} />
-                  </AdminField>
-                  <AdminField label="标签">
-                    <AdminInput value={editTags} onChange={(event) => setEditTags(event.target.value)} />
-                  </AdminField>
-                </div>
-                <AdminField label="描述">
-                  <AdminTextarea
-                    value={editDescription}
-                    onChange={(event) => setEditDescription(event.target.value)}
-                    rows={2}
-                  />
-                </AdminField>
-                <div className="flex gap-2">
-                  <AdminButton onClick={() => void saveEdit()} disabled={busy}>保存</AdminButton>
-                  <AdminButton variant="ghost" onClick={() => setEditOpen(false)}>取消</AdminButton>
-                </div>
-              </div>
-            )}
           </div>
-        ) : (
-          <p className="mt-3 border border-dashed border-rhine-line/60 p-6 text-center text-xs text-rhine-faint">
-            你没有任何论坛的管理权限，因此无法切换论坛。
-          </p>
         )}
       </AdminPanel>
 
-      {selected && (
-        <>
-          <AdminPanel title={`${selected.name} · 创建论坛`} subtitle="CREATE IN THIS CATEGORY">
-            <p className="mb-3 font-mono text-[9px] leading-relaxed text-rhine-faint">
-              当前滑块对应类别：{BOARD_ACCESS_LABELS[selected.access]}。
-              此处创建的论坛会自动归入该类别，不能通过表单改成其他类别。
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <AdminField label="名称 / NAME">
-                <AdminInput value={newName} onChange={(event) => setNewName(event.target.value)} />
-              </AdminField>
-              <AdminField label="Slug / URL">
-                <AdminInput value={newSlug} onChange={(event) => setNewSlug(event.target.value)} />
-              </AdminField>
-              <AdminField label="标签 / TAGS">
-                <AdminInput value={newTags} onChange={(event) => setNewTags(event.target.value)} />
-              </AdminField>
-              <AdminField label="类别 / ACCESS">
-                <AdminInput value={BOARD_ACCESS_LABELS[selected.access]} disabled />
-              </AdminField>
-            </div>
-            <AdminField label="描述 / DESCRIPTION">
-              <AdminTextarea
-                value={newDescription}
-                onChange={(event) => setNewDescription(event.target.value)}
-                rows={2}
-              />
-            </AdminField>
-            <AdminButton onClick={() => void createBoard()} disabled={busy || !newName || !newSlug}>
-              <Plus className="h-3 w-3" /> 在「{BOARD_ACCESS_LABELS[selected.access]}」创建
-            </AdminButton>
-          </AdminPanel>
-
-          <AdminPanel title={`${selected.name} · 板块公告`} subtitle="ANNOUNCEMENTS">
-            <div className="space-y-2">
-              <AdminInput
-                value={annTitle}
-                onChange={(event) => setAnnTitle(event.target.value)}
-                placeholder="公告标题"
-              />
-              <AdminTextarea
-                value={annContent}
-                onChange={(event) => setAnnContent(event.target.value)}
-                rows={2}
-                placeholder="公告内容"
-              />
-              <AdminButton onClick={() => void publishAnnouncement()} disabled={busy}>
-                <Megaphone className="h-3 w-3" /> 发布公告
+      <AdminPanel title="板块公告" subtitle="ANNOUNCEMENTS">
+        <div className="space-y-2">
+          <AdminInput value={annTitle} onChange={(event) => setAnnTitle(event.target.value)} placeholder="公告标题" />
+          <AdminTextarea value={annContent} onChange={(event) => setAnnContent(event.target.value)} rows={2} placeholder="公告内容" />
+          <AdminButton onClick={() => void publishAnnouncement()} disabled={busy}>
+            <Megaphone className="h-3 w-3" /> 发布公告
+          </AdminButton>
+        </div>
+        <ul className="mt-3 divide-y divide-rhine-line/40 border-t border-rhine-line/40">
+          {announcements.map((item) => (
+            <li key={item.id} className="flex items-center gap-2 py-2">
+              <span className="min-w-0 flex-1 truncate text-xs text-rhine-ink">{item.title}</span>
+              <AdminButton variant="danger" onClick={() => void removeAnnouncement(item.id)}>
+                <Trash2 className="h-3 w-3" /> 删除
               </AdminButton>
-            </div>
-            <ul className="mt-3 divide-y divide-rhine-line/40 border-t border-rhine-line/40">
-              {announcements.map((item) => (
-                <li key={item.id} className="flex items-center gap-2 py-2">
-                  <span className="min-w-0 flex-1 truncate text-xs text-rhine-ink">{item.title}</span>
-                  <AdminButton variant="danger" onClick={() => void removeAnnouncement(item.id)}>
-                    <Trash2 className="h-3 w-3" /> 删除
-                  </AdminButton>
-                </li>
-              ))}
-              {announcements.length === 0 && (
-                <li className="py-2 text-xs text-rhine-faint">暂无公告</li>
-              )}
-            </ul>
-          </AdminPanel>
+            </li>
+          ))}
+          {announcements.length === 0 && <li className="py-2 text-xs text-rhine-faint">暂无公告</li>}
+        </ul>
+      </AdminPanel>
 
-          <AdminPanel title={`${selected.name} · 等级与头衔`} subtitle="LEVELS & TITLES">
-            <p className="mb-3 font-mono text-[9px] text-rhine-faint">
-              每个论坛独立配置等级/头衔规则，不再使用全局头衔等级面板。
-            </p>
-            <div className="space-y-2">
-              {rules.map((rule, index) => (
-                <div key={index} className="grid gap-2 border border-rhine-line/50 p-2 sm:grid-cols-[90px_120px_1fr_40px]">
-                  <AdminField label="等级">
-                    <AdminInput
-                      type="number"
-                      value={rule.level}
-                      onChange={(event) =>
-                        setRules((current) =>
-                          current.map((item, i) =>
-                            i === index ? { ...item, level: Number(event.target.value) } : item,
-                          ),
-                        )
-                      }
-                    />
-                  </AdminField>
-                  <AdminField label="最低积分">
-                    <AdminInput
-                      type="number"
-                      value={rule.minPoints}
-                      onChange={(event) =>
-                        setRules((current) =>
-                          current.map((item, i) =>
-                            i === index ? { ...item, minPoints: Number(event.target.value) } : item,
-                          ),
-                        )
-                      }
-                    />
-                  </AdminField>
-                  <AdminField label="头衔">
-                    <AdminInput
-                      value={rule.title}
-                      onChange={(event) =>
-                        setRules((current) =>
-                          current.map((item, i) =>
-                            i === index ? { ...item, title: event.target.value } : item,
-                          ),
-                        )
-                      }
-                    />
-                  </AdminField>
-                  <button
-                    type="button"
-                    onClick={() => setRules((current) => current.filter((_, i) => i !== index))}
-                    className="mt-4 flex h-9 items-center justify-center border border-rhine-line text-rhine-faint hover:text-rhine-red"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <AdminButton
-                variant="ghost"
-                onClick={() =>
-                  setRules((current) => [
-                    ...current,
-                    { level: current.length + 1, minPoints: 0, title: '' },
-                  ])
-                }
-              >
-                <Plus className="h-3 w-3" /> 添加等级
-              </AdminButton>
-              <AdminButton onClick={() => void saveRules()} disabled={busy}>保存规则</AdminButton>
-            </div>
-
-            <div className="mt-4 grid gap-2 border-t border-rhine-line/40 pt-3 sm:grid-cols-[1fr_1fr_auto]">
-              <AdminField label="成员">
-                <select
-                  value={titleTarget}
-                  onChange={(event) => setTitleTarget(event.target.value)}
-                  className="h-9 w-full border border-rhine-line bg-rhine-abyss/70 px-2 font-mono text-xs text-rhine-ink"
-                >
-                  <option value="">选择成员</option>
-                  {forumUsers
-                    .filter((item) =>
-                      !titleTarget ||
-                      item.username.includes(titleTarget) ||
-                      item.nickname.includes(titleTarget),
+      <AdminPanel title="等级与头衔" subtitle="LEVELS & TITLES">
+        <div className="space-y-2">
+          {rules.map((rule, index) => (
+            <div key={index} className="grid gap-2 border border-rhine-line/50 p-2 sm:grid-cols-[90px_120px_1fr_40px]">
+              <AdminField label="等级">
+                <AdminInput
+                  type="number"
+                  value={rule.level}
+                  onChange={(event) =>
+                    setRules((current) =>
+                      current.map((item, i) => (i === index ? { ...item, level: Number(event.target.value) } : item)),
                     )
-                    .map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.nickname} · {item.forumTitle || '自动'}
-                      </option>
-                    ))}
-                </select>
+                  }
+                />
               </AdminField>
-              <AdminField label="头衔（留空恢复自动）">
-                <AdminInput value={grantTitle} onChange={(event) => setGrantTitle(event.target.value)} />
+              <AdminField label="最低积分">
+                <AdminInput
+                  type="number"
+                  value={rule.minPoints}
+                  onChange={(event) =>
+                    setRules((current) =>
+                      current.map((item, i) => (i === index ? { ...item, minPoints: Number(event.target.value) } : item)),
+                    )
+                  }
+                />
               </AdminField>
-              <label className="flex items-end gap-2 pb-2 font-mono text-[10px] text-rhine-dim">
-                <input type="checkbox" checked={grantLocked} onChange={(event) => setGrantLocked(event.target.checked)} />
-                锁定
-              </label>
-              <div className="sm:col-span-3">
-                <AdminButton onClick={() => void grantMemberTitle()} disabled={busy || !titleTarget}>
-                  发放本论坛头衔
+              <AdminField label="头衔">
+                <AdminInput
+                  value={rule.title}
+                  onChange={(event) =>
+                    setRules((current) =>
+                      current.map((item, i) => (i === index ? { ...item, title: event.target.value } : item)),
+                    )
+                  }
+                />
+              </AdminField>
+              <button
+                type="button"
+                onClick={() => setRules((current) => current.filter((_, i) => i !== index))}
+                className="mt-4 flex h-9 items-center justify-center border border-rhine-line text-rhine-faint hover:text-rhine-red"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <AdminButton
+            variant="ghost"
+            onClick={() => setRules((current) => [...current, { level: current.length + 1, minPoints: 0, title: '' }])}
+          >
+            <Plus className="h-3 w-3" /> 添加等级
+          </AdminButton>
+          <AdminButton onClick={() => void saveRules()} disabled={busy}>保存规则</AdminButton>
+        </div>
+
+        <div className="mt-4 grid gap-2 border-t border-rhine-line/40 pt-3 sm:grid-cols-2">
+          <AdminField label="成员搜索">
+            <AdminInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索成员" />
+          </AdminField>
+          <AdminField label="成员">
+            <select
+              value={titleTarget}
+              onChange={(event) => setTitleTarget(event.target.value)}
+              className="h-9 w-full border border-rhine-line bg-rhine-abyss/70 px-2 font-mono text-xs text-rhine-ink"
+            >
+              <option value="">选择成员</option>
+              {filteredUsers.slice(0, 100).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nickname} · {item.forumTitle || '自动'}
+                </option>
+              ))}
+            </select>
+          </AdminField>
+          <AdminField label="头衔（留空恢复自动）">
+            <AdminInput value={grantTitle} onChange={(event) => setGrantTitle(event.target.value)} />
+          </AdminField>
+          <label className="flex items-end gap-2 pb-2 font-mono text-[10px] text-rhine-dim">
+            <input type="checkbox" checked={grantLocked} onChange={(event) => setGrantLocked(event.target.checked)} />
+            锁定
+          </label>
+          <div className="sm:col-span-2">
+            <AdminButton onClick={() => void grantMemberTitle()} disabled={busy || !titleTarget}>
+              发放本论坛头衔
+            </AdminButton>
+          </div>
+        </div>
+      </AdminPanel>
+
+      <AdminPanel title="帖子管理" subtitle="THREADS">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {posts.map((post) => (
+            <article key={post.id} className="border border-rhine-line/60 bg-rhine-abyss/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[9px] text-rhine-gold">{post.status}{post.pinned ? ' · PIN' : ''}</span>
+                <span className="font-mono text-[9px] text-rhine-faint">{post.author}</span>
+              </div>
+              <h3 className="mt-1 text-sm text-rhine-ink">{post.title}</h3>
+              <p className="mt-1 font-mono text-[9px] text-rhine-faint">{post.replyCount} 条回复</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <AdminButton variant="ghost" onClick={() => void moderate(post.id, post.pinned ? 'unpin' : 'pin')}>
+                  {post.pinned ? '取消置顶' : '置顶'}
+                </AdminButton>
+                <AdminButton
+                  variant="ghost"
+                  onClick={() => void moderate(post.id, post.status === 'hidden' ? 'restore' : 'hide')}
+                >
+                  {post.status === 'hidden' ? '恢复' : '隐藏'}
+                </AdminButton>
+                <AdminButton variant="danger" onClick={() => void moderate(post.id, 'delete')}>
+                  删除
                 </AdminButton>
               </div>
-            </div>
-          </AdminPanel>
-
-          <AdminPanel
-            title={`${selected.name} · 帖子`}
-            subtitle="THREADS"
-            actions={
-              <Link
-                to={`/forum/${selected.slug}`}
-                className="inline-flex items-center gap-1 border border-rhine-line px-2 py-1 font-mono text-[9px] text-rhine-dim hover:text-rhine-gold"
-              >
-                <MessageSquare className="h-3 w-3" /> 打开论坛
-              </Link>
-            }
-          >
-            <div className="grid gap-2 sm:grid-cols-2">
-              {posts.slice(0, 12).map((post) => (
-                <article key={post.id} className="border border-rhine-line/50 bg-rhine-abyss/30 p-2">
-                  <div className="flex items-center justify-between gap-2 font-mono text-[8px] text-rhine-faint">
-                    <span>{post.status}{post.pinned ? ' · PIN' : ''}</span>
-                    <span>{post.author}</span>
-                  </div>
-                  <p className="mt-1 truncate text-xs text-rhine-ink">{post.title}</p>
-                  <p className="mt-1 font-mono text-[9px] text-rhine-faint">
-                    {post.replyCount} 条回复
-                  </p>
-                </article>
-              ))}
-              {posts.length === 0 && <p className="text-xs text-rhine-faint">暂无帖子</p>}
-            </div>
-          </AdminPanel>
-        </>
-      )}
+            </article>
+          ))}
+          {posts.length === 0 && <p className="text-xs text-rhine-faint">暂无帖子</p>}
+        </div>
+      </AdminPanel>
     </div>
   )
 }

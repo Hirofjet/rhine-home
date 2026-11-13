@@ -444,7 +444,7 @@ export function AdminAppPage() {
   }
 
   return (
-    <div className="min-h-screen bg-rhine-abyss text-rhine-ink">
+    <div className="admin-density min-h-screen bg-rhine-abyss text-rhine-ink">
       <header className="sticky top-0 z-50 border-b border-rhine-line/70 bg-rhine-abyss/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2.5 sm:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">

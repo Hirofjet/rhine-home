@@ -1,7 +1,7 @@
 {
   "name": "rhine-home",
   "private": true,
-  "version": "2.9.1",
+  "version": "2.9.2",
   "author": "Hirofjet",
   "license": "MIT",
   "type": "module",

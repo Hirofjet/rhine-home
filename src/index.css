@@ -721,3 +721,11 @@ html {
 [class~="text-[11px]"] {
   font-size: 11px;
 }
+
+/* 后台字体整体放大：仅影响 admin-density 容器，前台不变 */
+.admin-density .text-\[8px\] { font-size: 11px !important; line-height: 1.4 !important; }
+.admin-density .text-\[9px\] { font-size: 12px !important; line-height: 1.4 !important; }
+.admin-density .text-\[10px\] { font-size: 13px !important; line-height: 1.45 !important; }
+.admin-density .text-\[11px\] { font-size: 14px !important; line-height: 1.45 !important; }
+.admin-density .text-\[12px\] { font-size: 15px !important; line-height: 1.5 !important; }
+.admin-density .text-xs { font-size: 0.9rem !important; line-height: 1.45 !important; }

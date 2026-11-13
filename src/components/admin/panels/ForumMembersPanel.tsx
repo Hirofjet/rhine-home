@@ -24,6 +24,7 @@ interface Candidate {
   email: string
   identity: string
   role: string
+  permissions: string[]
 }
 
 interface Moderator {
@@ -58,6 +59,10 @@ export function ForumMembersPanel() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [autoQuery, setAutoQuery] = useState('')
+  const [autoUser, setAutoUser] = useState<Candidate | null>(null)
+  const [autoBusy, setAutoBusy] = useState(false)
+  const [autoNotice, setAutoNotice] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -184,6 +189,29 @@ export function ForumMembersPanel() {
 
   const cardClass = 'border border-rhine-line/60 bg-rhine-panel/30 p-3'
 
+  const setAutoApprove = async (enabled: boolean) => {
+    if (!autoUser) return
+    setAutoBusy(true)
+    setAutoNotice('')
+    try {
+      await adminApi.setPostAutoApprove(autoUser.id, enabled)
+      setAutoNotice(
+        enabled
+          ? `已授予 ${autoUser.nickname} 帖子免审`
+          : `已撤销 ${autoUser.nickname} 的帖子免审`,
+      )
+      const data = await adminApi.forumMemberCandidates('')
+      setCandidates(data.users)
+      setAutoUser(
+        data.users.find((item) => item.id === autoUser.id) ?? null,
+      )
+    } catch (err) {
+      setAutoNotice(errorMessage(err))
+    } finally {
+      setAutoBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <AdminError message={error} />
@@ -298,6 +326,80 @@ export function ForumMembersPanel() {
               </span>
               <AdminButton onClick={() => void assign()} disabled={busy || !selectedUser}>
                 <Plus className="h-3 w-3" /> 分配
+              </AdminButton>
+            </div>
+          </div>
+        </div>
+      </AdminPanel>
+
+      <AdminPanel title="帖子免审授权" subtitle="POST AUTO-APPROVE">
+        <p className="mb-2 font-mono text-[9px] leading-relaxed text-rhine-faint">
+          管理员账号默认免审；普通成员可在这里由有论坛成员权限的管理员单独授予「帖子免审」。
+        </p>
+        {autoNotice && <AdminNotice message={autoNotice} />}
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className={cardClass}>
+            <div className="flex items-center gap-2 border border-rhine-line bg-rhine-abyss/50 px-2 py-1.5">
+              <Search className="h-3 w-3 text-rhine-faint" />
+              <input
+                value={autoQuery}
+                onChange={(event) => setAutoQuery(event.target.value)}
+                placeholder="搜索成员"
+                className="w-full bg-transparent font-mono text-[10px] outline-none"
+              />
+            </div>
+            <div className="mt-2 max-h-40 overflow-y-auto border border-rhine-line/40">
+              {candidates
+                .filter((item) => {
+                  const keyword = autoQuery.trim().toLowerCase()
+                  return (
+                    !keyword ||
+                    item.username.toLowerCase().includes(keyword) ||
+                    item.nickname.toLowerCase().includes(keyword) ||
+                    item.email.toLowerCase().includes(keyword)
+                  )
+                })
+                .slice(0, 30)
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setAutoUser(item)}
+                    className={`flex w-full items-center justify-between gap-2 border-b border-rhine-line/30 px-2 py-1.5 text-left last:border-b-0 ${
+                      autoUser?.id === item.id ? 'bg-rhine-gold/10 text-rhine-gold' : 'text-rhine-dim'
+                    }`}
+                  >
+                    <span className="min-w-0 truncate text-xs">{item.nickname} @{item.username}</span>
+                    {item.permissions.includes('forum.post.autoapprove') && (
+                      <AdminBadge tone="green">免审</AdminBadge>
+                    )}
+                  </button>
+                ))}
+            </div>
+          </div>
+          <div className={`${cardClass} flex flex-col justify-between gap-3`}>
+            <div>
+              <p className="font-mono text-[9px] text-rhine-faint">当前成员</p>
+              <p className="mt-1 text-sm text-rhine-ink">{autoUser?.nickname || '未选择'}</p>
+              <p className="mt-1 font-mono text-[10px] text-rhine-dim">
+                {autoUser?.permissions.includes('forum.post.autoapprove')
+                  ? '当前：帖子免审'
+                  : '当前：发帖需审核'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <AdminButton
+                onClick={() => void setAutoApprove(true)}
+                disabled={autoBusy || !autoUser || autoUser.permissions.includes('forum.post.autoapprove')}
+              >
+                授予帖子免审
+              </AdminButton>
+              <AdminButton
+                variant="ghost"
+                onClick={() => void setAutoApprove(false)}
+                disabled={autoBusy || !autoUser || !autoUser.permissions.includes('forum.post.autoapprove')}
+              >
+                撤销免审
               </AdminButton>
             </div>
           </div>

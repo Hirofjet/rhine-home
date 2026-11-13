@@ -2312,6 +2312,7 @@ app.post('/api/forum/posts', requireAuth, requireVerifiedEmail, async (req, res)
   if (matched?.action === 'block') return moderationBlockedResponse(res, matched.term)
   const autoApprove =
     canModerateBoard(req.user, boardId) ||
+    isStaff(req.user) ||
     hasPermission(req.user, 'forum.post.autoapprove')
   const result = await execute(
     `INSERT INTO forum_posts (board_id, author_id, title, content, attachments, tags, status)
@@ -3352,6 +3353,43 @@ app.get('/api/admin/forum/member-candidates', requireAuth, requireForumAccess, a
     }))
   res.json({ users })
 })
+
+app.put(
+  '/api/admin/forum/members/:id/post-autoapprove',
+  requireAuth,
+  requireForumAccess,
+  async (req, res) => {
+    if (
+      !req.user.isSuper &&
+      !hasPermission(req.user, 'forum') &&
+      !hasPermission(req.user, 'forum.members')
+    ) {
+      return res.status(403).json({ error: 'forbidden' })
+    }
+    const userId = Number(req.params.id)
+    const enabled = req.body?.enabled === true
+    const rows = await query('SELECT id, permissions FROM users WHERE id = ? LIMIT 1', [userId])
+    if (!rows.length) return res.status(404).json({ error: 'user_not_found' })
+    let permissions = []
+    try {
+      permissions = JSON.parse(rows[0].permissions ?? '[]')
+    } catch {
+      permissions = []
+    }
+    if (!Array.isArray(permissions)) permissions = []
+    const next = permissions.filter((item) => item !== 'forum.post.autoapprove')
+    if (enabled) next.push('forum.post.autoapprove')
+    await execute('UPDATE users SET permissions = ? WHERE id = ?', [JSON.stringify(next), userId])
+    await auditRequest(req, {
+      action: 'forum.post_autoapprove.grant',
+      targetType: 'user',
+      targetId: userId,
+      status: 200,
+      detail: { enabled },
+    })
+    res.json({ ok: true, enabled })
+  },
+)
 
 app.get('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (req, res) => {
   const rows = await query(
@@ -4582,6 +4620,27 @@ app.get(
     }
     const { page, limit, offset } = pageParams(req, 30)
     const { where, params } = securityLogFilters(req)
+    if (['1', 'true', 'csv'].includes(String(req.query.export ?? ''))) {
+      const exportRows = await query(
+        `SELECT id, created_at, username, method, path, status, duration_ms, ip, request_id
+         FROM request_logs WHERE ${where} ORDER BY id DESC LIMIT 5000`,
+        params,
+      )
+      const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`
+      const header = 'id,created_at,username,method,path,status,duration_ms,ip,request_id'
+      const lines = exportRows.map((row) =>
+        [row.id, row.created_at, row.username, row.method, row.path, row.status, row.duration_ms, row.ip, row.request_id]
+          .map(escape)
+          .join(','),
+      )
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="request-logs-${new Date().toISOString().slice(0, 10)}.csv"`,
+      )
+      res.send(`\uFEFF${header}\n${lines.join('\n')}`)
+      return
+    }
     const count = await query(
       `SELECT COUNT(*) AS total FROM request_logs WHERE ${where}`,
       params,
@@ -4625,6 +4684,11 @@ app.get(
     if (action) {
       clauses.push('action = ?')
       params.push(action)
+    }
+    if (String(req.query.scope ?? '') === 'review') {
+      clauses.push(
+        "(action LIKE 'review.%' OR path LIKE '%/forum/review%' OR path LIKE '%/forum/requests/%/review%' OR path LIKE '%/messages/%/review%' OR path LIKE '%/admin/reports/%')",
+      )
     }
     if (req.query.status !== undefined && req.query.status !== '') {
       const status = Number(req.query.status)

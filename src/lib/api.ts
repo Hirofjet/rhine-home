@@ -902,6 +902,7 @@ export interface SecurityLogQuery {
   page?: number
   limit?: number
   export?: boolean
+  scope?: 'review'
 }
 
 export interface SecurityLogPage<T> {
@@ -936,6 +937,17 @@ export const securityLogApi = {
     const token = getToken()
     const response = await fetch(
       `${API_BASE}/api/admin/security/audit-logs${securityLogQuery({ ...input, export: true })}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      },
+    )
+    if (!response.ok) throw new Error('export_failed')
+    return response.blob()
+  },
+  async exportRequests(input: SecurityLogQuery = {}) {
+    const token = getToken()
+    const response = await fetch(
+      `${API_BASE}/api/admin/security/request-logs${securityLogQuery({ ...input, export: true })}`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       },
@@ -1109,6 +1121,12 @@ export const adminApi = {
       method: 'POST',
       body: data,
     })
+  },
+  setPostAutoApprove(userId: number, enabled: boolean) {
+    return api<{ ok: boolean; enabled: boolean }>(
+      `/api/admin/forum/members/${userId}/post-autoapprove`,
+      { method: 'PUT', body: { enabled } },
+    )
   },
   removeModerator(id: number) {
     return api<{ ok: boolean }>(`/api/admin/forum/moderators/${id}`, {
