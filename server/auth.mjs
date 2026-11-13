@@ -340,9 +340,9 @@ export function sanitizePermissions(value, actor) {
 // ---------- 会话 ----------
 export async function createSession(userId) {
   const token = crypto.randomBytes(32).toString('hex')
-  const expires = new Date(Date.now() + config.sessionHours * 3600 * 1000)
+  const expires = new Date(Date.now() + config.sessionDays * 24 * 3600 * 1000)
   await execute(
-    'INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+    'INSERT INTO sessions (token, user_id, expires_at, last_seen_at) VALUES (?, ?, ?, NOW())',
     [token, userId, expires],
   )
   return token
@@ -355,12 +355,25 @@ export async function destroySession(token) {
 export async function userBySession(token) {
   if (!token) return null
   const rows = await query(
-    `SELECT u.* FROM sessions s
+    `SELECT u.*, s.last_seen_at
+     FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token = ? AND s.expires_at > NOW()
      LIMIT 1`,
     [token],
   )
+  if (!rows.length) return null
+  const lastSeen = rows[0].last_seen_at
+    ? new Date(String(rows[0].last_seen_at).replace(' ', 'T'))
+    : null
+  const stale = !lastSeen || Date.now() - lastSeen.getTime() > 5 * 60 * 1000
+  if (stale) {
+    const expires = new Date(Date.now() + config.sessionDays * 24 * 3600 * 1000)
+    await execute(
+      'UPDATE sessions SET last_seen_at = NOW(), expires_at = ? WHERE token = ?',
+      [expires, token],
+    ).catch(() => undefined)
+  }
   return normalizeUser(rows[0])
 }
 

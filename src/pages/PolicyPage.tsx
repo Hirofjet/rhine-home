@@ -53,7 +53,7 @@ export function PolicyPage() {
             </section>
             <section>
               <h2 className="text-lg font-bold text-rhine-ink">6. 安全措施</h2>
-              <p className="mt-2">密码使用 scrypt 哈希；管理员可启用 TOTP 动态验证码；访问与审计日志用于安全事件追踪；敏感词、举报、屏蔽和紧急停止用于内容治理。互联网不存在绝对安全，请使用独立强密码。</p>
+              <p className="mt-2">密码使用 scrypt 哈希；所有用户都可以在个人资料中自行启用 TOTP 动态验证码（默认关闭），管理员同样适用；访问与审计日志用于安全事件追踪；敏感词、举报、屏蔽和紧急停止用于内容治理。互联网不存在绝对安全，请使用独立强密码。</p>
             </section>
             <section>
               <h2 className="text-lg font-bold text-rhine-ink">7. 未成年人</h2>

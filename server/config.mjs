@@ -52,8 +52,8 @@ export const config = {
   adminUser: process.env.ADMIN_USER ?? 'admin',
   adminPassword: process.env.ADMIN_PASSWORD ?? '',
 
-  // 会话时长（小时）
-  sessionHours: Number(process.env.SESSION_HOURS ?? 12),
+  // 会话空闲有效期（天）：每次访问自动续期，超过该天数未访问才失效
+  sessionDays: Number(process.env.SESSION_DAYS ?? 30),
 
   // 可信反向代理：默认仅信任同机回环代理；直连部署时外部 IP 不会被伪造
   trustProxy: process.env.TRUST_PROXY ?? 'loopback',

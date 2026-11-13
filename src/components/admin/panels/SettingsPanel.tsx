@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import { KeyRound } from 'lucide-react'
 import {
   authApi,
@@ -28,6 +29,7 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
   const [notice, setNotice] = useState('')
   const [mfaEnabled, setMfaEnabled] = useState(false)
   const [mfaSetup, setMfaSetup] = useState<{ secret: string; uri: string } | null>(null)
+  const [mfaQr, setMfaQr] = useState('')
   const [mfaCode, setMfaCode] = useState('')
   const [mfaPassword, setMfaPassword] = useState('')
   const [boards, setBoards] = useState<Board[]>([])
@@ -50,7 +52,8 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
     try {
       const data = await authApi.mfaSetup()
       setMfaSetup({ secret: data.secret, uri: data.uri })
-      setNotice('请用认证器录入密钥，然后输入 6 位验证码完成绑定。')
+      setMfaQr(await QRCode.toDataURL(data.uri, { margin: 1, width: 220 }))
+      setNotice('请用认证器扫描二维码，然后输入 6 位验证码完成绑定。')
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -61,6 +64,7 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
       await authApi.mfaEnable(mfaCode.trim())
       setMfaEnabled(true)
       setMfaSetup(null)
+      setMfaQr('')
       setMfaCode('')
       setNotice('动态验证码已启用')
     } catch (err) {
@@ -210,6 +214,13 @@ export function SettingsPanel({ user }: { user: ApiUser }) {
           </p>
           {mfaSetup && !mfaEnabled && (
             <div className="space-y-2 border border-rhine-line/60 bg-rhine-abyss/50 p-3">
+              {mfaQr && (
+                <img
+                  src={mfaQr}
+                  alt="MFA 二维码"
+                  className="mx-auto h-[220px] w-[220px] bg-white p-2"
+                />
+              )}
               <p className="font-mono text-[9px] tracking-wider text-rhine-gold">
                 手动密钥（保存到认证器）
               </p>

@@ -95,6 +95,7 @@ const TABLES = [
     token CHAR(64) NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL,
     expires_at DATETIME NOT NULL,
+    last_seen_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (token),
     KEY idx_sessions_user (user_id),
@@ -570,6 +571,15 @@ async function ensureSchemaUpgrades() {
     "tags_visibility ENUM('public','friends','private') NOT NULL DEFAULT 'public'",
   )
   await ensureColumn('email_codes', 'attempts', 'attempts TINYINT UNSIGNED NOT NULL DEFAULT 0')
+  await ensureColumn('sessions', 'last_seen_at', 'last_seen_at DATETIME NULL')
+  await pool
+    .query(
+      `UPDATE sessions
+       SET last_seen_at = COALESCE(last_seen_at, created_at),
+           expires_at = GREATEST(expires_at, DATE_ADD(NOW(), INTERVAL 30 DAY))
+       WHERE expires_at > NOW()`,
+    )
+    .catch(() => undefined)
   await ensureColumn('forum_title_rules', 'board_id', 'board_id BIGINT UNSIGNED NULL')
   await pool.query('ALTER TABLE forum_title_rules DROP INDEX uk_forum_title_level').catch(() => undefined)
   await pool

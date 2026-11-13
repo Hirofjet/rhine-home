@@ -30,6 +30,7 @@ import {
   type ProfileVisibility,
 } from '../lib/api'
 import { useSession } from '../components/auth/useSession'
+import { MfaCard } from '../components/auth/MfaCard'
 import { BirthdayPicker } from '../components/profile/BirthdayPicker'
 import { ForumAuthModal } from '../components/forum/ForumAuthModal'
 import { formatDateTime, STATUS_LABELS, STATUS_STYLES } from '../lib/format'
@@ -1046,6 +1047,8 @@ export function ProfilePage() {
               </button>
             </div>
           </div>
+
+          <MfaCard />
 
           <div className="space-y-3 border border-rhine-line/70 bg-rhine-panel/30 p-4">
             <p className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-rhine-faint">
