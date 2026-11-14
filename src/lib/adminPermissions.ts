@@ -23,14 +23,16 @@ export type AdminPanelKey =
   | 'settings'
 
 const FORUM_MANAGER = 'forum'
-const FORUM_BOARD = /^forum\.\d+$/
 
 const hasAny = (user: ApiUser, keys: string[]) =>
   user.isSuper || keys.some((key) => user.permissions.includes(key))
 
 const hasForum = (user: ApiUser) =>
   hasAny(user, [FORUM_MANAGER, 'forum.maintenance', 'forum.create']) ||
-  user.permissions.some((permission) => FORUM_BOARD.test(permission))
+  user.permissions.some((permission) =>
+    /^forum\.\d+$/.test(permission) ||
+    /^forum\.category\.(public|core|special)\.master$/.test(permission),
+  )
 
 /** 后台面板统一权限入口。settings 是唯一无额外权限要求的 staff 面板。 */
 export function canAccessPanel(user: ApiUser | null, panel: AdminPanelKey): boolean {
@@ -60,13 +62,13 @@ export function canAccessPanel(user: ApiUser | null, panel: AdminPanelKey): bool
     case 'forum-maintenance':
       return hasForum(user)
     case 'forum-members':
-      return hasAny(user, ['forum', 'forum.members'])
+      return hasForum(user)
     case 'forum-announcements':
-      return hasAny(user, ['forum', 'forum.announcements'])
+      return hasForum(user)
     case 'review-access':
-      return hasAny(user, ['forum', 'forum.access'])
+      return hasForum(user)
     case 'review-posts':
-      return hasAny(user, ['forum', 'forum.review'])
+      return hasForum(user)
     case 'review-logs':
       return hasAny(user, ['review.logs', 'security.logs', 'access_logs'])
     case 'reports':

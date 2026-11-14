@@ -1,7 +1,7 @@
 # RHINE//HOME
 
 > 莱茵生命风格的个人主页、档案库、论坛、留言板与管理系统。  
-> 当前版本：**v2.9.4**
+> 当前版本：**v2.10.0**
 
 RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它把「个人档案」「内容发布」「论坛社交」「3D 档案库」和「后台治理」放在同一套视觉与权限体系中，既保留二次元终端风格的界面，也提供可长期维护的数据与权限结构。
 
@@ -84,18 +84,18 @@ RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它�
 | 普通用户 | 注册、发帖、回复、关注、私信 |
 | 访客 | 浏览公开内容，不可发帖/关注 |
 
-权限树覆盖（可搜索、按类别筛选、批量选择）：
+权限树覆盖（四个总管理权限可勾选，其余自动联动）：
 
 ```text
-admin.overview / home.edit
+forum                                     // 论坛总管理
+forum.category.public.master              // 普通论坛总管理
+forum.category.core.master                // 核心论坛总管理
+forum.category.special.master             // 特殊论坛总管理
+forum.<boardId>                           // 子管理员（论坛成员管理授予）
+admin.overview / home.edit / projects / logs / guestbook
 archive.articles / archive.photos / archive.videos
-projects / logs / guestbook
-forum / forum.maintenance / forum.members / forum.announcements
-forum.create / forum.review / forum.access / forum.post.autoapprove
-forum.<boardId> / forum.<boardId>.post.* / forum.<boardId>.reply.*
 reports.manage / moderation.manage / review.logs
-security.logs / access_logs / security.readonly / themes.manage
-members.manage / members.grant（仅超管）
+security.logs / access_logs / themes.manage / security.readonly
 ```
 
 详见 [后台权限与论坛管理](docs/ADMIN_PERMISSIONS.md)。
@@ -370,6 +370,7 @@ npm start
 | v2.9.2 | 论坛类别三合一、后台字号、日志拆分与帖子免审授权 |
 | v2.9.3 | 类别总管理授权、子管理免审范围与权限越权修复 |
 | v2.9.4 | 存量论坛总管理权限回填 |
+| v2.10.0 | 四总管理权限树、身份头衔同步与论坛成员用户视图 |
 
 `logs/` 已覆盖 v0.1.0–v2.4.2，自 v2.4.0 起随仓库维护；每篇均包含作者署名。
 

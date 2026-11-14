@@ -275,7 +275,78 @@ async function ensureCategoryBoardPermissions(user) {
   return user
 }
 
-/** 非超管不能操作「同样拥有管理权限」的账号 */
+/** 根据权限重新计算身份与全局头衔；所有权限增删后调用。 */
+async function syncUserIdentity(userId) {
+  if (!userId) return null
+  const rows = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [userId])
+  if (!rows.length) return null
+  const user = normalizeUser(rows[0])
+  if (user.isSuper) {
+    await execute(
+      "UPDATE users SET role_code = 'super', forum_title = '超级管理员', forum_title_locked = 1 WHERE id = ?",
+      [userId],
+    )
+    return 'super'
+  }
+  const permissions = user.permissions
+  const categoryMasters = ['public', 'core', 'special'].filter((access) =>
+    permissions.includes(`forum.category.${access}.master`),
+  )
+  const hasForumMaster = permissions.includes('forum')
+  const seniorPermissions = [
+    'projects',
+    'logs',
+    'reports.manage',
+    'moderation.manage',
+    'access_logs',
+    'security.logs',
+    'themes.manage',
+    'review.logs',
+  ]
+  let role = 'member'
+  if (hasForumMaster) {
+    role = seniorPermissions.some((key) => permissions.includes(key))
+      ? 'senior'
+      : 'forum_master'
+  } else if (categoryMasters.length >= 2) {
+    role = 'forum_master'
+  } else if (categoryMasters.length === 1) {
+    role =
+      CATEGORY_MASTER_ROLE[categoryMasters[0]] === 'normal_master'
+        ? 'normal_master'
+        : CATEGORY_MASTER_ROLE[categoryMasters[0]] === 'core_master'
+          ? 'core_master'
+          : 'special_master'
+  } else {
+    const boardIds = permissions
+      .map((permission) => /^forum\.(\d+)$/.exec(permission))
+      .filter(Boolean)
+      .map((match) => Number(match[1]))
+    if (boardIds.length) {
+      const boards = await query(
+        'SELECT id, access FROM forum_boards WHERE id IN (?)',
+        [boardIds],
+      )
+      const access = boards[0]?.access
+      role =
+        access === 'core'
+          ? 'core_admin'
+          : access === 'special'
+            ? 'special_admin'
+            : 'normal_admin'
+    } else if (permissions.includes('security.readonly')) {
+      role = 'regulator'
+    }
+  }
+  const title = role === 'member' ? '' : (ROLE_LABELS[role] ?? '')
+  await execute(
+    'UPDATE users SET role_code = ?, forum_title = ?, forum_title_locked = 1 WHERE id = ?',
+    [role, title, userId],
+  )
+  return role
+}
+
+
 function canManageTarget(actor, target) {
   if (target.isSuper) return actor.isSuper
   if (actor.isSuper) return true
@@ -551,8 +622,11 @@ app.post('/api/auth/login', async (req, res) => {
     })
     return res.status(401).json({ error: 'invalid_credentials' })
   }
-  const user = normalizeUser(rows[0])
+  let user = normalizeUser(rows[0])
   await ensureCategoryBoardPermissions(user)
+  await syncUserIdentity(user.id)
+  const refreshedRows = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [user.id])
+  user = normalizeUser(refreshedRows[0])
   if (banActive(user)) {
     const until = user.bannedUntil
       ? new Date(String(user.bannedUntil).replace(' ', 'T'))
@@ -804,6 +878,7 @@ app.post('/api/admin/users', requireAuth, requireMembersManage, async (req, res)
      VALUES (?, ?, 1, ?, 0, ?)`,
     [username, email, hashPassword(password), JSON.stringify(permissions)],
   )
+  await syncUserIdentity(Number(result.insertId))
   const rows = await query('SELECT * FROM users WHERE id = ?', [result.insertId])
   res.status(201).json({ user: publicUser(normalizeUser(rows[0])) })
 })
@@ -869,12 +944,11 @@ app.put(
       return res.status(403).json({ error: 'forbidden' })
     }
     const permissions = sanitizePermissions(req.body?.permissions, req.user)
-    const nextRole = await effectiveRoleAfterPermissions(target, permissions)
-    await execute('UPDATE users SET permissions = ?, role_code = ? WHERE id = ?', [
+    await execute('UPDATE users SET permissions = ? WHERE id = ?', [
       JSON.stringify(permissions),
-      nextRole,
       id,
     ])
+    await syncUserIdentity(id)
     await notify(
       id,
       'permission',
@@ -968,6 +1042,7 @@ app.post(
       JSON.stringify(sanitizePermissions(permissions, req.user)),
       userId,
     ])
+    await syncUserIdentity(userId)
     await notify(userId, 'permission', '后台身份模板已应用', templates[0].name, '/admin')
     res.json({ ok: true })
   },
@@ -1011,6 +1086,11 @@ app.put('/api/admin/users/:id/identity', requireAuth, async (req, res) => {
     JSON.stringify([...new Set(permissions)]),
     id,
   ])
+  const refreshedUser = normalizeUser(
+    (await query('SELECT * FROM users WHERE id = ?', [id]))[0],
+  )
+  await ensureCategoryBoardPermissions(refreshedUser)
+  await syncUserIdentity(id)
   await notify(
     id,
     'permission',
@@ -1743,10 +1823,10 @@ app.get('/api/forum/boards/:slug', async (req, res) => {
   const posts = await query(
     `SELECT p.id, p.title, p.created_at, p.updated_at, p.tags, p.pinned,
             COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.id AS author_id, u.avatar_url AS author_avatar,
-            COALESCE((SELECT fmt.title FROM forum_member_titles fmt
-              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_title) AS author_title,
-            COALESCE((SELECT fmt.level FROM forum_member_titles fmt
-              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_level) AS author_level,
+            COALESCE(NULLIF(u.forum_title, ''), (SELECT fmt.title FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id)) AS author_title,
+            COALESCE(NULLIF(u.forum_level, 0), (SELECT fmt.level FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id)) AS author_level,
             (SELECT COUNT(*) FROM forum_replies r WHERE r.post_id = p.id AND r.status = 'approved') AS reply_count
      FROM forum_posts p JOIN users u ON u.id = p.author_id
      WHERE p.board_id = ? AND p.status = 'approved'
@@ -1777,10 +1857,10 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   const id = Number(req.params.id)
   const rows = await query(
     `SELECT p.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar,
-            COALESCE((SELECT fmt.title FROM forum_member_titles fmt
-              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_title) AS author_title,
-            COALESCE((SELECT fmt.level FROM forum_member_titles fmt
-              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_level) AS author_level,
+            COALESCE(NULLIF(u.forum_title, ''), (SELECT fmt.title FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id)) AS author_title,
+            COALESCE(NULLIF(u.forum_level, 0), (SELECT fmt.level FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id)) AS author_level,
             b.slug AS board_slug, b.name AS board_name
      FROM forum_posts p
      JOIN users u ON u.id = p.author_id
@@ -1792,10 +1872,10 @@ app.get('/api/forum/posts/:id', async (req, res) => {
   const post = rows[0]
   const replies = await query(
     `SELECT r.*, COALESCE(NULLIF(u.nickname,''), u.username) AS author, u.avatar_url AS author_avatar,
-            COALESCE((SELECT fmt.title FROM forum_member_titles fmt
-              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_title) AS author_title,
-            COALESCE((SELECT fmt.level FROM forum_member_titles fmt
-              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id), u.forum_level) AS author_level
+            COALESCE(NULLIF(u.forum_title, ''), (SELECT fmt.title FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id)) AS author_title,
+            COALESCE(NULLIF(u.forum_level, 0), (SELECT fmt.level FROM forum_member_titles fmt
+              WHERE fmt.user_id = u.id AND fmt.board_id = p.board_id)) AS author_level
      FROM forum_replies r
      JOIN users u ON u.id = r.author_id
      JOIN forum_posts p ON p.id = r.post_id
@@ -3443,6 +3523,7 @@ app.put(
       }
     }
     await execute('UPDATE users SET permissions = ? WHERE id = ?', [JSON.stringify(next), userId])
+    await syncUserIdentity(userId)
     res.json({ ok: true, enabled })
   },
 )
@@ -3476,6 +3557,7 @@ app.put(
     const next = permissions.filter((item) => item !== key)
     if (enabled) next.push(key)
     await execute('UPDATE users SET permissions = ? WHERE id = ?', [JSON.stringify(next), userId])
+    await syncUserIdentity(userId)
     await auditRequest(req, {
       action: 'forum.post_autoapprove.grant',
       targetType: 'user',
@@ -3579,6 +3661,7 @@ app.post('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (
       userId,
     ])
   }
+  await syncUserIdentity(userId)
   await notify(
     userId,
     'permission',
@@ -3654,6 +3737,7 @@ app.delete('/api/admin/forum/moderators/:id', requireAuth, requireForumAccess, a
       })
     }
   }
+  await syncUserIdentity(Number(rows[0].user_id))
   res.json({ ok: true })
 })
 

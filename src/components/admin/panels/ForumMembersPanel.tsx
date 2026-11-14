@@ -156,6 +156,20 @@ export function ForumMembersPanel() {
     )
   })
 
+  const userGroups = useMemo(() => {
+    const map = new Map<
+      number,
+      { userId: number; username: string; items: Moderator[] }
+    >()
+    for (const item of filteredModerators) {
+      if (!map.has(item.userId)) {
+        map.set(item.userId, { userId: item.userId, username: item.username, items: [] })
+      }
+      map.get(item.userId)?.items.push(item)
+    }
+    return [...map.values()]
+  }, [filteredModerators])
+
   const assign = async () => {
     if (!selectedUser) {
       setError('请选择成员')
@@ -214,12 +228,15 @@ export function ForumMembersPanel() {
     }
   }
 
-  const remove = async (item: Moderator) => {
-    if (!window.confirm(`移除 ${item.username} 对「${item.boardName}」的管理权限？`)) return
+  const removeUser = async (username: string, items: Moderator[]) => {
+    if (!window.confirm(`移除 ${username} 的全部 ${items.length} 个论坛成员身份？`)) return
     setBusy(true)
+    setError('')
     try {
-      await adminApi.removeModerator(item.id)
-      setNotice('论坛成员权限已移除')
+      for (const item of items) {
+        await adminApi.removeModerator(item.id)
+      }
+      setNotice(`已移除 ${username} 的全部论坛成员身份`)
       await load()
     } catch (err) {
       setError(errorMessage(err))
@@ -482,26 +499,50 @@ export function ForumMembersPanel() {
           </span>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {filteredModerators.map((item) => (
-            <article key={item.id} className={cardClass}>
-              <div className="flex items-center justify-between gap-2">
-                <AdminBadge tone={item.role === 'master' ? 'gold' : 'cyan'}>
-                  {item.role === 'master' ? '总管理员' : '子管理员'}
+          {userGroups.map((group) => (
+            <article key={group.userId} className={cardClass}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-rhine-ink">{group.username}</p>
+                  <p className="mt-0.5 font-mono text-[9px] text-rhine-faint">
+                    {group.items.length} 个论坛身份
+                  </p>
+                </div>
+                <AdminBadge
+                  tone={group.items.some((item) => item.role === 'master') ? 'gold' : 'cyan'}
+                >
+                  {group.items.some((item) => item.role === 'master')
+                    ? '含总管理员'
+                    : '子管理员'}
                 </AdminBadge>
-                <span className="font-mono text-[8px] text-rhine-faint">
-                  {BOARD_ACCESS_LABELS[item.access as BoardAccess] ?? item.access}
-                </span>
               </div>
-              <p className="mt-2 truncate text-sm text-rhine-ink">{item.username}</p>
-              <p className="mt-0.5 truncate font-mono text-[10px] text-rhine-dim">{item.boardName}</p>
+              <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                {group.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-2 border border-rhine-line/40 px-2 py-1 font-mono text-[9px] text-rhine-dim"
+                  >
+                    <span className="min-w-0 truncate">
+                      {BOARD_ACCESS_LABELS[item.access as BoardAccess] ?? item.access} · {item.boardName}
+                    </span>
+                    <span className="shrink-0 text-rhine-faint">
+                      {item.role === 'master' ? '总管理' : '子管理'}
+                    </span>
+                  </div>
+                ))}
+              </div>
               <div className="mt-2 flex justify-end">
-                <AdminButton variant="danger" onClick={() => void remove(item)} disabled={busy}>
-                  <Trash2 className="h-3 w-3" /> 移除
+                <AdminButton
+                  variant="danger"
+                  onClick={() => void removeUser(group.username, group.items)}
+                  disabled={busy}
+                >
+                  <Trash2 className="h-3 w-3" /> 移除该用户全部身份
                 </AdminButton>
               </div>
             </article>
           ))}
-          {filteredModerators.length === 0 && (
+          {userGroups.length === 0 && (
             <p className="p-4 text-center text-xs text-rhine-faint md:col-span-2 xl:col-span-3">
               暂无论坛成员
             </p>
