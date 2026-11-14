@@ -231,6 +231,14 @@ const requireVerifiedEmail = (req, res, next) => {
 const canModerateBoard = (user, boardId) =>
   hasPermission(user, `forum.${boardId}`)
 
+const canManageAnnouncements = (user, boardId) =>
+  canModerateBoard(user, boardId) ||
+  hasPermission(user, `forum.${boardId}.announcements`)
+
+const canReviewBoard = (user, boardId) =>
+  canModerateBoard(user, boardId) ||
+  hasPermission(user, `forum.${boardId}.review`)
+
 const CATEGORY_MASTER_ROLE = {
   public: 'normal_master',
   core: 'core_master',
@@ -2667,7 +2675,9 @@ app.post('/api/admin/forum/boards', requireAuth, requireForumAccess, async (req,
   const requestedAccess = ['public', 'special', 'core'].includes(req.body?.access)
     ? req.body.access
     : 'public'
-  const canCreate = canManageCategory(req.user, requestedAccess)
+  const canCreate =
+    canManageCategory(req.user, requestedAccess) ||
+    hasPermission(req.user, `forum.category.${requestedAccess}.create`)
   if (!canCreate) return res.status(403).json({ error: 'category_master_required' })
   const name = asString(req.body?.name, 100)
   const slug = asString(req.body?.slug, 64).toLowerCase()
@@ -2948,7 +2958,7 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
     boardId = Number(rows[0].board_id)
-    if (!canModerateBoard(req.user, boardId)) {
+    if (!canReviewBoard(req.user, boardId)) {
       return res.status(403).json({ error: 'forbidden' })
     }
     await execute(
@@ -2975,7 +2985,7 @@ app.post('/api/admin/forum/review', requireAuth, requireForumAccess, async (req,
     )
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
     boardId = Number(rows[0].board_id)
-    if (!canModerateBoard(req.user, boardId)) {
+    if (!canReviewBoard(req.user, boardId)) {
       return res.status(403).json({ error: 'forbidden' })
     }
     await execute(
@@ -3205,7 +3215,7 @@ app.post(
   async (req, res) => {
     const boardId = Number(req.body?.boardId) || null
     const allowed = boardId
-      ? canModerateBoard(req.user, boardId)
+      ? canManageAnnouncements(req.user, boardId)
       : req.user.isSuper || hasPermission(req.user, 'forum')
     if (!allowed) {
       return res.status(403).json({ error: 'forbidden' })
@@ -3237,7 +3247,7 @@ app.delete(
     ])
     if (!rows.length) return res.status(404).json({ error: 'not_found' })
     const allowed = rows[0].board_id
-      ? canModerateBoard(req.user, Number(rows[0].board_id))
+      ? canManageAnnouncements(req.user, Number(rows[0].board_id))
       : req.user.isSuper || hasPermission(req.user, 'forum')
     if (!allowed) {
       return res.status(403).json({ error: 'forbidden' })

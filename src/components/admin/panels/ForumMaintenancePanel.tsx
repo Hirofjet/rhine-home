@@ -97,7 +97,9 @@ export function ForumMaintenancePanel() {
     [manageable, category],
   )
   const selected = selectedId ? manageable.find((board) => board.id === selectedId) ?? null : null
-  const canCreate = canManageCategory(user, category)
+  const canCreate =
+    canManageCategory(user, category) ||
+    user?.permissions.includes(`forum.category.${category}.create`)
 
   const loadBoards = useCallback(async () => {
     try {
@@ -129,6 +131,7 @@ export function ForumMaintenancePanel() {
   const counts = CATEGORIES.filter(
     (item) =>
       canManageCategory(user, item) ||
+      user?.permissions.includes(`forum.category.${item}.create`) ||
       manageable.some((board) => board.access === item),
   ).map((item) => ({
     item,

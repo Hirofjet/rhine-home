@@ -133,7 +133,9 @@ export const isForumPermission = (permission) =>
   permission === 'forum.category.public.master' ||
   permission === 'forum.category.core.master' ||
   permission === 'forum.category.special.master' ||
+  /^forum\.category\.(public|core|special)\.create$/.test(permission) ||
   /^forum\.\d+$/.test(permission) ||
+  /^forum\.\d+\.(announcements|review|post\.autoapprove)$/.test(permission) ||
   /^forum\.\d+\.(post|reply)\.(publish|pin|hide|delete|review)$/.test(permission)
 
 export const hasForumAction = (user, boardId, action) => {
@@ -319,7 +321,7 @@ export function sanitizePermissions(value, actor) {
   const allowed = new Set(PERMISSION_KEYS)
   const list = value
     .filter((item) => typeof item === 'string')
-    .filter((item) => allowed.has(item) || /^forum\.\d+(?:\.(?:post|reply)\.(?:publish|pin|hide|delete|review))?$/.test(item))
+    .filter((item) => allowed.has(item) || isForumPermission(item))
   const unique = [...new Set(list)]
   if (!actor?.isSuper) {
     return unique.filter(

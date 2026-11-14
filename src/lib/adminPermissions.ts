@@ -30,8 +30,8 @@ const hasAny = (user: ApiUser, keys: string[]) =>
 const hasForum = (user: ApiUser) =>
   hasAny(user, [FORUM_MANAGER, 'forum.maintenance', 'forum.create']) ||
   user.permissions.some((permission) =>
-    /^forum\.\d+$/.test(permission) ||
-    /^forum\.category\.(public|core|special)\.master$/.test(permission),
+    /^forum\.\d+(\..+)?$/.test(permission) ||
+    /^forum\.category\.(public|core|special)\.(master|create)$/.test(permission),
   )
 
 /** 后台面板统一权限入口。settings 是唯一无额外权限要求的 staff 面板。 */

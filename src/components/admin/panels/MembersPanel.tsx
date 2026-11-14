@@ -336,7 +336,11 @@ export function MembersPanel({ user }: MembersPanelProps) {
   const summarize = (target: ApiUser) => {
     if (target.isSuper) return '全部权限'
     const labels: string[] = []
-    if (target.permissions.includes('archive')) labels.push('档案（全部）')
+    if (target.permissions.includes('forum')) labels.push('论坛全部')
+    if (target.permissions.includes('forum.category.public.master')) labels.push('普通论坛总管理')
+    if (target.permissions.includes('forum.category.core.master')) labels.push('核心论坛总管理')
+    if (target.permissions.includes('forum.category.special.master')) labels.push('特殊论坛总管理')
+    if (target.permissions.includes('archive')) labels.push('档案全部')
     else {
       if (target.permissions.includes('archive.articles')) labels.push('文章')
       if (target.permissions.includes('archive.photos')) labels.push('照片')
@@ -344,21 +348,79 @@ export function MembersPanel({ user }: MembersPanelProps) {
     }
     if (target.permissions.includes('logs')) labels.push('日志')
     if (target.permissions.includes('guestbook')) labels.push('留言板')
-    if (target.permissions.includes('forum')) labels.push('论坛（全部板块）')
-    else {
-      target.permissions
+    if (!target.permissions.includes('forum')) {
+      const boardNames = target.permissions
         .filter((permission) => /^forum\.\d+$/.test(permission))
-        .forEach((permission) => {
-          const boardId = Number(permission.split('.')[1])
-          const board = boards.find((item) => item.id === boardId)
-          if (board) labels.push(`论坛·${board.name}`)
-        })
+        .map((permission) => boards.find((item) => item.id === Number(permission.split('.')[1])))
+        .filter((board): board is (typeof boards)[number] => Boolean(board))
+        .map((board) => board.name)
+      if (boardNames.length) labels.push(`版块：${boardNames.join(' / ')}`)
     }
-    if (target.permissions.includes('forum.post.autoapprove')) labels.push('帖子免审')
+    if (target.permissions.includes('forum.post.autoapprove')) labels.push('全论坛免审')
     if (target.permissions.includes('members.manage')) labels.push('管理成员')
     if (target.permissions.includes('members.grant')) labels.push('授权权限')
     return labels.length ? labels.join(' · ') : '无'
   }
+
+  const memberActions = (target: ApiUser, tableGrid = false) => (
+    <div
+      className={
+        tableGrid
+          ? 'grid grid-cols-2 gap-1.5'
+          : 'flex flex-wrap items-center justify-end gap-1.5'
+      }
+    >
+      {canEditPermissions(target) && (
+        <AdminButton
+          variant="ghost"
+          className="px-2.5 py-1 text-[9px] tracking-[0.08em]"
+          onClick={() => openPermissions(target)}
+        >
+          <ShieldCheck className="h-3 w-3" /> 权限
+        </AdminButton>
+      )}
+      {canResetPassword(target) && (
+        <AdminButton
+          variant="ghost"
+          className="px-2.5 py-1 text-[9px] tracking-[0.08em]"
+          onClick={() => openPassword(target)}
+        >
+          <KeyRound className="h-3 w-3" /> 重置密码
+        </AdminButton>
+      )}
+      {canResetPassword(target) &&
+        (target.banned ? (
+          <AdminButton
+            variant="ghost"
+            className="px-2.5 py-1 text-[9px] tracking-[0.08em]"
+            onClick={() => void unban(target)}
+          >
+            解封
+          </AdminButton>
+        ) : (
+          <AdminButton
+            variant="danger"
+            className="px-2.5 py-1 text-[9px] tracking-[0.08em]"
+            onClick={() => {
+              setBanTarget(target)
+              setBanPermanent(false)
+              setBanReason('')
+            }}
+          >
+            <Ban className="h-3 w-3" /> 封禁
+          </AdminButton>
+        ))}
+      {canDelete(target) && (
+        <AdminButton
+          variant="danger"
+          className="px-2.5 py-1 text-[9px] tracking-[0.08em]"
+          onClick={() => setModal({ type: 'delete', target })}
+        >
+          <Trash2 className="h-3 w-3" /> 删除
+        </AdminButton>
+      )}
+    </div>
+  )
 
   return (
     <div className="space-y-4">
@@ -403,15 +465,51 @@ export function MembersPanel({ user }: MembersPanelProps) {
                 <option value="banned">已封禁</option>
               </select>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-left">
+            <div className="space-y-2 md:hidden">
+              {filteredUsers.map((target) => {
+                const self = target.id === user.id
+                return (
+                  <article
+                    key={target.id}
+                    className="border border-rhine-line/50 bg-rhine-panel/30 p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-rhine-ink">{target.username}</span>
+                      {self && <AdminBadge tone="gold">当前账号</AdminBadge>}
+                      {target.banned && <AdminBadge tone="red">封禁</AdminBadge>}
+                      {target.status === 'disabled' && <AdminBadge tone="red">已禁用</AdminBadge>}
+                      <span className="ml-auto">
+                        <AdminBadge
+                          tone={
+                            target.isSuper ? 'gold' : target.role === 'admin' ? 'cyan' : 'line'
+                          }
+                        >
+                          {ROLE_LABELS[target.role]}
+                        </AdminBadge>
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate font-mono text-[9px] text-rhine-faint">
+                      {target.email}
+                    </p>
+                    <p className="mt-2 text-[10px] leading-relaxed text-rhine-dim">
+                      {summarize(target)}
+                    </p>
+                    <div className="mt-2 border-t border-rhine-line/30 pt-2">
+                      {memberActions(target)}
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
                 <thead>
                   <tr className="border-b border-rhine-line/60 font-mono text-[9px] tracking-[0.22em] text-rhine-faint">
-                    <th className="py-2 pr-3 font-normal">成员</th>
-                    <th className="py-2 pr-3 font-normal">邮箱</th>
-                    <th className="py-2 pr-3 font-normal">角色</th>
+                    <th className="w-[150px] py-2 pr-3 font-normal">成员</th>
+                    <th className="hidden w-[190px] py-2 pr-3 font-normal 2xl:table-cell">邮箱</th>
+                    <th className="w-[112px] py-2 pr-3 font-normal">角色</th>
                     <th className="py-2 pr-3 font-normal">权限</th>
-                    <th className="py-2 text-right font-normal">操作</th>
+                    <th className="w-[320px] py-2 text-right font-normal">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -437,11 +535,14 @@ export function MembersPanel({ user }: MembersPanelProps) {
                               <AdminBadge tone="red">已禁用</AdminBadge>
                             )}
                           </div>
+                          <p className="mt-1 truncate font-mono text-[9px] text-rhine-faint 2xl:hidden">
+                            {target.email}
+                          </p>
                         </td>
-                        <td className="py-3 pr-3">
-                          <span className="text-rhine-dim">{target.email}</span>
+                        <td className="hidden py-3 pr-3 2xl:table-cell">
+                          <span className="block truncate text-rhine-dim">{target.email}</span>
                         </td>
-                        <td className="py-3 pr-3">
+                        <td className="whitespace-nowrap py-3 pr-3">
                           <AdminBadge
                             tone={
                               target.isSuper
@@ -454,56 +555,11 @@ export function MembersPanel({ user }: MembersPanelProps) {
                             {ROLE_LABELS[target.role]}
                           </AdminBadge>
                         </td>
-                        <td className="max-w-[260px] py-3 pr-3 text-[10px] leading-relaxed tracking-wider">
+                        <td className="max-w-[260px] py-3 pr-3 text-[10px] leading-relaxed tracking-wider break-words">
                           {summarize(target)}
                         </td>
                         <td className="py-3 text-right">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {canEditPermissions(target) && (
-                              <AdminButton
-                                variant="ghost"
-                                onClick={() => openPermissions(target)}
-                              >
-                                <ShieldCheck className="h-3 w-3" /> 权限
-                              </AdminButton>
-                            )}
-                            {canResetPassword(target) && (
-                              <AdminButton
-                                variant="ghost"
-                                onClick={() => openPassword(target)}
-                              >
-                                <KeyRound className="h-3 w-3" /> 重置密码
-                              </AdminButton>
-                            )}
-                            {canResetPassword(target) &&
-                              (target.banned ? (
-                                <AdminButton
-                                  variant="ghost"
-                                  onClick={() => void unban(target)}
-                                >
-                                  解封
-                                </AdminButton>
-                              ) : (
-                                <AdminButton
-                                  variant="danger"
-                                  onClick={() => {
-                                    setBanTarget(target)
-                                    setBanPermanent(false)
-                                    setBanReason('')
-                                  }}
-                                >
-                                  <Ban className="h-3 w-3" /> 封禁
-                                </AdminButton>
-                              ))}
-                            {canDelete(target) && (
-                              <AdminButton
-                                variant="danger"
-                                onClick={() => setModal({ type: 'delete', target })}
-                              >
-                                <Trash2 className="h-3 w-3" /> 删除
-                              </AdminButton>
-                            )}
-                          </div>
+                          {memberActions(target, true)}
                         </td>
                       </tr>
                     )

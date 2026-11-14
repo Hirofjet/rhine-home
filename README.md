@@ -1,7 +1,7 @@
 # RHINE//HOME
 
 > 莱茵生命风格的个人主页、档案库、论坛、留言板与管理系统。  
-> 当前版本：**v2.10.0**
+> 当前版本：**v2.10.1**
 
 RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它把「个人档案」「内容发布」「论坛社交」「3D 档案库」和「后台治理」放在同一套视觉与权限体系中，既保留二次元终端风格的界面，也提供可长期维护的数据与权限结构。
 
@@ -84,14 +84,18 @@ RHINE//HOME 是一个面向个人创作者与小型社区的全栈站点。它�
 | 普通用户 | 注册、发帖、回复、关注、私信 |
 | 访客 | 浏览公开内容，不可发帖/关注 |
 
-权限树覆盖（四个总管理权限可勾选，其余自动联动）：
+权限树覆盖（四个总管理权限批量联动，单项仍可单独勾选）：
 
 ```text
 forum                                     // 论坛总管理
 forum.category.public.master              // 普通论坛总管理
 forum.category.core.master                // 核心论坛总管理
 forum.category.special.master             // 特殊论坛总管理
+forum.category.<access>.create           // 类别创建论坛（单项）
 forum.<boardId>                           // 子管理员（论坛成员管理授予）
+forum.<boardId>.announcements             // 子论坛公告
+forum.<boardId>.review                    // 子论坛待审
+forum.<boardId>.post.autoapprove          // 子论坛免审
 admin.overview / home.edit / projects / logs / guestbook
 archive.articles / archive.photos / archive.videos
 reports.manage / moderation.manage / review.logs
@@ -371,6 +375,7 @@ npm start
 | v2.9.3 | 类别总管理授权、子管理免审范围与权限越权修复 |
 | v2.9.4 | 存量论坛总管理权限回填 |
 | v2.10.0 | 四总管理权限树、身份头衔同步与论坛成员用户视图 |
+| v2.10.1 | 权限卡片重做、单项权限恢复、表格换行与移动端修复 |
 
 `logs/` 已覆盖 v0.1.0–v2.4.2，自 v2.4.0 起随仓库维护；每篇均包含作者署名。
 

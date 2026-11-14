@@ -34,7 +34,7 @@ export function AdminButton({
       type="button"
       {...props}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-40',
         BUTTON_STYLES[variant],
         className,
       )}
@@ -183,7 +183,7 @@ export function AdminBadge({
   return (
     <span
       className={cx(
-        'border px-1.5 py-0.5 font-mono text-[9px] tracking-[0.16em]',
+        'whitespace-nowrap border px-1.5 py-0.5 font-mono text-[9px] tracking-[0.16em]',
         tones[tone],
       )}
     >
