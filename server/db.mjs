@@ -734,7 +734,10 @@ async function backfillCategoryMasterPermissions() {
     const [rows] = await pool.query('SELECT permissions FROM users WHERE id = ?', [userId])
     let permissions = []
     try {
-      permissions = JSON.parse(rows[0]?.permissions ?? '[]')
+      const stored = rows[0]?.permissions
+      permissions = Array.isArray(stored)
+        ? stored
+        : JSON.parse(stored ?? '[]')
     } catch {
       permissions = []
     }

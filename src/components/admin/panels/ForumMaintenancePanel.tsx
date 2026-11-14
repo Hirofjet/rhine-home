@@ -128,12 +128,7 @@ export function ForumMaintenancePanel() {
     await loadBoards()
   }
 
-  const counts = CATEGORIES.filter(
-    (item) =>
-      canManageCategory(user, item) ||
-      user?.permissions.includes(`forum.category.${item}.create`) ||
-      manageable.some((board) => board.access === item),
-  ).map((item) => ({
+  const counts = CATEGORIES.map((item) => ({
     item,
     label: BOARD_ACCESS_LABELS[item],
     count: manageable.filter((board) => board.access === item).length,

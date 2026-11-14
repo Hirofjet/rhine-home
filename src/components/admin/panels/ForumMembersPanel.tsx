@@ -187,6 +187,12 @@ export function ForumMembersPanel() {
         adminType === 'master'
           ? categoryBoards
           : categoryBoards.filter((board) => String(board.id) === boardId)
+      const selectedCategories: BoardAccess[] =
+        adminType === 'master'
+          ? category === 'all'
+            ? ['public', 'core', 'special']
+            : [category]
+          : []
       if (!targets.length) {
         setError('当前类别下没有可分配的论坛')
         return
@@ -198,7 +204,6 @@ export function ForumMembersPanel() {
       }
       let ok = 0
       let failed = 0
-      const successCategories = new Set<BoardAccess>()
       for (const board of targets) {
         try {
           await adminApi.assignModerator({
@@ -207,13 +212,12 @@ export function ForumMembersPanel() {
             role: adminType,
           })
           ok += 1
-          successCategories.add(board.access)
         } catch {
           failed += 1
         }
       }
       if (adminType === 'master') {
-        for (const access of successCategories) {
+        for (const access of selectedCategories) {
           await adminApi.setCategoryMaster(selectedUser.id, access, true).catch(() => undefined)
         }
       }

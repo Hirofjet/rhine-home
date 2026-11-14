@@ -228,6 +228,19 @@ const requireVerifiedEmail = (req, res, next) => {
 }
 
 /** 是否有权管理某个论坛板块（forum 拥有全部板块） */
+function parsePermissionList(value) {
+  if (Array.isArray(value)) return value.filter((item) => typeof item === 'string')
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
 const canModerateBoard = (user, boardId) =>
   hasPermission(user, `forum.${boardId}`)
 
@@ -850,7 +863,7 @@ app.post('/api/admin/me/mfa/disable', requireAuth, async (req, res) => {
 // ============================================================
 app.get('/api/admin/users', requireAuth, requireUserAdmin, async (req, res) => {
   const q = asString(req.query.q, 64)
-  const rows = q
+  const sourceRows = q
     ? await query(
         `SELECT * FROM users
          WHERE username LIKE ? OR email LIKE ?
@@ -858,6 +871,32 @@ app.get('/api/admin/users', requireAuth, requireUserAdmin, async (req, res) => {
         [`%${q}%`, `%${q}%`],
       )
     : await query('SELECT * FROM users ORDER BY id ASC LIMIT 500')
+  const forumRoles = new Set([
+    'forum_master',
+    'normal_master',
+    'core_master',
+    'special_master',
+    'normal_admin',
+    'core_admin',
+    'special_admin',
+  ])
+  let reconciled = false
+  for (const row of sourceRows) {
+    if (forumRoles.has(row.role_code)) {
+      await syncUserIdentity(Number(row.id))
+      reconciled = true
+    }
+  }
+  const rows = reconciled
+    ? q
+      ? await query(
+          `SELECT * FROM users
+           WHERE username LIKE ? OR email LIKE ?
+           ORDER BY id ASC LIMIT 500`,
+          [`%${q}%`, `%${q}%`],
+        )
+      : await query('SELECT * FROM users ORDER BY id ASC LIMIT 500')
+    : sourceRows
   res.json({ users: rows.map(normalizeUser).map(publicUser) })
 })
 
@@ -3517,7 +3556,7 @@ app.put(
     if (!rows.length) return res.status(404).json({ error: 'user_not_found' })
     let permissions = []
     try {
-      permissions = JSON.parse(rows[0].permissions ?? '[]')
+      permissions = parsePermissionList(rows[0].permissions)
     } catch {
       permissions = []
     }
@@ -3558,15 +3597,39 @@ app.put(
     if (!rows.length) return res.status(404).json({ error: 'user_not_found' })
     let permissions = []
     try {
-      permissions = JSON.parse(rows[0].permissions ?? '[]')
+      permissions = parsePermissionList(rows[0].permissions)
     } catch {
       permissions = []
     }
     if (!Array.isArray(permissions)) permissions = []
     const key = `forum.${boardId}.post.autoapprove`
-    const next = permissions.filter((item) => item !== key)
-    if (enabled) next.push(key)
-    await execute('UPDATE users SET permissions = ? WHERE id = ?', [JSON.stringify(next), userId])
+    if (enabled) {
+      await execute(
+        `UPDATE users
+         SET permissions = JSON_ARRAY_APPEND(COALESCE(permissions, JSON_ARRAY()), '$', ?)
+         WHERE id = ? AND JSON_SEARCH(permissions, 'one', ?) IS NULL`,
+        [key, userId, key],
+      ).catch(async () => {
+        const next = permissions.filter((item) => item !== key)
+        next.push(key)
+        await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+          JSON.stringify(next),
+          userId,
+        ])
+      })
+    } else {
+      await execute(
+        `UPDATE users
+         SET permissions = JSON_REMOVE(permissions, JSON_UNQUOTE(JSON_SEARCH(permissions, 'one', ?)))
+         WHERE id = ? AND JSON_SEARCH(permissions, 'one', ?) IS NOT NULL`,
+        [key, userId, key],
+      ).catch(async () => {
+        await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+          JSON.stringify(permissions.filter((item) => item !== key)),
+          userId,
+        ])
+      })
+    }
     await syncUserIdentity(userId)
     await auditRequest(req, {
       action: 'forum.post_autoapprove.grant',
@@ -3633,7 +3696,28 @@ app.post('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (
     'SELECT * FROM forum_moderators WHERE board_id = ? AND user_id = ?',
     [boardId, userId],
   )
-  if (existing.length) return res.status(409).json({ error: 'already_moderator' })
+  if (existing.length) {
+    const current = existing[0]
+    if (role === 'master' && current.role === 'admin') {
+      const masters = await query(
+        "SELECT id FROM forum_moderators WHERE board_id = ? AND role = 'master' AND user_id <> ? LIMIT 1",
+        [boardId, userId],
+      )
+      if (masters.length) return res.status(409).json({ error: 'master_limit' })
+      await execute("UPDATE forum_moderators SET role = 'master' WHERE id = ?", [current.id])
+    }
+    const userRows = await query('SELECT permissions FROM users WHERE id = ?', [userId])
+    const permissions = parsePermissionList(userRows[0]?.permissions)
+    if (!permissions.includes(`forum.${boardId}`)) {
+      permissions.push(`forum.${boardId}`)
+      await execute('UPDATE users SET permissions = ? WHERE id = ?', [
+        JSON.stringify(permissions),
+        userId,
+      ])
+    }
+    await syncUserIdentity(userId)
+    return res.status(200).json({ ok: true, already: true })
+  }
   if (role === 'master') {
     const masters = await query(
       "SELECT id FROM forum_moderators WHERE board_id = ? AND role = 'master' LIMIT 1",
@@ -3660,7 +3744,7 @@ app.post('/api/admin/forum/moderators', requireAuth, requireForumAccess, async (
   const userRows = await query('SELECT permissions FROM users WHERE id = ?', [userId])
   let permissions = []
   try {
-    permissions = JSON.parse(userRows[0]?.permissions ?? '[]')
+    permissions = parsePermissionList(userRows[0]?.permissions)
   } catch {
     permissions = []
   }
@@ -3703,7 +3787,7 @@ app.delete('/api/admin/forum/moderators/:id', requireAuth, requireForumAccess, a
     ])
     let permissions = []
     try {
-      permissions = JSON.parse(userRows[0]?.permissions ?? '[]')
+      permissions = parsePermissionList(userRows[0]?.permissions)
     } catch {
       permissions = []
     }
@@ -3732,7 +3816,7 @@ app.delete('/api/admin/forum/moderators/:id', requireAuth, requireForumAccess, a
         ])
         let targetPermissions = []
         try {
-          targetPermissions = JSON.parse(targetRows[0]?.permissions ?? '[]')
+          targetPermissions = parsePermissionList(targetRows[0]?.permissions)
         } catch {
           targetPermissions = []
         }
